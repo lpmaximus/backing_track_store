@@ -1,0 +1,41 @@
+[
+  {
+    "id": "1",
+    "slug": "bohemian-rhapsody-queen",
+    "title": "Bohemian Rhapsody",
+    "artist": "Queen",
+    "genre": "Rock",
+    "key": "Bb",
+    "bpm": 72,
+    "audioFile": "",
+    "duration": 355,
+    "cifra": "Intro:\nBb  Gm  Cm  F\n\n[Verso]\nBb          Gm\nIs this the real life?\nCm                F\nIs this just fantasy?\nBb               Gm\nCaught in a landslide\nCm              F\nNo escape from reality\nAb              Eb\nOpen your eyes\nBm       F\nLook up to the skies and see\nCm          F7\nI'm just a poor boy, I need no sympathy\n\n[Pré-Refrão]\nBb  F/A  Gm  F  Eb\nEasy come, easy go, little high, little low\nEb/Bb  Bb   Adim  Am  Eb  Bb\nAnywhere the wind blows doesn't really matter to me\n\n[Refrão]\nBb\nTo me\nBb Bb/Ab\nMama, just killed a man\nGm       Gm/F#  Gm/F  C/E\nPut a gun against his head\nCm              Bb\nPulled my trigger, now he's dead\nBb  Bb/Ab\nMama, life had just begun\nGm  Gm/F#  Gm/F  C/E\nBut now I've gone and thrown it all away\n\n[Ponte]\nEb   Bb/D    Cm    Fm\nI don't want to die\nEb   Bb/D    Cm    Fm\nI sometimes wish I'd never been born at all",
+    "createdAt": "2026-06-05T00:00:00Z"
+  },
+  {
+    "id": "2",
+    "slug": "hotel-california-eagles",
+    "title": "Hotel California",
+    "artist": "Eagles",
+    "genre": "Rock",
+    "key": "Bm",
+    "bpm": 75,
+    "audioFile": "",
+    "duration": 391,
+    "cifra": "Intro:\nBm  F#  A  E  G  D  Em  F#\n\n[Verso 1]\nBm                       F#\nOn a dark desert highway, cool wind in my hair\nA                            E\nWarm smell of colitas rising up through the air\nG                           D\nUp ahead in the distance, I saw a shimmering light\nEm\nMy head grew heavy and my sight grew dim\nF#\nI had to stop for the night\n\n[Verso 2]\nBm                     F#\nThere she stood in the doorway\nA                         E\nI heard the mission bell\nG                             D\nAnd I was thinking to myself\nEm                       F#\nThis could be heaven or this could be hell\n\n[Refrão]\nG           D\nWelcome to the Hotel California\nF#              Bm\nSuch a lovely place, such a lovely face\nG                 D\nPlenty of room at the Hotel California\nEm                         F#\nAny time of year, you can find it here",
+    "createdAt": "2026-06-05T00:00:00Z"
+  },
+  {
+    "id": "3",
+    "slug": "garota-de-ipanema-joao-gilberto",
+    "title": "Garota de Ipanema",
+    "artist": "João Gilberto",
+    "genre": "Bossa Nova",
+    "key": "F",
+    "bpm": 130,
+    "audioFile": "",
+    "duration": 248,
+    "cifra": "Intro:\nFmaj7  G7  Gm7  C7\n\n[Verso 1]\nFmaj7             G7\nOlha que coisa mais linda\nGm7              C7\nMais cheia de graça\nFmaj7              G7\nÉ ela menina que vem e que passa\nGm7             Fmaj7\nNum doce balanço a caminho do mar\n\n[Verso 2]\nFmaj7             G7\nMoço a flor da cidade que treme de amor\nGm7                C7\nÉ ela menina com sua blusa branca\nFmaj7              G7\nE que vai passando\nGm7             Fmaj7\nNo seu corpo dourado pelo sol\n\n[Ponte]\nDb                  Gb\nAh, por que estou tão sozinho?\nB             E\nAh, por que tudo é tão triste?\nAm7          D7\nAh, a beleza que existe\nGm7     C7\nA beleza que não é só minha\nGm7          C7\nQue também passa sozinha\n\n[Refrão]\nFmaj7                  G7\nAh, se ela soubesse que quando ela passa\nGm7              C7\nO mundo inteirinho se enche de graça\nFmaj7              G7\nE fica mais lindo por causa do amor",
+    "createdAt": "2026-06-05T00:00:00Z"
+  }
+]
