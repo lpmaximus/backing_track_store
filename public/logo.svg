@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Outer rings -->
+  <circle cx="100" cy="100" r="96" fill="none" stroke="#111" stroke-width="3.5"/>
+  <circle cx="100" cy="100" r="88" fill="none" stroke="#111" stroke-width="1.5"/>
+
+  <!-- Arc text: BACKING (top) -->
+  <defs>
+    <path id="topArc" d="M 22,100 A 78,78 0 0,1 178,100"/>
+    <path id="bottomArc" d="M 30,118 A 78,78 0 0,0 170,118"/>
+  </defs>
+  <text font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="19" fill="#111" letter-spacing="6">
+    <textPath href="#topArc" startOffset="50%" text-anchor="middle">BACKING</textPath>
+  </text>
+
+  <!-- Arc text: TRACK STORE (bottom) -->
+  <text font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="17" fill="#111" letter-spacing="4">
+    <textPath href="#bottomArc" startOffset="50%" text-anchor="middle">TRACK STORE</textPath>
+  </text>
+
+  <!-- Stars -->
+  <text x="28" y="108" font-size="14" fill="#111" text-anchor="middle">★</text>
+  <text x="172" y="108" font-size="14" fill="#111" text-anchor="middle">★</text>
+
+  <!-- BTS text -->
+  <text x="100" y="116" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="44" fill="#111" text-anchor="middle" letter-spacing="-1">BTS</text>
+</svg>

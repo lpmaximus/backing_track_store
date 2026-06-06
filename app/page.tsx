@@ -1,30 +1,20 @@
 import Link from "next/link";
-import songs from "@/data/songs.json";
+import Image from "next/image";
+import { db, songs as songsTable } from "@/src/db";
+import { eq, ilike, or, and } from "drizzle-orm";
+import SiteHeader from "./components/SiteHeader";
+import SiteFooter from "./components/SiteFooter";
 
-const GENRES = ["Todos", ...Array.from(new Set(songs.map((s) => s.genre)))];
+const GENRES = [
+  "Todos","Rock","Pop","MPB","Bossa Nova","Samba",
+  "Jazz","Funk","Forró","Gospel","Reggae","Blues",
+];
 
-const genreColors: Record<string, string> = {
-  Rock: "#ef4444",
-  "Bossa Nova": "#10b981",
-  Samba: "#f59e0b",
-  Pop: "#8b5cf6",
-  MPB: "#3b82f6",
-  Jazz: "#f97316",
-  Forró: "#ec4899",
-  Funk: "#14b8a6",
+const GENRE_EMOJI: Record<string, string> = {
+  Rock: "🎸", Pop: "🎤", MPB: "🇧🇷", "Bossa Nova": "🎷",
+  Samba: "🥁", Jazz: "🎺", Funk: "🕺", Forró: "🪗",
+  Gospel: "✝️", Reggae: "🌿", Blues: "😢",
 };
-
-function GenreBadge({ genre }: { genre: string }) {
-  const color = genreColors[genre] ?? "#888";
-  return (
-    <span
-      style={{ background: color + "22", color, border: `1px solid ${color}44` }}
-      className="text-xs font-semibold px-2 py-0.5 rounded-full"
-    >
-      {genre}
-    </span>
-  );
-}
 
 export default async function HomePage({
   searchParams,
@@ -32,213 +22,215 @@ export default async function HomePage({
   searchParams?: Promise<{ q?: string; genre?: string }>;
 }) {
   const params = await searchParams;
-  const q = params?.q?.toLowerCase() ?? "";
+  const q     = params?.q     ?? "";
   const genre = params?.genre ?? "Todos";
 
-  const filtered = songs.filter((s) => {
-    const matchGenre = genre === "Todos" || s.genre === genre;
-    const matchQ =
-      !q ||
-      s.title.toLowerCase().includes(q) ||
-      s.artist.toLowerCase().includes(q);
-    return matchGenre && matchQ;
-  });
+  const conditions = [eq(songsTable.published, true)];
+  if (genre && genre !== "Todos") conditions.push(eq(songsTable.genre, genre));
+  if (q) {
+    const cond = or(ilike(songsTable.title, `%${q}%`), ilike(songsTable.artist, `%${q}%`));
+    if (cond) conditions.push(cond);
+  }
+
+  const songs = await db
+    .select()
+    .from(songsTable)
+    .where(and(...conditions))
+    .orderBy(songsTable.title);
+
+  const isSearch = !!(q || (genre && genre !== "Todos"));
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
-      {/* Header */}
-      <header
-        style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}
-        className="sticky top-0 z-50"
-      >
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 no-underline">
-            <span style={{ color: "var(--accent)" }} className="text-2xl font-black tracking-tight">
-              🎸 BackingTrack
-            </span>
-            <span style={{ color: "var(--muted)" }} className="text-sm font-medium hidden sm:block">
-              .store
-            </span>
-          </Link>
-          <Link
-            href="/admin"
-            style={{ color: "var(--muted)", fontSize: 13 }}
-            className="hover:opacity-70 transition-opacity"
-          >
-            Admin
-          </Link>
-        </div>
-      </header>
+    <>
+      <SiteHeader />
 
-      {/* Hero */}
-      <div
-        style={{
-          background: "linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%)",
-          borderBottom: "1px solid var(--border)",
-        }}
-        className="py-12 px-4"
-      >
-        <div className="max-w-5xl mx-auto text-center">
-          <h1 className="text-4xl font-black mb-2" style={{ color: "var(--text)" }}>
-            Bases + Cifras para Músicos
-          </h1>
-          <p style={{ color: "var(--muted)" }} className="text-lg mb-8">
-            Toque, ensaie e se apresente com backing tracks profissionais
-          </p>
+      <main style={{ minHeight: "100vh", background: "var(--bg)" }}>
+
+        {/* HERO */}
+        {!isSearch && (
+          <section style={{
+            maxWidth: 1200, margin: "0 auto", padding: "72px 24px 56px",
+            display: "grid", gridTemplateColumns: "1fr 1fr", alignItems: "center", gap: 48,
+          }}>
+            <div>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                background: "rgba(29,185,84,0.12)", border: "1px solid rgba(29,185,84,0.3)",
+                borderRadius: 500, padding: "6px 14px", marginBottom: 24,
+              }}>
+                <span style={{ color: "var(--accent)", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em" }}>
+                  ● PARA MÚSICOS
+                </span>
+              </div>
+              <h1 style={{ fontSize: 72, fontWeight: 900, lineHeight: 0.95, margin: "0 0 24px", color: "#fff", letterSpacing: "-0.02em" }}>
+                Backing<br /><span style={{ color: "var(--accent)" }}>tracks</span><br />+ cifras.
+              </h1>
+              <p style={{ fontSize: 20, color: "var(--muted)", lineHeight: 1.6, margin: "0 0 36px", maxWidth: 480 }}>
+                Toque, ensaie e se apresente com bases profissionais e cifras sincronizadas em tempo real.
+              </p>
+              <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                <Link href="#catalogo" className="btn-primary" style={{ fontSize: 15, padding: "14px 32px" }}>
+                  Explorar músicas
+                </Link>
+                <Link href="/planos" className="btn-ghost" style={{ fontSize: 15, padding: "14px 32px" }}>
+                  Ver planos
+                </Link>
+              </div>
+              <div style={{ display: "flex", gap: 32, marginTop: 40, flexWrap: "wrap" }}>
+                {[
+                  { label: "Músicas", value: `${songs.length}+` },
+                  { label: "Gêneros",  value: "12" },
+                  { label: "Acesso",   value: "Free" },
+                ].map(({ label, value }) => (
+                  <div key={label}>
+                    <div style={{ fontSize: 28, fontWeight: 900, color: "#fff" }}>{value}</div>
+                    <div style={{ fontSize: 13, color: "var(--muted)" }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Hero visual */}
+            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
+              <div style={{
+                width: "100%", maxWidth: 480, background: "var(--surface)",
+                borderRadius: 20, border: "1px solid var(--border2)", overflow: "hidden",
+                boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
+              }}>
+                <div style={{ padding: "18px 20px", borderBottom: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: 6, background: "linear-gradient(135deg,#1db954,#0f7a3a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🎸</div>
+                    <div>
+                      <div style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}>Garota de Ipanema</div>
+                      <div style={{ color: "var(--muted)", fontSize: 12 }}>Tom Jobim · Bossa Nova</div>
+                    </div>
+                    <div style={{ marginLeft: "auto", color: "var(--accent)", fontWeight: 700, fontSize: 12 }}>▶ 2:14</div>
+                  </div>
+                </div>
+                <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)" }}>
+                  <div style={{ height: 40, display: "flex", alignItems: "center", gap: 2 }}>
+                    {Array.from({ length: 56 }, (_, i) => (
+                      <div key={i} style={{ flex: 1, height: `${20 + Math.sin(i*0.5)*10 + (i%3)*4}px`, borderRadius: 2, background: i < 20 ? "var(--accent)" : "var(--surface3)", opacity: i < 20 ? 1 : 0.5 }} />
+                    ))}
+                  </div>
+                </div>
+                <div style={{ padding: "14px 20px" }}>
+                  <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, letterSpacing: "0.12em", marginBottom: 8 }}>▶ VERSO</div>
+                  <div style={{ fontFamily: "monospace", fontSize: 13, lineHeight: 2 }}>
+                    {["Am7","D7","Gmaj7","C#m"].map(c => <span key={c} style={{ color: "var(--chord)", fontWeight: 700, marginRight: 12 }}>{c}</span>)}
+                    <div style={{ color: "var(--muted)", fontSize: 12 }}>Olha que coisa mais linda, mais cheia de graça</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* CATALOG */}
+        <div id="catalogo" style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px 48px" }}>
 
           {/* Search */}
-          <form method="GET" className="flex gap-2 max-w-lg mx-auto">
-            <input
-              type="text"
-              name="q"
-              defaultValue={q}
-              placeholder="Buscar música ou artista..."
-              style={{
-                background: "var(--surface2)",
-                border: "1px solid var(--border)",
-                color: "var(--text)",
-              }}
-              className="flex-1 px-4 py-2.5 rounded-lg text-sm outline-none focus:border-amber-500 transition-colors"
-            />
-            <input type="hidden" name="genre" value={genre} />
-            <button
-              type="submit"
-              style={{ background: "var(--accent)", color: "#000" }}
-              className="px-5 py-2.5 rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity"
-            >
-              Buscar
-            </button>
+          <form method="GET" style={{ marginBottom: 24 }}>
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 10, display: "flex", alignItems: "center", padding: "0 16px", gap: 10, maxWidth: 440 }}>
+              <span style={{ color: "var(--muted)", fontSize: 16 }}>🔍</span>
+              <input
+                name="q" defaultValue={q} placeholder="Buscar música ou artista..."
+                style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 14, padding: "12px 0" }}
+              />
+              {q && <Link href="/" style={{ color: "var(--muted)", fontSize: 13 }}>✕</Link>}
+            </div>
           </form>
-        </div>
-      </div>
 
-      {/* Content */}
-      <main className="max-w-5xl mx-auto px-4 py-8">
-        {/* Genre filters */}
-        <div className="flex gap-2 flex-wrap mb-6">
-          {GENRES.map((g) => (
-            <Link
-              key={g}
-              href={`/?genre=${g}${q ? `&q=${q}` : ""}`}
-              style={{
-                background: g === genre ? "var(--accent)" : "var(--surface2)",
-                color: g === genre ? "#000" : "var(--text)",
-                border: `1px solid ${g === genre ? "var(--accent)" : "var(--border)"}`,
-              }}
-              className="px-3 py-1.5 rounded-full text-sm font-medium transition-all hover:opacity-80"
-            >
-              {g}
-            </Link>
-          ))}
-        </div>
-
-        {/* Stats */}
-        <p style={{ color: "var(--muted)" }} className="text-sm mb-4">
-          {filtered.length} {filtered.length === 1 ? "música" : "músicas"} encontradas
-        </p>
-
-        {/* Song grid */}
-        {filtered.length === 0 ? (
-          <div className="text-center py-20">
-            <p style={{ color: "var(--muted)" }} className="text-lg">
-              Nenhuma música encontrada.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((song) => (
-              <Link
-                key={song.id}
-                href={`/song/${song.slug}`}
+          {/* Genre pills */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 28 }}>
+            {GENRES.map(g => (
+              <Link key={g}
+                href={`/?genre=${encodeURIComponent(g)}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
                 style={{
-                  background: "var(--surface)",
-                  border: "1px solid var(--border)",
+                  padding: "7px 16px", borderRadius: 500, fontSize: 13, fontWeight: 600,
+                  border: g === genre ? "1px solid var(--accent)" : "1px solid var(--border2)",
+                  background: g === genre ? "rgba(29,185,84,0.15)" : "var(--surface)",
+                  color: g === genre ? "var(--accent)" : "var(--muted)",
+                  display: "inline-flex", alignItems: "center", gap: 5,
                 }}
-                className="rounded-xl p-4 flex flex-col gap-3 hover:border-amber-500/50 transition-all group no-underline"
               >
-                {/* Thumb placeholder */}
-                <div
-                  style={{
-                    background: "var(--surface2)",
-                    borderRadius: 8,
-                    height: 80,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <span style={{ fontSize: 36 }}>
-                    {song.audioFile ? "🎵" : "🎸"}
-                  </span>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3
-                      style={{ color: "var(--text)" }}
-                      className="font-bold text-base leading-tight group-hover:text-amber-400 transition-colors"
-                    >
-                      {song.title}
-                    </h3>
-                    <GenreBadge genre={song.genre} />
-                  </div>
-                  <p style={{ color: "var(--muted)" }} className="text-sm">
-                    {song.artist}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3 mt-auto">
-                  <span
-                    style={{
-                      background: "var(--surface2)",
-                      color: "var(--muted)",
-                      fontSize: 12,
-                      padding: "2px 8px",
-                      borderRadius: 4,
-                    }}
-                  >
-                    Tom: {song.key}
-                  </span>
-                  <span
-                    style={{
-                      background: "var(--surface2)",
-                      color: "var(--muted)",
-                      fontSize: 12,
-                      padding: "2px 8px",
-                      borderRadius: 4,
-                    }}
-                  >
-                    {song.bpm} BPM
-                  </span>
-                  {song.audioFile && (
-                    <span
-                      style={{
-                        marginLeft: "auto",
-                        background: "#10b98122",
-                        color: "#10b981",
-                        fontSize: 12,
-                        padding: "2px 8px",
-                        borderRadius: 4,
-                        border: "1px solid #10b98133",
-                      }}
-                    >
-                      ▶ Base
-                    </span>
-                  )}
-                </div>
+                {GENRE_EMOJI[g] && <span style={{ fontSize: 14 }}>{GENRE_EMOJI[g]}</span>}
+                {g}
               </Link>
             ))}
           </div>
+
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#fff", margin: "0 0 18px" }}>
+            {q ? `Resultados para "${q}"` : genre !== "Todos" ? `${GENRE_EMOJI[genre] ?? ""} ${genre}` : "🔥 Em alta agora"}
+          </h2>
+
+          {/* Song grid */}
+          {songs.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "80px 0", color: "var(--muted)" }}>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+              <p style={{ fontSize: 16, marginBottom: 12 }}>Nenhuma música encontrada.</p>
+              <Link href="/" style={{ color: "var(--accent)", fontWeight: 600 }}>Ver todas →</Link>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+              {songs.map(song => (
+                <Link key={song.id} href={`/song/${song.slug}`} className="song-card">
+                  <div style={{ width: 56, height: 56, borderRadius: 8, background: "var(--surface3)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>
+                    {song.thumbnailUrl
+                      ? <Image src={song.thumbnailUrl} alt={song.artist} width={56} height={56} style={{ objectFit: "cover", width: "100%", height: "100%" }} />
+                      : (GENRE_EMOJI[song.genre] ?? "🎵")
+                    }
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "#fff", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {song.title}
+                    </div>
+                    <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {song.artist}
+                    </div>
+                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                      <span style={{ background: "var(--surface3)", color: "var(--muted)", fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 4 }}>{song.key}</span>
+                      <span style={{ background: "var(--surface3)", color: "var(--muted)", fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 4 }}>{song.bpm} BPM</span>
+                      {song.audioUrl && (
+                        <span style={{ background: "rgba(29,185,84,0.15)", color: "var(--accent)", fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4 }}>▶ Base</span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* PRO PROMO */}
+        {!isSearch && (
+          <section style={{ maxWidth: 1200, margin: "0 auto 64px", padding: "0 24px" }}>
+            <div style={{
+              background: "linear-gradient(135deg, var(--surface) 0%, #0a2016 100%)",
+              border: "1px solid rgba(29,185,84,0.2)", borderRadius: 18, padding: "36px 44px",
+              display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 32,
+            }}>
+              <div>
+                <span className="pro-badge" style={{ display: "inline-block", marginBottom: 12 }}>PRO</span>
+                <h3 style={{ fontSize: 26, fontWeight: 900, color: "#fff", margin: "0 0 10px" }}>
+                  Eleve sua prática ao próximo nível
+                </h3>
+                <p style={{ color: "var(--muted)", fontSize: 15, margin: 0, lineHeight: 1.6 }}>
+                  Stems por instrumento, pitch shift, loop A-B, setlist para show e modo performance.
+                  <br />Trial de 7 dias grátis — sem cartão de crédito.
+                </p>
+              </div>
+              <div style={{ textAlign: "center", flexShrink: 0 }}>
+                <div style={{ color: "var(--accent)", fontSize: 34, fontWeight: 900 }}>R$19,90</div>
+                <div style={{ color: "var(--muted)", fontSize: 13, marginBottom: 16 }}>/mês</div>
+                <Link href="/planos" className="btn-primary">Começar grátis</Link>
+              </div>
+            </div>
+          </section>
         )}
       </main>
 
-      {/* Footer */}
-      <footer
-        style={{ borderTop: "1px solid var(--border)", color: "var(--muted)" }}
-        className="text-center text-sm py-6 mt-8"
-      >
-        © 2026 BackingTrack.store — Para músicos, por músicos
-      </footer>
-    </div>
+      <SiteFooter />
+    </>
   );
 }

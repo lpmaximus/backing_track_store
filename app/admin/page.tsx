@@ -4,16 +4,18 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 
 type Song = {
-  id: string;
+  id: number;
   slug: string;
   title: string;
   artist: string;
   genre: string;
   key: string;
   bpm: number;
-  audioFile: string;
+  audioUrl: string | null;
+  thumbnailUrl: string | null;
   duration: number;
-  cifra: string;
+  cifraText: string | null;
+  published: boolean;
   createdAt: string;
 };
 
@@ -24,9 +26,11 @@ const EMPTY_SONG: Omit<Song, "id" | "createdAt"> = {
   genre: "Rock",
   key: "C",
   bpm: 120,
-  audioFile: "",
+  audioUrl: null,
+  thumbnailUrl: null,
   duration: 180,
-  cifra: "",
+  cifraText: null,
+  published: true,
 };
 
 const GENRES = ["Rock", "Pop", "MPB", "Bossa Nova", "Samba", "Jazz", "Forró", "Funk", "Sertanejo", "Gospel", "Reggae", "Blues", "Outro"];
@@ -51,18 +55,35 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [tab, setTab] = useState<"list" | "edit">("list");
+  const [uploadingAudio, setUploadingAudio] = useState(false);
+  const [uploadingThumb, setUploadingThumb] = useState(false);
 
-  const authenticate = () => {
+  const adminHeaders = {
+    "Content-Type": "application/json",
+    "x-admin-password": password,
+  };
+
+  const authenticate = async () => {
     if (!password) { setAuthError("Digite a senha"); return; }
-    setAuthenticated(true);
-    setAuthError("");
-    fetchSongs();
+    // Testa a senha com um PUT sem ID (retorna 400 se auth ok, 401 se senha errada)
+    const res = await fetch("/api/songs?id=0", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({}),
+    });
+    if (res.status !== 401) {
+      setAuthenticated(true);
+      setAuthError("");
+      fetchSongs();
+    } else {
+      setAuthError("Senha incorreta");
+    }
   };
 
   const fetchSongs = async () => {
     const res = await fetch("/api/songs");
     const data = await res.json();
-    setSongs(data);
+    setSongs(Array.isArray(data) ? data : []);
   };
 
   const newSong = () => {
@@ -75,7 +96,7 @@ export default function AdminPage() {
     setTab("edit");
   };
 
-  const handleChange = (field: string, value: string | number) => {
+  const handleChange = (field: string, value: string | number | boolean | null) => {
     setEditing((prev) => {
       const updated = { ...prev, [field]: value } as Partial<Song>;
       if ((field === "title" || field === "artist") && !prev?.id) {
@@ -87,6 +108,67 @@ export default function AdminPage() {
     });
   };
 
+  const uploadAudio = async (file: File) => {
+    if (!file) return;
+    setUploadingAudio(true);
+    setMessage("⏳ Fazendo upload...");
+    try {
+      const key = `audio/${editing?.slug || slugify(file.name.replace(/\.[^/.]+$/, ""))}/${file.name}`;
+      const urlRes = await fetch("/api/admin/upload-url", {
+        method: "POST",
+        headers: adminHeaders,
+        body: JSON.stringify({ key, contentType: file.type || "audio/mpeg" }),
+      });
+      const { uploadUrl, publicUrl, error } = await urlRes.json();
+      if (error) { setMessage(`❌ ${error}`); setUploadingAudio(false); return; }
+
+      // Upload direto para o R2
+      await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "audio/mpeg" },
+        body: file,
+      });
+
+      handleChange("audioUrl", publicUrl);
+      setMessage("✅ Áudio enviado para o R2!");
+    } catch (e) {
+      setMessage("❌ Erro no upload. Verifique as variáveis R2.");
+      console.error(e);
+    }
+    setUploadingAudio(false);
+  };
+
+  const uploadThumbnail = async (file: File) => {
+    if (!file) return;
+    setUploadingThumb(true);
+    setMessage("⏳ Enviando imagem...");
+    try {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const slug = editing?.slug || slugify((editing?.title ?? "") + "-" + (editing?.artist ?? ""));
+      const key = `images/${slug}.${ext}`;
+      const urlRes = await fetch("/api/admin/upload-url", {
+        method: "POST",
+        headers: adminHeaders,
+        body: JSON.stringify({ key, contentType: file.type || "image/jpeg" }),
+      });
+      const { uploadUrl, publicUrl, error } = await urlRes.json();
+      if (error) { setMessage(`❌ ${error}`); setUploadingThumb(false); return; }
+
+      await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "image/jpeg" },
+        body: file,
+      });
+
+      handleChange("thumbnailUrl", publicUrl);
+      setMessage("✅ Imagem enviada!");
+    } catch (e) {
+      setMessage("❌ Erro no upload da imagem.");
+      console.error(e);
+    }
+    setUploadingThumb(false);
+  };
+
   const save = async () => {
     if (!editing?.title || !editing?.artist) {
       setMessage("❌ Preencha título e artista.");
@@ -95,13 +177,16 @@ export default function AdminPage() {
     setSaving(true);
     setMessage("");
     try {
-      const res = await fetch("/api/songs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, song: editing }),
+      const isNew = !editing.id;
+      const method = isNew ? "POST" : "PUT";
+      const url = isNew ? "/api/songs" : `/api/songs?id=${editing.id}`;
+      const res = await fetch(url, {
+        method,
+        headers: adminHeaders,
+        body: JSON.stringify(editing),
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok) {
         setMessage("✅ Salvo com sucesso!");
         fetchSongs();
         setTimeout(() => { setTab("list"); setEditing(null); setMessage(""); }, 1200);
@@ -114,12 +199,11 @@ export default function AdminPage() {
     setSaving(false);
   };
 
-  const deleteSong = async (id: string) => {
+  const deleteSong = async (id: number) => {
     if (!confirm("Deletar esta música?")) return;
-    const res = await fetch("/api/songs", {
+    const res = await fetch(`/api/songs?id=${id}`, {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password, id }),
+      headers: adminHeaders,
     });
     const data = await res.json();
     if (data.success) fetchSongs();
@@ -206,11 +290,17 @@ export default function AdminPage() {
                 key={song.id}
                 style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}
               >
-                <div style={{ fontSize: 28, flexShrink: 0 }}>{song.audioFile ? "🎵" : "🎸"}</div>
+                <div style={{ width: 44, height: 44, borderRadius: 8, overflow: "hidden", flexShrink: 0, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+                  {song.thumbnailUrl
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={song.thumbnailUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : (song.audioUrl ? "🎵" : "🎸")
+                  }
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ color: "var(--text)", fontWeight: 700, fontSize: 15 }}>{song.title}</p>
                   <p style={{ color: "var(--muted)", fontSize: 13 }}>{song.artist} · {song.genre} · {song.key} · {song.bpm} BPM</p>
-                  {!song.audioFile && (
+                  {!song.audioUrl && (
                     <p style={{ color: "#f59e0b", fontSize: 12 }}>⚠ Sem base de áudio</p>
                   )}
                 </div>
@@ -229,7 +319,7 @@ export default function AdminPage() {
                     Editar
                   </button>
                   <button
-                    onClick={() => deleteSong(song.id)}
+                    onClick={() => deleteSong(Number(song.id))}
                     style={{ background: "#ef444422", color: "#ef4444", border: "1px solid #ef444433", padding: "5px 10px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}
                   >
                     🗑
@@ -298,14 +388,52 @@ export default function AdminPage() {
                 />
               </div>
               <div>
-                <label style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>ARQUIVO DE ÁUDIO</label>
-                <input
-                  value={editing.audioFile ?? ""}
-                  onChange={(e) => handleChange("audioFile", e.target.value)}
-                  style={{ background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", padding: "9px 12px", borderRadius: 8, width: "100%", fontSize: 14 }}
-                  placeholder="Ex: garota-ipanema.mp3"
-                />
-                <p style={{ color: "var(--muted)", fontSize: 11, marginTop: 4 }}>Coloque o arquivo em <code>/public/audio/</code></p>
+                <label style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>THUMBNAIL (imagem)</label>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  {editing.thumbnailUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={editing.thumbnailUrl} alt="thumb" style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover", border: "1px solid var(--border)", flexShrink: 0 }} />
+                  )}
+                  <input
+                    value={editing.thumbnailUrl ?? ""}
+                    onChange={(e) => handleChange("thumbnailUrl", e.target.value)}
+                    style={{ background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", padding: "9px 12px", borderRadius: 8, flex: 1, fontSize: 13, fontFamily: "monospace" }}
+                    placeholder="https://pub-xxx.r2.dev/images/..."
+                  />
+                  <label style={{ background: uploadingThumb ? "var(--surface2)" : "#3b82f622", color: uploadingThumb ? "var(--muted)" : "#3b82f6", border: "1px solid #3b82f644", padding: "9px 14px", borderRadius: 8, fontSize: 13, cursor: uploadingThumb ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+                    {uploadingThumb ? "⏳..." : "🖼 Upload"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      disabled={uploadingThumb}
+                      onChange={(e) => e.target.files?.[0] && uploadThumbnail(e.target.files[0])}
+                    />
+                  </label>
+                </div>
+                <p style={{ color: "var(--muted)", fontSize: 11, marginTop: 4 }}>Foto do artista ou capa da música (JPG/PNG). Recomendado: 400×400px.</p>
+              </div>
+              <div>
+                <label style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>ÁUDIO (R2)</label>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    value={editing.audioUrl ?? ""}
+                    onChange={(e) => handleChange("audioUrl", e.target.value)}
+                    style={{ background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", padding: "9px 12px", borderRadius: 8, flex: 1, fontSize: 13, fontFamily: "monospace" }}
+                    placeholder="https://pub-xxx.r2.dev/audio/..."
+                  />
+                  <label style={{ background: uploadingAudio ? "var(--surface2)" : "#f59e0b22", color: uploadingAudio ? "var(--muted)" : "#f59e0b", border: "1px solid #f59e0b44", padding: "9px 14px", borderRadius: 8, fontSize: 13, cursor: uploadingAudio ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+                    {uploadingAudio ? "⏳..." : "⬆ Upload"}
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      style={{ display: "none" }}
+                      disabled={uploadingAudio}
+                      onChange={(e) => e.target.files?.[0] && uploadAudio(e.target.files[0])}
+                    />
+                  </label>
+                </div>
+                <p style={{ color: "var(--muted)", fontSize: 11, marginTop: 4 }}>Upload envia direto para o Cloudflare R2 (sem passar pelo Vercel).</p>
               </div>
             </div>
 
@@ -325,8 +453,8 @@ export default function AdminPage() {
                 CIFRA (Cole o texto da cifra)
               </label>
               <textarea
-                value={editing.cifra ?? ""}
-                onChange={(e) => handleChange("cifra", e.target.value)}
+                value={editing.cifraText ?? ""}
+                onChange={(e) => handleChange("cifraText", e.target.value)}
                 rows={16}
                 style={{ background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--text)", padding: "12px", borderRadius: 8, width: "100%", fontSize: 13, fontFamily: "Courier New, monospace", lineHeight: 1.8, resize: "vertical" }}
                 placeholder={`[Verso]\nAm   G\nLetra da música...\n\n[Refrão]\nC   F   G\nRefrão aqui...`}

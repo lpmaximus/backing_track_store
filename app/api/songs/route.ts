@@ -1,73 +1,85 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFileSync, writeFileSync } from "fs";
-import path from "path";
+import { db, songs } from "@/src/db";
+import { eq, ilike, or, and } from "drizzle-orm";
 
-const SONGS_PATH = path.join(process.cwd(), "data", "songs.json");
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "backingtrack2026";
-
-function getSongs() {
-  const raw = readFileSync(SONGS_PATH, "utf-8");
-  return JSON.parse(raw);
+function isAdmin(req: NextRequest) {
+  return req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const q = searchParams.get("q") ?? "";
+  const genre = searchParams.get("genre") ?? "";
+  const slug = searchParams.get("slug") ?? "";
+
   try {
-    const songs = getSongs();
-    return NextResponse.json(songs);
-  } catch {
-    return NextResponse.json({ error: "Erro ao ler músicas" }, { status: 500 });
+    // Busca por slug único
+    if (slug) {
+      const [song] = await db.select().from(songs).where(eq(songs.slug, slug)).limit(1);
+      if (!song) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
+      return NextResponse.json(song);
+    }
+
+    // Lista com filtros opcionais
+    const conditions = [eq(songs.published, true)];
+    if (genre && genre !== "Todos") conditions.push(eq(songs.genre, genre));
+    if (q) {
+      const cond = or(ilike(songs.title, `%${q}%`), ilike(songs.artist, `%${q}%`));
+      if (cond) conditions.push(cond);
+    }
+
+    const result = await db
+      .select()
+      .from(songs)
+      .where(and(...conditions))
+      .orderBy(songs.title);
+
+    return NextResponse.json(result);
+  } catch (err) {
+    console.error("[GET /api/songs]", err);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
+  if (!isAdmin(req)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
     const body = await req.json();
-    const { password, song } = body;
+    const [created] = await db.insert(songs).values(body).returning();
+    return NextResponse.json(created, { status: 201 });
+  } catch (err) {
+    console.error("[POST /api/songs]", err);
+    return NextResponse.json({ error: "Erro ao criar música" }, { status: 500 });
+  }
+}
 
-    if (password !== ADMIN_PASSWORD) {
-      return NextResponse.json({ error: "Senha incorreta" }, { status: 401 });
-    }
-
-    const songs = getSongs();
-
-    if (song.id) {
-      // Update
-      const idx = songs.findIndex((s: { id: string }) => s.id === song.id);
-      if (idx !== -1) {
-        songs[idx] = song;
-      } else {
-        songs.push(song);
-      }
-    } else {
-      // Create
-      const newSong = {
-        ...song,
-        id: String(Date.now()),
-        createdAt: new Date().toISOString(),
-      };
-      songs.push(newSong);
-    }
-
-    writeFileSync(SONGS_PATH, JSON.stringify(songs, null, 2));
-    return NextResponse.json({ success: true });
-  } catch (e) {
-    return NextResponse.json({ error: "Erro ao salvar" }, { status: 500 });
+export async function PUT(req: NextRequest) {
+  if (!isAdmin(req)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const id = Number(new URL(req.url).searchParams.get("id"));
+  if (!id) return NextResponse.json({ error: "ID obrigatório" }, { status: 400 });
+  try {
+    const body = await req.json();
+    const [updated] = await db
+      .update(songs)
+      .set({ ...body, updatedAt: new Date() })
+      .where(eq(songs.id, id))
+      .returning();
+    return NextResponse.json(updated);
+  } catch (err) {
+    console.error("[PUT /api/songs]", err);
+    return NextResponse.json({ error: "Erro ao atualizar" }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
+  if (!isAdmin(req)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const id = Number(new URL(req.url).searchParams.get("id"));
+  if (!id) return NextResponse.json({ error: "ID obrigatório" }, { status: 400 });
   try {
-    const { password, id } = await req.json();
-
-    if (password !== ADMIN_PASSWORD) {
-      return NextResponse.json({ error: "Senha incorreta" }, { status: 401 });
-    }
-
-    const songs = getSongs();
-    const updated = songs.filter((s: { id: string }) => s.id !== id);
-    writeFileSync(SONGS_PATH, JSON.stringify(updated, null, 2));
+    await db.delete(songs).where(eq(songs.id, id));
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error("[DELETE /api/songs]", err);
     return NextResponse.json({ error: "Erro ao deletar" }, { status: 500 });
   }
 }
