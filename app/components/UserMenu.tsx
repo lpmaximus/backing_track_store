@@ -48,6 +48,12 @@ export default function UserMenu({ user }: Props) {
                   Fazer upgrade Pro
                 </Link>
               )}
+              {isPro && (
+                <Link href="/setlists" onClick={() => setOpen(false)}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 6, color: "var(--muted)", fontSize: 13 }}>
+                  Minhas Setlists
+                </Link>
+              )}
               <Link href="/perfil" onClick={() => setOpen(false)}
                 style={{ display: "block", padding: "8px 12px", borderRadius: 6, color: "var(--muted)", fontSize: 13 }}>
                 Perfil

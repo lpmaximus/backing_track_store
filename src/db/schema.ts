@@ -84,6 +84,46 @@ export const subscriptions = pgTable("subscriptions", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// ─── Comments ─────────────────────────────────────────────────────────────────
+// Free pode ler; apenas Pro/admin podem escrever (checagem feita na API).
+export const comments = pgTable("comments", {
+  id: serial("id").primaryKey(),
+  songId: integer("song_id")
+    .notNull()
+    .references(() => songs.id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ─── Setlists (Pro) ───────────────────────────────────────────────────────────
+export const setlists = pgTable("setlists", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 200 }).notNull(),
+  notes: text("notes"), // anotações gerais do show (data, local, observações)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Músicas dentro de uma setlist, com ordem e anotação por música
+export const setlistSongs = pgTable("setlist_songs", {
+  id: serial("id").primaryKey(),
+  setlistId: integer("setlist_id")
+    .notNull()
+    .references(() => setlists.id, { onDelete: "cascade" }),
+  songId: integer("song_id")
+    .notNull()
+    .references(() => songs.id, { onDelete: "cascade" }),
+  position: integer("position").notNull().default(0),
+  notes: text("notes"), // anotação por música (ex: "tocar 1 tom abaixo")
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type Song = typeof songs.$inferSelect;
 export type NewSong = typeof songs.$inferInsert;
@@ -92,6 +132,12 @@ export type NewStem = typeof stems.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Subscription = typeof subscriptions.$inferSelect;
+export type Comment = typeof comments.$inferSelect;
+export type NewComment = typeof comments.$inferInsert;
+export type Setlist = typeof setlists.$inferSelect;
+export type NewSetlist = typeof setlists.$inferInsert;
+export type SetlistSong = typeof setlistSongs.$inferSelect;
+export type NewSetlistSong = typeof setlistSongs.$inferInsert;
 
 export interface ChordSection {
   section: string;    // "Verso" | "Refrão" | "Ponte" etc.

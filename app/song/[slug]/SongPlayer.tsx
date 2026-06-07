@@ -6,6 +6,9 @@ import Link from "next/link";
 import Image from "next/image";
 import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
+import Comments from "./Comments";
+import AddToSetlist from "./AddToSetlist";
+import AdBanner from "@/app/components/AdBanner";
 import type { Stem } from "./WavePlayer";
 
 // WavePlayer usa APIs de browser — importar só no client
@@ -235,6 +238,9 @@ export default function SongPlayer({ song, stems, isPro = false }: Props) {
               ))}
             </div>
 
+            {/* Adicionar a setlist (Pro) */}
+            {isPro && <AddToSetlist songId={song.id} />}
+
             {/* Pro upsell */}
             {!isPro && (
               <div style={{ background: "linear-gradient(135deg, #ffffff 0%, #eafbf1 100%)", border: "1px solid rgba(29,185,84,0.25)", borderRadius: 12, padding: 16, textAlign: "center" }}>
@@ -247,6 +253,12 @@ export default function SongPlayer({ song, stems, isPro = false }: Props) {
             )}
           </div>
         </div>
+
+        {/* Banner publicitário (apenas Free, fora do player) */}
+        <AdBanner variant="compact" />
+
+        {/* Comentarios */}
+        <Comments songId={song.id} />
       </div>
 
       <SiteFooter />

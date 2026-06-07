@@ -4,6 +4,7 @@ import { db, songs as songsTable } from "@/src/db";
 import { eq, ilike, or, and } from "drizzle-orm";
 import SiteHeader from "./components/SiteHeader";
 import SiteFooter from "./components/SiteFooter";
+import AdBanner from "./components/AdBanner";
 
 const GENRES = [
   "Todos","Rock","Pop","MPB","Bossa Nova","Samba",
@@ -163,6 +164,11 @@ export default async function HomePage({
           <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: "0 0 18px" }}>
             {q ? `Resultados para "${q}"` : genre !== "Todos" ? `${GENRE_EMOJI[genre] ?? ""} ${genre}` : "🔥 Em alta agora"}
           </h2>
+
+          {/* Banner publicitário (apenas Free) */}
+          <div style={{ marginBottom: 24 }}>
+            <AdBanner />
+          </div>
 
           {/* Song grid */}
           {songs.length === 0 ? (
