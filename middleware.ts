@@ -1,6 +1,13 @@
-import { auth } from "@/auth";
+import NextAuth from "next-auth";
 import { NextResponse, NextRequest } from "next/server";
 import type { Session } from "next-auth";
+import { authConfig } from "./auth.config";
+
+// Instância própria, edge-safe — NÃO usar `auth` de "@/auth" aqui,
+// pois esse arquivo importa src/db (Neon) no topo do módulo, o que
+// quebra no Edge Runtime do middleware ("No database connection
+// string was provided to neon()").
+const { auth } = NextAuth(authConfig);
 
 export default auth((req: NextRequest & { auth: Session | null }) => {
   const { pathname } = req.nextUrl;

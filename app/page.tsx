@@ -45,13 +45,31 @@ export default async function HomePage({
     <>
       <SiteHeader />
 
+      {/* BETA BANNER */}
+      <div style={{ background: "var(--text)", borderBottom: "1px solid var(--border)" }}>
+        <div style={{
+          maxWidth: 1200, margin: "0 auto", padding: "10px 24px",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+          flexWrap: "wrap", textAlign: "center",
+        }}>
+          <span style={{
+            background: "var(--accent)", color: "#fff", fontSize: 10, fontWeight: 800,
+            letterSpacing: "0.1em", padding: "3px 9px", borderRadius: 999, flexShrink: 0,
+          }}>
+            BETA
+          </span>
+          <p style={{ color: "#fff", fontSize: 13, margin: 0, lineHeight: 1.5 }}>
+            Estamos em fase de testes — <strong>ainda não vendemos planos</strong>. Explore o catálogo livre enquanto evoluímos a plataforma com você.
+          </p>
+        </div>
+      </div>
+
       <main style={{ minHeight: "100vh", background: "var(--bg)" }}>
 
         {/* HERO */}
         {!isSearch && (
-          <section style={{
+          <section className="hero-grid" style={{
             maxWidth: 1200, margin: "0 auto", padding: "72px 24px 56px",
-            display: "grid", gridTemplateColumns: "1fr 1fr", alignItems: "center", gap: 48,
           }}>
             <div>
               <div style={{
@@ -91,38 +109,85 @@ export default async function HomePage({
               </div>
             </div>
 
-            {/* Hero visual */}
-            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
-              <div style={{
-                width: "100%", maxWidth: 480, background: "var(--surface)",
-                borderRadius: 20, border: "1px solid var(--border)", overflow: "hidden",
-                boxShadow: "0 24px 80px rgba(0,0,0,0.1)",
-              }}>
-                <div style={{ padding: "18px 20px", borderBottom: "1px solid var(--border)" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 48, height: 48, borderRadius: 6, background: "linear-gradient(135deg,#1db954,#0f7a3a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🎸</div>
-                    <div>
-                      <div style={{ color: "var(--text)", fontWeight: 700, fontSize: 14 }}>Garota de Ipanema</div>
-                      <div style={{ color: "var(--muted)", fontSize: 12 }}>Tom Jobim · Bossa Nova</div>
-                    </div>
-                    <div style={{ marginLeft: "auto", color: "var(--accent)", fontWeight: 700, fontSize: 12 }}>▶ 2:14</div>
-                  </div>
+            {/* Hero visual — selo BTS + waveform decorativo */}
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+              <div style={{ position: "relative", width: "100%", maxWidth: 460, height: 340, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {/* waveform decorativo */}
+                <div style={{ position: "absolute", inset: "40px 0", display: "flex", alignItems: "center", gap: 4, opacity: 0.4 }} aria-hidden>
+                  {Array.from({ length: 64 }, (_, i) => (
+                    <div key={i} style={{
+                      flex: 1,
+                      height: `${14 + Math.abs(Math.sin(i * 0.45)) * 130}px`,
+                      borderRadius: 2,
+                      background: i % 7 === 0 ? "var(--accent)" : "var(--border2)",
+                    }} />
+                  ))}
                 </div>
-                <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)" }}>
-                  <div style={{ height: 40, display: "flex", alignItems: "center", gap: 2 }}>
-                    {Array.from({ length: 56 }, (_, i) => (
-                      <div key={i} style={{ flex: 1, height: `${20 + Math.sin(i*0.5)*10 + (i%3)*4}px`, borderRadius: 2, background: i < 20 ? "var(--accent)" : "var(--surface3)", opacity: i < 20 ? 1 : 0.5 }} />
-                    ))}
-                  </div>
-                </div>
-                <div style={{ padding: "14px 20px" }}>
-                  <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700, letterSpacing: "0.12em", marginBottom: 8 }}>▶ VERSO</div>
-                  <div style={{ fontFamily: "monospace", fontSize: 13, lineHeight: 2 }}>
-                    {["Am7","D7","Gmaj7","C#m"].map(c => <span key={c} style={{ color: "var(--chord)", fontWeight: 700, marginRight: 12 }}>{c}</span>)}
-                    <div style={{ color: "var(--muted)", fontSize: 12 }}>Olha que coisa mais linda, mais cheia de graça</div>
+
+                {/* selo circular */}
+                <div style={{
+                  position: "relative", width: 232, height: 232, borderRadius: "50%",
+                  background: "var(--surface)", border: "2px solid var(--text)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 24px 64px rgba(0,0,0,0.12)", flexShrink: 0,
+                }}>
+                  <svg viewBox="0 0 232 232" width="232" height="232" style={{ position: "absolute", inset: 0 }} aria-hidden>
+                    <defs>
+                      <path id="heroSealPath" d="M 116,116 m -88,0 a 88,88 0 1,1 176,0 a 88,88 0 1,1 -176,0" fill="none" />
+                    </defs>
+                    <circle cx="116" cy="116" r="102" fill="none" stroke="#111111" strokeWidth="1.5" />
+                    <text fontSize="10.5" fontWeight={700} letterSpacing="3.5" fill="#111111">
+                      <textPath href="#heroSealPath" startOffset="2%">BACKING TRACK STORE • BACKING TRACK STORE •</textPath>
+                    </text>
+                  </svg>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: "0.05em", color: "var(--text)" }}>★ BTS ★</div>
+                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.2em", color: "var(--accent)", marginTop: 6 }}>VERSÃO BETA</div>
                   </div>
                 </div>
               </div>
+            </div>
+          </section>
+        )}
+
+        {/* EM ALTA AGORA — destaques */}
+        {!isSearch && songs.length > 0 && (
+          <section style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: 0 }}>🔥 Em alta agora</h2>
+              <Link href="#catalogo" className="footer-link" style={{ fontWeight: 600, color: "var(--text)" }}>Ver todas →</Link>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14 }}>
+              {songs.slice(0, 4).map(song => (
+                <Link key={song.id} href={`/song/${song.slug}`} style={{
+                  background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16,
+                  padding: 14, display: "flex", flexDirection: "column", gap: 14,
+                  transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s", color: "inherit",
+                }} className="song-card-featured">
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 10, background: "var(--surface3)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+                      {song.thumbnailUrl
+                        ? <Image src={song.thumbnailUrl} alt={song.artist} width={52} height={52} style={{ objectFit: "cover", width: "100%", height: "100%" }} />
+                        : (GENRE_EMOJI[song.genre] ?? "🎵")
+                      }
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{song.title}</div>
+                      <div style={{ color: "var(--muted)", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{song.artist}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", gap: 5 }}>
+                      <span style={{ background: "var(--surface3)", color: "var(--muted)", fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 4 }}>Tom: {song.key}</span>
+                      <span style={{ background: "var(--surface3)", color: "var(--muted)", fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 4 }}>{song.bpm} BPM</span>
+                    </div>
+                    <span aria-hidden style={{
+                      width: 30, height: 30, borderRadius: "50%", background: "var(--text)", color: "#fff",
+                      display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0,
+                    }}>▶</span>
+                  </div>
+                </Link>
+              ))}
             </div>
           </section>
         )}
@@ -148,11 +213,12 @@ export default async function HomePage({
               <Link key={g}
                 href={`/?genre=${encodeURIComponent(g)}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
                 style={{
-                  padding: "7px 16px", borderRadius: 500, fontSize: 13, fontWeight: 600,
-                  border: g === genre ? "1px solid var(--accent)" : "1px solid var(--border2)",
-                  background: g === genre ? "rgba(29,185,84,0.15)" : "var(--surface)",
-                  color: g === genre ? "var(--accent)" : "var(--muted)",
+                  padding: "8px 18px", borderRadius: 500, fontSize: 13, fontWeight: 600,
+                  border: g === genre ? "1px solid var(--text)" : "1px solid var(--border2)",
+                  background: g === genre ? "var(--text)" : "var(--surface)",
+                  color: g === genre ? "#fff" : "var(--muted)",
                   display: "inline-flex", alignItems: "center", gap: 5,
+                  transition: "background 0.15s, color 0.15s, border-color 0.15s",
                 }}
               >
                 {GENRE_EMOJI[g] && <span style={{ fontSize: 14 }}>{GENRE_EMOJI[g]}</span>}
@@ -207,6 +273,38 @@ export default async function HomePage({
             </div>
           )}
         </div>
+
+        {/* DIFERENCIAIS */}
+        {!isSearch && (
+          <section style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px 56px" }}>
+            <div style={{
+              display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12,
+            }}>
+              {[
+                { icon: "🎚️", title: "Qualidade profissional", text: "Áudios em alta definição" },
+                { icon: "🎵", title: "Diversos estilos", text: "Rock, Pop, MPB e mais" },
+                { icon: "🕒", title: "Atualizações constantes", text: "Novas músicas toda semana" },
+                { icon: "📖", title: "Catálogo livre", text: "Acesso sem bloqueios no beta" },
+              ].map(({ icon, title, text }) => (
+                <div key={title} style={{
+                  display: "flex", alignItems: "center", gap: 14, padding: "22px 24px",
+                  border: "1px solid var(--border)", borderRadius: 16, background: "var(--surface)",
+                }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--border2)",
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0,
+                  }}>
+                    {icon}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{title}</div>
+                    <div style={{ color: "var(--muted)", fontSize: 13 }}>{text}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* PRO PROMO */}
         {!isSearch && (

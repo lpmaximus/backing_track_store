@@ -4,8 +4,11 @@ import Credentials from "next-auth/providers/credentials";
 import { db, users } from "@/src/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { authConfig } from "./auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+
   providers: [
     Google({
       clientId:     process.env.GOOGLE_CLIENT_ID!,
@@ -32,9 +35,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
 
-  session: { strategy: "jwt" },
-
   callbacks: {
+    ...authConfig.callbacks,
+
     async signIn({ user, account }) {
       if (account?.provider === "google") {
         // Upsert user na nossa tabela
@@ -82,19 +85,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return token;
     },
-
-    async session({ session, token }) {
-      if (token) {
-        (session.user as unknown as { id: string; role: string }).id   = token.id as string;
-        (session.user as unknown as { id: string; role: string }).role = token.role as string;
-      }
-      return session;
-    },
-  },
-
-  pages: {
-    signIn:  "/entrar",
-    signOut: "/",
-    error:   "/entrar",
   },
 });

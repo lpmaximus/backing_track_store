@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
-import SiteHeader from "@/app/components/SiteHeader";
-import SiteFooter from "@/app/components/SiteFooter";
 import Comments from "./Comments";
+import ChordToken from "./ChordDiagram";
 import AddToSetlist from "./AddToSetlist";
 import AdBanner from "@/app/components/AdBanner";
 import type { Stem } from "./WavePlayer";
@@ -40,6 +39,11 @@ type Props = {
   song: Song;
   stems: Stem[];
   isPro?: boolean;
+  // Renderizados pelo componente pai (Server Component) e passados como nó pronto —
+  // SiteHeader usa auth()/db (Neon) e NÃO pode ser importado por um "use client",
+  // senão o bundler leva neon() para o browser ("No database connection string...").
+  header: ReactNode;
+  footer: ReactNode;
 };
 
 function formatTime(s: number) {
@@ -61,7 +65,7 @@ function CifraText({ text, fontSize }: { text: string; fontSize: number }) {
             <div key={i} style={{ marginBottom: 2 }}>
               {line.split(/(\s+)/).map((p, j) =>
                 p.trim()
-                  ? <span key={j} style={{ color: "var(--chord)", fontWeight: 700, marginRight: 10 }}>{p}</span>
+                  ? <ChordToken key={j} name={p} color="var(--chord)" fontSize={fontSize} marginRight={10} />
                   : <span key={j}>{p}</span>
               )}
             </div>
@@ -101,9 +105,7 @@ function ChordDisplay({ sections, currentTime, fontSize }: { sections: ChordSect
             </div>
             <div>
               {sec.chords.split(" ").filter(Boolean).map((chord, j) => (
-                <span key={j} style={{ color: isActive ? "var(--chord)" : "var(--muted)", fontWeight: 700, marginRight: 14, fontSize, transition: "color 0.3s" }}>
-                  {chord}
-                </span>
+                <ChordToken key={j} name={chord} color={isActive ? "var(--chord)" : "var(--muted)"} fontSize={fontSize} marginRight={14} />
               ))}
             </div>
           </div>
@@ -114,22 +116,50 @@ function ChordDisplay({ sections, currentTime, fontSize }: { sections: ChordSect
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-export default function SongPlayer({ song, stems, isPro = false }: Props) {
+export default function SongPlayer({ song, stems, isPro = false, header, footer }: Props) {
   const [currentTime, setCurrentTime]   = useState(0);
   const [autoScroll,  setAutoScroll]    = useState(false);
   const [scrollSpd,   setScrollSpd]     = useState(1);
   const [fontSize,    setFontSize]       = useState(14);
-  const cifraRef = useState<HTMLDivElement | null>(null);
-  const scrollIntervalRef = useState<ReturnType<typeof setInterval> | null>(null);
+  const cifraRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll effect
+  // Auto-scroll: enquanto `autoScroll` estiver ativo, rola o container da cifra
+  // suavemente, na velocidade definida em `scrollSpd` (px por tick).
+  useEffect(() => {
+    if (!autoScroll) return;
+    const el = cifraRef.current;
+    if (!el) return;
+
+    const id = setInterval(() => {
+      el.scrollTop += scrollSpd;
+      // Chegou ao fim — para automaticamente.
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) {
+        setAutoScroll(false);
+      }
+    }, 50);
+
+    return () => clearInterval(id);
+  }, [autoScroll, scrollSpd]);
+
+  // Atalho de teclado "A" para ligar/desligar o auto-scroll
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "a") return;
+      const target = e.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
+      setAutoScroll(v => !v);
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
+
   const handleAutoScrollToggle = () => {
     setAutoScroll(v => !v);
   };
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
-      <SiteHeader />
+      {header}
 
       <div style={{ flex: 1, maxWidth: 1200, margin: "0 auto", padding: "24px 24px 40px", width: "100%", display: "flex", flexDirection: "column", gap: 20 }}>
 
@@ -187,8 +217,8 @@ export default function SongPlayer({ song, stems, isPro = false }: Props) {
               </div>
               {/* Content */}
               <div
-                ref={el => { (cifraRef as unknown as React.MutableRefObject<HTMLDivElement | null>).current = el; }}
-                style={{ padding: "20px 24px", overflowY: "auto", maxHeight: "calc(100vh - 440px)", minHeight: 280 }}
+                ref={cifraRef}
+                style={{ padding: "20px 24px", overflowY: "auto", maxHeight: "calc(100vh - 280px)", minHeight: 520 }}
               >
                 {song.chords && song.chords.length > 0
                   ? <ChordDisplay sections={song.chords} currentTime={currentTime} fontSize={fontSize} />
@@ -261,7 +291,7 @@ export default function SongPlayer({ song, stems, isPro = false }: Props) {
         <Comments songId={song.id} />
       </div>
 
-      <SiteFooter />
+      {footer}
     </div>
   );
 }

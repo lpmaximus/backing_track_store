@@ -3,6 +3,8 @@ import { db, songs as songsTable, stems as stemsTable } from "@/src/db";
 import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import SongPlayer from "./SongPlayer";
+import SiteHeader from "@/app/components/SiteHeader";
+import SiteFooter from "@/app/components/SiteFooter";
 
 export const dynamic = "force-dynamic";
 
@@ -26,5 +28,13 @@ export default async function SongPage({ params }: { params: Promise<{ slug: str
   const session = await auth();
   const isPro = session?.user?.role === "pro" || session?.user?.role === "admin";
 
-  return <SongPlayer song={song} stems={stems} isPro={isPro} />;
+  return (
+    <SongPlayer
+      song={song}
+      stems={stems}
+      isPro={isPro}
+      header={<SiteHeader />}
+      footer={<SiteFooter />}
+    />
+  );
 }

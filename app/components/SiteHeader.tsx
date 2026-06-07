@@ -5,6 +5,7 @@ import UserMenu from "./UserMenu";
 
 const NAV = [
   { label: "Explorar", href: "/" },
+  { label: "Gêneros",  href: "/#catalogo" },
   { label: "Planos",   href: "/planos" },
 ];
 
@@ -41,13 +42,29 @@ export default async function SiteHeader() {
           ))}
         </nav>
 
+        {/* Busca rápida */}
+        <Link href="/#catalogo" aria-label="Buscar músicas" title="Buscar" className="nav-link" style={{ fontSize: 17, display: "flex", alignItems: "center" }}>
+          🔍
+        </Link>
+
         {/* Auth */}
         {user ? (
           <UserMenu user={{ name: user.name ?? null, email: user.email ?? "", image: user.image ?? null, role: user.role }} />
         ) : (
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <Link href="/entrar" className="nav-link" style={{ fontWeight: 600 }}>Entrar</Link>
-            <Link href="/planos" className="btn-primary" style={{ padding: "8px 20px", fontSize: 13 }}>Seja Pro</Link>
+            <span
+              aria-disabled="true"
+              title="Em breve — ainda não vendemos planos durante o beta"
+              style={{
+                padding: "8px 20px", fontSize: 13, fontWeight: 600, borderRadius: 14,
+                background: "var(--surface3)", color: "var(--muted2)",
+                cursor: "not-allowed", display: "inline-flex", alignItems: "center", gap: 6,
+                border: "1px solid var(--border2)",
+              }}
+            >
+              Seja Pro <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.06em" }}>(em breve)</span>
+            </span>
           </div>
         )}
       </div>

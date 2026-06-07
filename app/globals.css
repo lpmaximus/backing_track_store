@@ -1,5 +1,5 @@
-@import "tailwindcss";
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
+@import "tailwindcss";
 
 :root {
   /* Tema claro — clean, inspirado em arquive/home.html */
@@ -123,6 +123,13 @@ input[type="range"]::-webkit-slider-thumb:hover {
   border-color: var(--border2);
 }
 
+/* Cards de destaque "Em alta agora" */
+.song-card-featured:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.08);
+  border-color: var(--border2);
+}
+
 /* Nav links */
 .nav-link {
   color: var(--muted);
@@ -132,6 +139,31 @@ input[type="range"]::-webkit-slider-thumb:hover {
   text-decoration: none;
 }
 .nav-link:hover { color: var(--text); }
+
+/* Hero — duas colunas, empilha em telas estreitas */
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 48px;
+}
+@media (max-width: 880px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 32px; }
+  .hero-grid h1 { font-size: 48px !important; }
+}
+
+/* Grid de colunas do rodapé — responsivo */
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.3fr repeat(3, 1fr);
+  gap: 32px;
+}
+@media (max-width: 880px) {
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .footer-grid { grid-template-columns: 1fr; }
+}
 
 /* Footer links */
 .footer-link {
