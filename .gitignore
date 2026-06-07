@@ -43,4 +43,3 @@ next-env.d.ts
 # Arquivos locais e segredos
 arquive/
 scripts/
-src/types/
