@@ -43,7 +43,7 @@ export default async function SiteHeader() {
 
         {/* Auth */}
         {user ? (
-          <UserMenu user={{ name: user.name ?? null, email: user.email, image: user.image ?? null, role: user.role }} />
+          <UserMenu user={{ name: user.name ?? null, email: user.email ?? "", image: user.image ?? null, role: user.role }} />
         ) : (
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <Link href="/entrar" className="nav-link" style={{ fontWeight: 600 }}>Entrar</Link>
