@@ -80,7 +80,7 @@ function EntrarForm() {
       }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{ fontSize: 28, fontWeight: 900, color: "#fff", marginBottom: 4 }}>
+          <div style={{ fontSize: 28, fontWeight: 900, color: "var(--text)", marginBottom: 4 }}>
             Backing<span style={{ color: "var(--accent)" }}>Track</span>.store
           </div>
           <p style={{ color: "var(--muted)", fontSize: 14, margin: 0 }}>

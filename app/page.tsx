@@ -62,7 +62,7 @@ export default async function HomePage({
                   ● PARA MÚSICOS
                 </span>
               </div>
-              <h1 style={{ fontSize: 72, fontWeight: 900, lineHeight: 0.95, margin: "0 0 24px", color: "#fff", letterSpacing: "-0.02em" }}>
+              <h1 style={{ fontSize: 72, fontWeight: 900, lineHeight: 0.95, margin: "0 0 24px", color: "var(--text)", letterSpacing: "-0.02em" }}>
                 Backing<br /><span style={{ color: "var(--accent)" }}>tracks</span><br />+ cifras.
               </h1>
               <p style={{ fontSize: 20, color: "var(--muted)", lineHeight: 1.6, margin: "0 0 36px", maxWidth: 480 }}>
@@ -83,7 +83,7 @@ export default async function HomePage({
                   { label: "Acesso",   value: "Free" },
                 ].map(({ label, value }) => (
                   <div key={label}>
-                    <div style={{ fontSize: 28, fontWeight: 900, color: "#fff" }}>{value}</div>
+                    <div style={{ fontSize: 28, fontWeight: 900, color: "var(--text)" }}>{value}</div>
                     <div style={{ fontSize: 13, color: "var(--muted)" }}>{label}</div>
                   </div>
                 ))}
@@ -94,14 +94,14 @@ export default async function HomePage({
             <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
               <div style={{
                 width: "100%", maxWidth: 480, background: "var(--surface)",
-                borderRadius: 20, border: "1px solid var(--border2)", overflow: "hidden",
-                boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
+                borderRadius: 20, border: "1px solid var(--border)", overflow: "hidden",
+                boxShadow: "0 24px 80px rgba(0,0,0,0.1)",
               }}>
                 <div style={{ padding: "18px 20px", borderBottom: "1px solid var(--border)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{ width: 48, height: 48, borderRadius: 6, background: "linear-gradient(135deg,#1db954,#0f7a3a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🎸</div>
                     <div>
-                      <div style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}>Garota de Ipanema</div>
+                      <div style={{ color: "var(--text)", fontWeight: 700, fontSize: 14 }}>Garota de Ipanema</div>
                       <div style={{ color: "var(--muted)", fontSize: 12 }}>Tom Jobim · Bossa Nova</div>
                     </div>
                     <div style={{ marginLeft: "auto", color: "var(--accent)", fontWeight: 700, fontSize: 12 }}>▶ 2:14</div>
@@ -131,7 +131,7 @@ export default async function HomePage({
 
           {/* Search */}
           <form method="GET" style={{ marginBottom: 24 }}>
-            <div style={{ background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 10, display: "flex", alignItems: "center", padding: "0 16px", gap: 10, maxWidth: 440 }}>
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 14, display: "flex", alignItems: "center", padding: "0 16px", gap: 10, maxWidth: 440 }}>
               <span style={{ color: "var(--muted)", fontSize: 16 }}>🔍</span>
               <input
                 name="q" defaultValue={q} placeholder="Buscar música ou artista..."
@@ -160,7 +160,7 @@ export default async function HomePage({
             ))}
           </div>
 
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#fff", margin: "0 0 18px" }}>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", margin: "0 0 18px" }}>
             {q ? `Resultados para "${q}"` : genre !== "Todos" ? `${GENRE_EMOJI[genre] ?? ""} ${genre}` : "🔥 Em alta agora"}
           </h2>
 
@@ -182,7 +182,7 @@ export default async function HomePage({
                     }
                   </div>
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: "#fff", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {song.title}
                     </div>
                     <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -206,13 +206,13 @@ export default async function HomePage({
         {!isSearch && (
           <section style={{ maxWidth: 1200, margin: "0 auto 64px", padding: "0 24px" }}>
             <div style={{
-              background: "linear-gradient(135deg, var(--surface) 0%, #0a2016 100%)",
-              border: "1px solid rgba(29,185,84,0.2)", borderRadius: 18, padding: "36px 44px",
+              background: "linear-gradient(135deg, #ffffff 0%, #eafbf1 100%)",
+              border: "1px solid rgba(29,185,84,0.25)", borderRadius: 20, padding: "36px 44px",
               display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 32,
             }}>
               <div>
                 <span className="pro-badge" style={{ display: "inline-block", marginBottom: 12 }}>PRO</span>
-                <h3 style={{ fontSize: 26, fontWeight: 900, color: "#fff", margin: "0 0 10px" }}>
+                <h3 style={{ fontSize: 26, fontWeight: 900, color: "var(--text)", margin: "0 0 10px" }}>
                   Eleve sua prática ao próximo nível
                 </h3>
                 <p style={{ color: "var(--muted)", fontSize: 15, margin: 0, lineHeight: 1.6 }}>

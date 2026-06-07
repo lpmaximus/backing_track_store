@@ -14,7 +14,7 @@ export default async function SiteHeader() {
 
   return (
     <header style={{
-      background: "rgba(15,15,15,0.92)",
+      background: "rgba(255,255,255,0.85)",
       backdropFilter: "blur(12px)",
       borderBottom: "1px solid var(--border)",
       position: "sticky",
@@ -23,14 +23,14 @@ export default async function SiteHeader() {
     }}>
       <div style={{
         maxWidth: 1200, margin: "0 auto", padding: "0 24px",
-        height: 64, display: "flex", alignItems: "center", gap: 40,
+        height: 72, display: "flex", alignItems: "center", gap: 40,
       }}>
         {/* Logo */}
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <Image src="/logo-bts.png" alt="BTS" width={40} height={40} />
+          <Image src="/logo-bts.png" alt="BTS" width={40} height={40} style={{ borderRadius: 10 }} />
           <div style={{ lineHeight: 1.15 }}>
-            <div style={{ fontWeight: 900, fontSize: 11, color: "#fff", letterSpacing: "0.12em" }}>BACKING</div>
-            <div style={{ fontWeight: 900, fontSize: 11, color: "var(--accent)", letterSpacing: "0.12em" }}>TRACK STORE</div>
+            <div style={{ fontWeight: 800, fontSize: 11, color: "var(--text)", letterSpacing: "0.12em" }}>BACKING</div>
+            <div style={{ fontWeight: 800, fontSize: 11, color: "var(--accent)", letterSpacing: "0.12em" }}>TRACK STORE</div>
           </div>
         </Link>
 

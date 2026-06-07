@@ -32,14 +32,14 @@ export default function UserMenu({ user }: Props) {
           <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
           <div style={{
             position: "absolute", top: "calc(100% + 10px)", right: 0, zIndex: 50,
-            background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 12,
-            padding: 8, minWidth: 200, boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+            background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16,
+            padding: 8, minWidth: 240, maxWidth: 320, boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
           }}>
             <div style={{ padding: "8px 12px 12px", borderBottom: "1px solid var(--border)" }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 2 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {user.name ?? "Usuario"}
               </div>
-              <div style={{ fontSize: 12, color: "var(--muted)" }}>{user.email}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user.email}</div>
             </div>
             <div style={{ padding: "8px 0" }}>
               {!isPro && (

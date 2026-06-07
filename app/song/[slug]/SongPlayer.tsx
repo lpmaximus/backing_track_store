@@ -142,7 +142,7 @@ export default function SongPlayer({ song, stems, isPro = false }: Props) {
             <Link href="/" style={{ color: "var(--muted)", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 8 }}>
               ← Voltar ao catálogo
             </Link>
-            <h1 style={{ fontWeight: 900, fontSize: 26, margin: "0 0 5px", color: "#fff" }}>{song.title}</h1>
+            <h1 style={{ fontWeight: 900, fontSize: 26, margin: "0 0 5px", color: "var(--text)" }}>{song.title}</h1>
             <p style={{ color: "var(--muted)", fontSize: 14, margin: 0 }}>
               {song.artist} · {song.genre} · Tom: <strong style={{ color: "var(--text)" }}>{song.key}</strong> · {song.bpm} BPM
             </p>
@@ -237,7 +237,7 @@ export default function SongPlayer({ song, stems, isPro = false }: Props) {
 
             {/* Pro upsell */}
             {!isPro && (
-              <div style={{ background: "linear-gradient(135deg, var(--surface) 0%, #0a2016 100%)", border: "1px solid rgba(29,185,84,0.2)", borderRadius: 12, padding: 16, textAlign: "center" }}>
+              <div style={{ background: "linear-gradient(135deg, #ffffff 0%, #eafbf1 100%)", border: "1px solid rgba(29,185,84,0.25)", borderRadius: 12, padding: 16, textAlign: "center" }}>
                 <span className="pro-badge" style={{ display: "inline-block", marginBottom: 10 }}>PRO</span>
                 <p style={{ color: "var(--muted)", fontSize: 12, lineHeight: 1.5, margin: "0 0 12px" }}>Stems, pitch shift e loop A-B</p>
                 <Link href="/planos" className="btn-primary" style={{ padding: "8px 16px", fontSize: 12, display: "block" }}>

@@ -53,7 +53,7 @@ export default function WavePlayer({
       const WaveSurfer = (await import("wavesurfer.js")).default;
       ws = WaveSurfer.create({
         container: waveRef.current!,
-        waveColor: "#3a3a3a",
+        waveColor: "#dddddd",
         progressColor: "#1db954",
         cursorColor: "#1db954",
         cursorWidth: 2,
@@ -175,7 +175,7 @@ export default function WavePlayer({
             </button>
 
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{songTitle}</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{songTitle}</div>
               <div style={{ color: "var(--muted)", fontSize: 12 }}>{songArtist}</div>
             </div>
 

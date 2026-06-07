@@ -88,7 +88,7 @@ export default function PlanosPage() {
 
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 52 }}>
-          <h1 style={{ fontSize: 48, fontWeight: 900, color: "#fff", margin: "0 0 16px", letterSpacing: "-0.02em" }}>
+          <h1 style={{ fontSize: 48, fontWeight: 900, color: "var(--text)", margin: "0 0 16px", letterSpacing: "-0.02em" }}>
             Escolha seu plano
           </h1>
           <p style={{ color: "var(--muted)", fontSize: 18, margin: 0 }}>
@@ -122,7 +122,7 @@ export default function PlanosPage() {
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "28px 28px 32px" }}>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: "var(--muted)", letterSpacing: "0.1em", marginBottom: 8 }}>FREE</div>
-              <div style={{ fontSize: 36, fontWeight: 900, color: "#fff" }}>R$0</div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: "var(--text)" }}>R$0</div>
               <div style={{ color: "var(--muted)", fontSize: 14, marginTop: 4 }}>para sempre</div>
             </div>
             <div style={{ display: "flex", flexDirection: "column" as const, gap: 10, marginBottom: 24 }}>
@@ -144,8 +144,8 @@ export default function PlanosPage() {
 
           {/* Pro */}
           <div style={{
-            background: "linear-gradient(160deg, var(--surface) 0%, #0a2016 100%)",
-            border: "1px solid rgba(29,185,84,0.4)", borderRadius: 16, padding: "28px 28px 32px",
+            background: "linear-gradient(160deg, #ffffff 0%, #eafbf1 100%)",
+            border: "1px solid rgba(29,185,84,0.35)", borderRadius: 16, padding: "28px 28px 32px",
             position: "relative" as const,
           }}>
             <div style={{ position: "absolute" as const, top: -12, left: "50%", transform: "translateX(-50%)" }}>
@@ -156,7 +156,7 @@ export default function PlanosPage() {
 
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: "var(--accent)", letterSpacing: "0.1em", marginBottom: 8 }}>PRO</div>
-              <div style={{ fontSize: 36, fontWeight: 900, color: "#fff" }}>{price}</div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: "var(--text)" }}>{price}</div>
               <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
                 7 dias gratis{savings}
               </div>
