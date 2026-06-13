@@ -12,6 +12,13 @@ const { auth } = NextAuth(authConfig);
 export default auth((req: NextRequest & { auth: Session | null }) => {
   const { pathname } = req.nextUrl;
 
+  // ── MAINTENANCE MODE ────────────────────────────────────────────────────────
+  // Para ligar: MAINTENANCE_MODE=true no .env.local (ou variável de ambiente).
+  // Para desligar: mudar para false ou remover a variável.
+  if (process.env.MAINTENANCE_MODE === "true" && pathname !== "/coming-soon") {
+    return NextResponse.redirect(new URL("/coming-soon", req.url));
+  }
+
   // Rotas protegidas que exigem login
   const protectedPaths = ["/setlist", "/perfil"];
   const isProtected = protectedPaths.some(p => pathname.startsWith(p));
