@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 export default function ComingSoonPage() {
   const [email, setEmail]     = useState("");
@@ -44,17 +45,16 @@ export default function ComingSoonPage() {
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
     }}>
 
-      {/* Logo / Selo */}
-      <div style={{
-        width: 96, height: 96, borderRadius: "50%",
-        border: "2px solid #222",
-        background: "#111",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        marginBottom: 40,
-      }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "0.05em", color: "#fff" }}>★ BTS ★</div>
-        </div>
+      {/* Logo */}
+      <div style={{ marginBottom: 40 }}>
+        <Image
+          src="/LogoBTS_small.png"
+          alt="Backing Track Store"
+          width={200}
+          height={200}
+          priority
+          style={{ display: "block" }}
+        />
       </div>
 
       {/* Headline */}
