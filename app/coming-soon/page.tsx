@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 
 export default function ComingSoonPage() {
   const [email, setEmail]     = useState("");
@@ -27,7 +26,8 @@ export default function ComingSoonPage() {
         setStatus("error");
         setMessage(data.error || "Algo deu errado. Tente novamente.");
       }
-    } catch {
+    } catch (err) {
+      console.error("[waitlist]", err);
       setStatus("error");
       setMessage("Sem conexão. Tente novamente.");
     }
@@ -46,16 +46,14 @@ export default function ComingSoonPage() {
     }}>
 
       {/* Logo */}
-      <div style={{ marginBottom: 40 }}>
-        <Image
-          src="/LogoBTS_small.png"
-          alt="Backing Track Store"
-          width={200}
-          height={200}
-          priority
-          style={{ display: "block" }}
-        />
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/LogoBTS_small.png"
+        alt="Backing Track Store"
+        width={200}
+        height={200}
+        style={{ display: "block", marginBottom: 40 }}
+      />
 
       {/* Headline */}
       <h1 style={{
