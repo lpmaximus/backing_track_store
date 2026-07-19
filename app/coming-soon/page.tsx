@@ -172,8 +172,8 @@ export default function ComingSoonPage() {
       }}>
         <span style={{ color: "#333", fontSize: 12 }}>backingtrack.store</span>
         <span style={{ color: "#222", fontSize: 12 }}>·</span>
-        <a href="mailto:l2techs.ia@gmail.com" style={{ color: "#444", fontSize: 12, textDecoration: "none" }}>
-          l2techs.ia@gmail.com
+        <a href="mailto:contato@l2techs.com" style={{ color: "#444", fontSize: 12, textDecoration: "none" }}>
+          contato@l2techs.com
         </a>
         <span style={{ color: "#222", fontSize: 12 }}>·</span>
         <span style={{ color: "#333", fontSize: 12 }}>© {new Date().getFullYear()}</span>
