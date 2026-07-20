@@ -97,8 +97,8 @@ export default function PlanosContent() {
 
         {/* Pro */}
         <div style={{
-          background: "linear-gradient(160deg, #ffffff 0%, #eafbf1 100%)",
-          border: "1px solid rgba(29,185,84,0.35)", borderRadius: 16, padding: "28px 28px 32px",
+          background: "linear-gradient(160deg, #ffffff 0%, #fff4e0 100%)",
+          border: "1px solid rgba(255,154,0,0.35)", borderRadius: 16, padding: "28px 28px 32px",
           position: "relative" as const,
         }}>
           <div style={{ position: "absolute" as const, top: -12, left: "50%", transform: "translateX(-50%)" }}>
@@ -129,7 +129,7 @@ export default function PlanosContent() {
           </div>
 
           {isPro ? (
-            <div style={{ textAlign: "center", padding: "11px 0", background: "rgba(29,185,84,0.15)", border: "1px solid rgba(29,185,84,0.3)", borderRadius: 500, color: "var(--accent)", fontWeight: 700, fontSize: 14 }}>
+            <div style={{ textAlign: "center", padding: "11px 0", background: "rgba(255,154,0,0.15)", border: "1px solid rgba(255,154,0,0.3)", borderRadius: 500, color: "var(--accent)", fontWeight: 700, fontSize: 14 }}>
               ✓ Voce ja e Pro
             </div>
           ) : (

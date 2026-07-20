@@ -1,31 +1,28 @@
 import Link from "next/link";
+import BrandLogo from "./BrandLogo";
 
-const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
+const COLUMNS: { title: string; links: { label: string; href: string; disabled?: boolean }[] }[] = [
   {
     title: "Produto",
     links: [
-      { label: "Explorar músicas", href: "/" },
-      { label: "Planos",           href: "/planos" },
-      { label: "Setlists",         href: "/setlists" },
-      { label: "Como funciona",    href: "/#catalogo" },
-    ],
-  },
-  {
-    title: "Saiba mais",
-    links: [
-      { label: "Blog",             href: "/blog" },
-      { label: "Para artistas",    href: "/artistas" },
-      { label: "Central de ajuda", href: "/faq" },
-      { label: "Indique um amigo", href: "/planos" },
+      { label: "Separar Stems",          href: "/upload" },
+      { label: "Minhas Músicas",         href: "/perfil" },
+      { label: "Músicas Compartilhadas", href: "/compartilhadas" },
+      { label: "Setlists",               href: "/setlists" },
+      { label: "Bandas",                 href: "/bandas" },
+      // Em beta não vendemos planos ainda — link fica desabilitado (sem navegação).
+      { label: "Planos",                 href: "/planos", disabled: true },
+      { label: "Como funciona",          href: "/como-funciona" },
     ],
   },
   {
     title: "Sobre",
     links: [
-      { label: "Sobre nós",      href: "/sobre" },
-      { label: "Contato",        href: "/contato" },
-      { label: "Termos de Uso",  href: "/termos" },
-      { label: "Privacidade",    href: "/privacidade" },
+      { label: "Sobre nós",           href: "/sobre" },
+      { label: "Contato",             href: "/contato" },
+      { label: "Termos de Uso",       href: "/termos" },
+      { label: "Privacidade",         href: "/privacidade" },
+      { label: "Política de Cookies", href: "/cookies" },
     ],
   },
 ];
@@ -79,11 +76,10 @@ export default function SiteFooter() {
         <div className="footer-grid" style={{ marginBottom: 36 }}>
           {/* Marca + idioma + redes sociais */}
           <div>
-            <div style={{ lineHeight: 1.15, marginBottom: 14 }}>
-              <div style={{ fontWeight: 800, fontSize: 12, color: "var(--text)", letterSpacing: "0.12em" }}>BACKING</div>
-              <div style={{ fontWeight: 800, fontSize: 12, color: "var(--accent)", letterSpacing: "0.12em" }}>TRACK STORE</div>
+            <div style={{ marginBottom: 16 }}>
+              <BrandLogo size={30} variant="dark" />
             </div>
-            <p style={{ color: "var(--muted)", fontSize: 13, lineHeight: 1.6, margin: "0 0 18px", maxWidth: 240 }}>
+            <p style={{ color: "var(--muted)", fontSize: 13.5, fontWeight: 400, lineHeight: 1.7, margin: "0 0 18px", maxWidth: 280 }}>
               Backing tracks com cifra sincronizada para músicos amadores e profissionais. Toque, ensaie e suba ao palco.
             </p>
 
@@ -106,16 +102,16 @@ export default function SiteFooter() {
               </select>
             </label>
 
-            {/* Redes sociais */}
+            {/* Redes sociais — apenas ícones, sem link (ainda não temos perfis ativos) */}
             <div style={{ display: "flex", gap: 10 }}>
-              {SOCIAL.map(({ label, href, icon }) => (
-                <Link key={label} href={href} aria-label={label} title={label} style={{
+              {SOCIAL.map(({ label, icon }) => (
+                <span key={label} aria-label={label} title={label} style={{
                   width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--border2)",
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                   color: "var(--muted)",
                 }}>
                   {icon}
-                </Link>
+                </span>
               ))}
             </div>
           </div>
@@ -127,8 +123,15 @@ export default function SiteFooter() {
                 {title.toUpperCase()}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {links.map(({ label, href }) => (
-                  <Link key={label} href={href} className="footer-link">{label}</Link>
+                {links.map(({ label, href, disabled }) => (
+                  disabled ? (
+                    <span key={label} className="footer-link" title="Em breve"
+                      style={{ cursor: "default", opacity: 0.6 }}>
+                      {label}
+                    </span>
+                  ) : (
+                    <Link key={label} href={href} className="footer-link">{label}</Link>
+                  )
                 ))}
               </div>
             </div>
@@ -138,22 +141,11 @@ export default function SiteFooter() {
         {/* Linha inferior */}
         <div style={{
           borderTop: "1px solid var(--border)", paddingTop: 20,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          flexWrap: "wrap", gap: 14,
+          display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>
-            © 2026 <span style={{ color: "var(--text)", fontWeight: 600 }}>BackingTrack.store</span> — Para músicos, por músicos.
+          <p style={{ color: "var(--muted)", fontSize: 13, margin: 0, textAlign: "center" }}>
+            © 2026 <span style={{ color: "var(--text)", fontWeight: 600 }}>BackingTrack.store</span> — Conectando músicos através da música
           </p>
-          <div style={{ display: "flex", gap: 20 }}>
-            {[
-              { label: "Termos de Uso", href: "/termos" },
-              { label: "Privacidade",   href: "/privacidade" },
-              { label: "Contato",       href: "/contato" },
-              { label: "FAQ",           href: "/faq" },
-            ].map(({ label, href }) => (
-              <Link key={label} href={href} className="footer-link">{label}</Link>
-            ))}
-          </div>
         </div>
       </div>
     </footer>

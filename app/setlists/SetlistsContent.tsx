@@ -8,6 +8,8 @@ type SetlistItem = {
   id: number;
   name: string;
   notes: string | null;
+  bandId: number | null;
+  bandName: string | null;
   songCount: number;
   createdAt: string;
   updatedAt: string;
@@ -26,23 +28,42 @@ export default function SetlistsContent() {
   const [creating, setCreating] = useState(false);
   const [error, setError]    = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [bands, setBands] = useState<{ id: number; name: string }[]>([]);
+  const [bandId, setBandId] = useState("");
 
-  const isPro = session?.user?.role === "pro" || session?.user?.role === "admin";
+  // Acesso Pro EFETIVO: vem da resposta do servidor (que usa hasProAccess —
+  // inclui membro de banda com assinatura ativa), não do role do JWT.
+  // 403 = sem acesso; 200 = com acesso; null = ainda carregando.
+  const [proAccess, setProAccess] = useState<boolean | null>(null);
+  const isPro = proAccess === true;
+  const accessLoading = status === "loading" || (!!session?.user && proAccess === null);
 
   useEffect(() => {
-    if (status !== "authenticated" || !isPro) { setLoading(false); return; }
+    if (status === "loading") return;
+    if (status !== "authenticated") { setProAccess(false); setLoading(false); return; }
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/setlists");
-        const data = await res.json();
-        if (!cancelled && res.ok) setItems(data.setlists ?? []);
+        const [slRes, bRes] = await Promise.all([fetch("/api/setlists"), fetch("/api/bands")]);
+        if (cancelled) return;
+        if (slRes.status === 403) { setProAccess(false); return; }
+        setProAccess(true);
+        const data = await slRes.json();
+        if (slRes.ok) setItems(data.setlists ?? []);
+        if (bRes.ok) {
+          const bData = await bRes.json();
+          setBands(
+            (bData.bands ?? [])
+              .filter((b: { isLeader: boolean }) => b.isLeader)
+              .map((b: { id: number; name: string }) => ({ id: b.id, name: b.name })),
+          );
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [status, isPro]);
+  }, [status]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -53,16 +74,18 @@ export default function SetlistsContent() {
       const res = await fetch("/api/setlists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), notes: notes.trim() || undefined }),
+        body: JSON.stringify({ name: name.trim(), notes: notes.trim() || undefined, bandId: bandId ? Number(bandId) : undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Erro ao criar setlist");
         return;
       }
-      setItems(prev => [data.setlist, ...prev]);
+      const chosenBand = bands.find(b => String(b.id) === bandId);
+      setItems(prev => [{ ...data.setlist, bandName: chosenBand?.name ?? null }, ...prev]);
       setName("");
       setNotes("");
+      setBandId("");
       setShowForm(false);
     } catch {
       setError("Erro de conexao. Tente novamente.");
@@ -85,13 +108,13 @@ export default function SetlistsContent() {
         )}
       </div>
 
-      {status === "loading" ? null : !session?.user ? (
+      {accessLoading ? null : !session?.user ? (
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 28, textAlign: "center" }}>
           <p style={{ color: "var(--muted)", fontSize: 14, margin: "0 0 14px" }}>Entre na sua conta para criar e gerenciar setlists.</p>
           <Link href="/entrar" className="btn-primary" style={{ padding: "9px 22px", fontSize: 13, display: "inline-block" }}>Entrar</Link>
         </div>
       ) : !isPro ? (
-        <div style={{ background: "linear-gradient(135deg, #ffffff 0%, #eafbf1 100%)", border: "1px solid rgba(29,185,84,0.25)", borderRadius: 12, padding: 28, textAlign: "center" }}>
+        <div style={{ background: "linear-gradient(135deg, #ffffff 0%, #fff4e0 100%)", border: "1px solid rgba(255,154,0,0.25)", borderRadius: 12, padding: 28, textAlign: "center" }}>
           <span className="pro-badge" style={{ display: "inline-block", marginBottom: 12 }}>PRO</span>
           <p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.6, margin: "0 0 16px" }}>
             Setlists sao um recurso exclusivo do plano Pro. Crie repertorios, organize a ordem das musicas e adicione anotacoes para cada show.
@@ -125,6 +148,22 @@ export default function SetlistsContent() {
                   fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box",
                 }}
               />
+              {bands.length > 0 && (
+                <select
+                  value={bandId}
+                  onChange={e => setBandId(e.target.value)}
+                  style={{
+                    width: "100%", padding: "11px 14px", borderRadius: 10, marginBottom: 12,
+                    border: "1px solid var(--border2)", background: "var(--surface2)", color: "var(--text)",
+                    fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box",
+                  }}
+                >
+                  <option value="">Setlist pessoal</option>
+                  {bands.map(b => (
+                    <option key={b.id} value={b.id}>Banda: {b.name}</option>
+                  ))}
+                </select>
+              )}
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <button type="submit" disabled={!name.trim() || creating} className="btn-primary"
                   style={{ padding: "9px 22px", fontSize: 13, opacity: !name.trim() || creating ? 0.6 : 1 }}>
@@ -154,6 +193,11 @@ export default function SetlistsContent() {
                   <div style={{ minWidth: 0 }}>
                     <p style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {s.name}
+                      {s.bandName && (
+                        <span style={{ marginLeft: 8, background: "rgba(255,154,0,0.12)", color: "var(--accent)", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4, whiteSpace: "nowrap" }}>
+                          👥 {s.bandName}
+                        </span>
+                      )}
                     </p>
                     <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>
                       {s.songCount} {s.songCount === 1 ? "musica" : "musicas"} · Atualizada em {formatDate(s.updatedAt)}

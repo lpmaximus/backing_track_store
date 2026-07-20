@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "*.cloudflarestorage.com",
       },
+      {
+        // Foto de perfil do login Google (NextAuth)
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
     ],
   },
 };

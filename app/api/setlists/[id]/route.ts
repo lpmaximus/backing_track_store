@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { db, setlists, setlistSongs, songs } from "@/src/db";
+import { db, setlists, setlistSongs, songs, bandMembers, bands } from "@/src/db";
 import { eq, asc, and } from "drizzle-orm";
+import { hasProAccess } from "@/src/lib/access";
 
-function requirePro(role?: string) {
-  return role === "pro" || role === "admin";
-}
-
+// Mutações (renomear/excluir) continuam só do dono/líder.
 async function loadOwnedSetlist(id: number, userId: number) {
   const [setlist] = await db.select().from(setlists).where(eq(setlists.id, id)).limit(1);
   if (!setlist) return null;
@@ -14,11 +12,27 @@ async function loadOwnedSetlist(id: number, userId: number) {
   return setlist;
 }
 
+// Leitura (GET): dono OU membro ativo da banda dona da setlist (Frente E).
+async function loadAccessibleSetlist(id: number, userId: number) {
+  const [setlist] = await db.select().from(setlists).where(eq(setlists.id, id)).limit(1);
+  if (!setlist) return null;
+  if (setlist.userId === userId) return setlist;
+  if (setlist.bandId) {
+    const [member] = await db
+      .select({ id: bandMembers.id })
+      .from(bandMembers)
+      .where(and(eq(bandMembers.bandId, setlist.bandId), eq(bandMembers.userId, userId), eq(bandMembers.status, "active")))
+      .limit(1);
+    if (member) return setlist;
+  }
+  return "forbidden" as const;
+}
+
 // GET /api/setlists/:id — detalhe com musicas (ordenadas)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
-  if (!requirePro(session.user.role)) {
+  if (!(await hasProAccess(Number(session.user.id), session.user.role))) {
     return NextResponse.json({ error: "Recurso exclusivo do plano Pro" }, { status: 403 });
   }
 
@@ -28,7 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!id) return NextResponse.json({ error: "ID invalido" }, { status: 400 });
 
     const userId = Number(session.user.id);
-    const setlist = await loadOwnedSetlist(id, userId);
+    const setlist = await loadAccessibleSetlist(id, userId);
     if (!setlist) return NextResponse.json({ error: "Setlist nao encontrada" }, { status: 404 });
     if (setlist === "forbidden") return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
 
@@ -51,7 +65,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .where(eq(setlistSongs.setlistId, id))
       .orderBy(asc(setlistSongs.position), asc(setlistSongs.id));
 
-    return NextResponse.json({ setlist, songs: items });
+    // Nome da banda (se for setlist compartilhada) + instrumento do viewer, para
+    // que o player pré-mute tudo menos a trilha dele ao abrir a música (R2).
+    let bandName: string | null = null;
+    let viewerInstrument: string | null = null;
+    if (setlist.bandId) {
+      const [band] = await db.select({ name: bands.name }).from(bands).where(eq(bands.id, setlist.bandId)).limit(1);
+      bandName = band?.name ?? null;
+      const [membership] = await db
+        .select({ instrument: bandMembers.instrument })
+        .from(bandMembers)
+        .where(and(eq(bandMembers.bandId, setlist.bandId), eq(bandMembers.userId, userId), eq(bandMembers.status, "active")))
+        .limit(1);
+      viewerInstrument = membership?.instrument ?? null;
+    }
+
+    return NextResponse.json({
+      setlist: { ...setlist, bandName, viewerInstrument, canEdit: setlist.userId === userId },
+      songs: items,
+    });
   } catch (err) {
     console.error("[GET /api/setlists/:id]", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
@@ -62,7 +94,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
-  if (!requirePro(session.user.role)) {
+  if (!(await hasProAccess(Number(session.user.id), session.user.role))) {
     return NextResponse.json({ error: "Recurso exclusivo do plano Pro" }, { status: 403 });
   }
 
@@ -100,7 +132,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
-  if (!requirePro(session.user.role)) {
+  if (!(await hasProAccess(Number(session.user.id), session.user.role))) {
     return NextResponse.json({ error: "Recurso exclusivo do plano Pro" }, { status: 403 });
   }
 

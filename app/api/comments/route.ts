@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db, comments, users, songs } from "@/src/db";
 import { eq, desc } from "drizzle-orm";
+import { roleCan } from "@/src/lib/permissions";
 
 // GET /api/comments?songId=123 — qualquer pessoa pode ler (Free incluso)
 export async function GET(req: NextRequest) {
@@ -37,8 +38,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
   }
 
-  const role = session.user.role;
-  if (role !== "pro" && role !== "admin") {
+  // Comunidade: Pro/ProBand/admin escrevem; Free e FreeBand só leem (ADR-BTS-002).
+  if (!roleCan(session.user.role, "comment_publication")) {
     return NextResponse.json({ error: "Apenas assinantes Pro podem comentar" }, { status: 403 });
   }
 

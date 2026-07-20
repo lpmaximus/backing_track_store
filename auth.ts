@@ -6,6 +6,11 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { authConfig } from "./auth.config";
 
+// Conta impedida de logar: suspensa, banida ou em processo de exclusão (R3).
+function isLoginBlocked(u: { status?: string | null; deletionScheduledAt?: Date | null }): boolean {
+  return u.status === "blocked" || u.status === "banned" || Boolean(u.deletionScheduledAt);
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
 
@@ -30,6 +35,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!user || !user.passwordHash) return null;
         const valid = await bcrypt.compare(credentials.password as string, user.passwordHash);
         if (!valid) return null;
+        // Conta suspensa/banida ou marcada para exclusão não loga (R3).
+        if (isLoginBlocked(user)) return null;
         return { id: String(user.id), email: user.email, name: user.name, role: user.role };
       },
     }),
@@ -56,6 +63,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             providerId: user.id,
             role:       "free",
           });
+        } else if (isLoginBlocked(existing)) {
+          // Conta suspensa/banida ou em exclusão não entra via Google (R3).
+          return false;
         }
       }
       return true;

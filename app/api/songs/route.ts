@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, songs } from "@/src/db";
-import { eq, ilike, or, and } from "drizzle-orm";
+import { eq, ilike, or, and, ne } from "drizzle-orm";
 
 function isAdmin(req: NextRequest) {
   return req.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
@@ -20,8 +20,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(song);
     }
 
-    // Lista com filtros opcionais
-    const conditions = [eq(songs.published, true)];
+    // Lista com filtros opcionais (oculta bloqueadas por moderação — R3)
+    const conditions = [eq(songs.published, true), ne(songs.moderationStatus, "blocked")];
     if (genre && genre !== "Todos") conditions.push(eq(songs.genre, genre));
     if (q) {
       const cond = or(ilike(songs.title, `%${q}%`), ilike(songs.artist, `%${q}%`));

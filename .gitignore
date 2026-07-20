@@ -43,3 +43,6 @@ next-env.d.ts
 # Arquivos locais e segredos
 arquive/
 scripts/
+
+# scripts descartáveis de migração/debug (rodados localmente)
+_*.mjs

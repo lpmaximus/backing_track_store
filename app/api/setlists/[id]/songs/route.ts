@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db, setlists, setlistSongs, songs } from "@/src/db";
 import { eq, max } from "drizzle-orm";
-
-function requirePro(role?: string) {
-  return role === "pro" || role === "admin";
-}
+import { hasProAccess } from "@/src/lib/access";
 
 async function loadOwnedSetlist(id: number, userId: number) {
   const [setlist] = await db.select().from(setlists).where(eq(setlists.id, id)).limit(1);
@@ -18,7 +15,7 @@ async function loadOwnedSetlist(id: number, userId: number) {
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
-  if (!requirePro(session.user.role)) {
+  if (!(await hasProAccess(Number(session.user.id), session.user.role))) {
     return NextResponse.json({ error: "Recurso exclusivo do plano Pro" }, { status: 403 });
   }
 

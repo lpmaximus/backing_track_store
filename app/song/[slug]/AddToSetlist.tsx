@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { isProRole } from "@/src/lib/roles";
 
 type SetlistItem = {
   id: number;
@@ -19,7 +20,7 @@ export default function AddToSetlist({ songId }: { songId: number }) {
   const [done, setDone]       = useState<Set<number>>(new Set());
   const [error, setError]     = useState("");
 
-  const isPro = session?.user?.role === "pro" || session?.user?.role === "admin";
+  const isPro = isProRole(session?.user?.role);
   if (!isPro) return null;
 
   async function toggle() {

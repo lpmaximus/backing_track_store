@@ -42,7 +42,7 @@ export default function ComingSoonPage() {
       alignItems: "center",
       justifyContent: "center",
       padding: "40px 24px",
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif",
     }}>
 
       {/* Logo */}
@@ -67,7 +67,7 @@ export default function ComingSoonPage() {
         maxWidth: 700,
       }}>
         Backing tracks<br />
-        <span style={{ color: "#1db954" }}>+ cifras.</span><br />
+        <span style={{ color: "#FF9A00" }}>+ cifras.</span><br />
         Em breve.
       </h1>
 
@@ -117,8 +117,8 @@ export default function ComingSoonPage() {
               type="submit"
               disabled={status === "loading"}
               style={{
-                background: "#1db954",
-                color: "#fff",
+                background: "#FF9A00",
+                color: "#0D0D0F",
                 border: "none",
                 padding: "14px 22px",
                 fontWeight: 700,
@@ -145,15 +145,15 @@ export default function ComingSoonPage() {
         </form>
       ) : (
         <div style={{
-          background: "rgba(29,185,84,0.1)",
-          border: "1px solid rgba(29,185,84,0.3)",
+          background: "rgba(255,154,0,0.1)",
+          border: "1px solid rgba(255,154,0,0.3)",
           borderRadius: 12,
           padding: "18px 28px",
           textAlign: "center",
           maxWidth: 400,
         }}>
           <div style={{ fontSize: 24, marginBottom: 8 }}>🎵</div>
-          <p style={{ color: "#1db954", fontWeight: 700, margin: "0 0 4px", fontSize: 15 }}>
+          <p style={{ color: "#FF9A00", fontWeight: 700, margin: "0 0 4px", fontSize: 15 }}>
             Você está na lista!
           </p>
           <p style={{ color: "#666", fontSize: 13, margin: 0 }}>

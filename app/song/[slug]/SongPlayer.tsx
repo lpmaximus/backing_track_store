@@ -4,11 +4,16 @@ import { useState, useRef, useEffect, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
+import { useSession } from "next-auth/react";
 import Comments from "./Comments";
 import ChordToken from "./ChordDiagram";
 import AddToSetlist from "./AddToSetlist";
+import ChordEditor from "./ChordEditor";
+import LyricsEditor from "./LyricsEditor";
 import AdBanner from "@/app/components/AdBanner";
 import type { Stem } from "./WavePlayer";
+
+type LyricsLine = { time: number; text: string };
 
 // WavePlayer usa APIs de browser — importar só no client
 const WavePlayer = dynamic(() => import("./WavePlayer"), { ssr: false });
@@ -32,6 +37,11 @@ type Song = {
   duration: number;
   cifraText: string | null;
   chords: ChordSection[] | null;
+  chordsStatus?: string | null;
+  chordsSource?: string | null;
+  lyrics?: LyricsLine[] | null;
+  lyricsStatus?: string | null;
+  lyricsSource?: string | null;
   published: boolean;
 };
 
@@ -39,6 +49,9 @@ type Props = {
   song: Song;
   stems: Stem[];
   isPro?: boolean;
+  // Trilha-guia da banda: instrumento do integrante. Quando definido, o player
+  // vem com só essa trilha no ar (pré-muta as outras). Ver page.tsx (?solo=).
+  soloInstrument?: string | null;
   // Renderizados pelo componente pai (Server Component) e passados como nó pronto —
   // SiteHeader usa auth()/db (Neon) e NÃO pode ser importado por um "use client",
   // senão o bundler leva neon() para o browser ("No database connection string...").
@@ -92,8 +105,8 @@ function ChordDisplay({ sections, currentTime, fontSize }: { sections: ChordSect
             marginBottom: 18,
             padding: "10px 14px",
             borderRadius: 8,
-            background: isActive ? "rgba(29,185,84,0.08)" : "transparent",
-            border: isActive ? "1px solid rgba(29,185,84,0.25)" : "1px solid transparent",
+            background: isActive ? "rgba(255,154,0,0.08)" : "transparent",
+            border: isActive ? "1px solid rgba(255,154,0,0.25)" : "1px solid transparent",
             transition: "all 0.3s",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -115,13 +128,141 @@ function ChordDisplay({ sections, currentTime, fontSize }: { sections: ChordSect
   );
 }
 
+// ─── Letra sincronizada ───────────────────────────────────────────────────────
+function LyricsDisplay({ lines, currentTime, fontSize }: { lines: LyricsLine[]; currentTime: number; fontSize: number }) {
+  const activeIdx = lines.reduce((best, l, i) => (l.time <= currentTime ? i : best), -1);
+  return (
+    <div style={{ fontSize, lineHeight: 1.9 }}>
+      {lines.map((l, i) => {
+        const isActive = i === activeIdx;
+        return (
+          <p key={i} style={{
+            margin: "0 0 6px",
+            padding: "4px 10px",
+            borderRadius: 6,
+            color: isActive ? "var(--text)" : "var(--muted)",
+            background: isActive ? "rgba(255,154,0,0.10)" : "transparent",
+            fontWeight: isActive ? 700 : 400,
+            transition: "all 0.25s",
+          }}>
+            {l.text}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
-export default function SongPlayer({ song, stems, isPro = false, header, footer }: Props) {
+export default function SongPlayer({ song, stems, isPro = false, soloInstrument = null, header, footer }: Props) {
   const [currentTime, setCurrentTime]   = useState(0);
   const [autoScroll,  setAutoScroll]    = useState(false);
   const [scrollSpd,   setScrollSpd]     = useState(1);
   const [fontSize,    setFontSize]       = useState(14);
   const cifraRef = useRef<HTMLDivElement | null>(null);
+
+  // ── Cifra colaborativa (Frentes C/D) ──
+  const { status: authStatus } = useSession();
+  const isAuth = authStatus === "authenticated";
+  const [chords, setChords]             = useState<ChordSection[] | null>(song.chords);
+  const [chordsStatus, setChordsStatus] = useState<string>(song.chordsStatus ?? "validated");
+  const [editing, setEditing]           = useState(false);
+  const [generating, setGenerating]     = useState(false);
+  const [reported, setReported]         = useState(false);
+
+  // ── Letra (caminho 3: Whisper no vocal + correção da comunidade) ──
+  const [viewMode, setViewMode]                 = useState<"chords" | "lyrics">("chords");
+  const [lyrics, setLyrics]                     = useState<LyricsLine[] | null>(song.lyrics ?? null);
+  const [lyricsStatus, setLyricsStatus]         = useState<string>(song.lyricsStatus ?? "validated");
+  const [editingLyrics, setEditingLyrics]       = useState(false);
+  const [generatingLyrics, setGeneratingLyrics] = useState(false);
+
+  // Frente C: se ainda não há cifra, faz poll do endpoint que finaliza a
+  // detecção automática (Music.ai é assíncrono). Só para usuário logado.
+  useEffect(() => {
+    if (!isAuth) return;
+    if (chords && chords.length > 0) return;
+    let cancelled = false;
+    let tries = 0;
+    const tick = async () => {
+      if (cancelled) return;
+      tries++;
+      try {
+        const res = await fetch(`/api/chords/advance/${song.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && data.chords && data.chords.length > 0) {
+            setChords(data.chords);
+            setChordsStatus(data.chordsStatus ?? "draft");
+            setGenerating(false);
+            return;
+          }
+          if (!cancelled && (data.jobStatus === "none" || data.jobStatus === "failed")) {
+            setGenerating(false);
+            return;
+          }
+          if (!cancelled) setGenerating(true);
+        }
+      } catch { /* ignora e tenta de novo */ }
+      if (!cancelled && tries < 40) setTimeout(tick, 5000);
+      else if (!cancelled) setGenerating(false);
+    };
+    const t = setTimeout(tick, 1200);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [song.id, isAuth]);
+
+  // Letra: mesmo padrão de poll da cifra — finaliza a transcrição automática
+  // (Whisper é assíncrono). Só para usuário logado e enquanto não há letra.
+  useEffect(() => {
+    if (!isAuth) return;
+    if (lyrics && lyrics.length > 0) return;
+    let cancelled = false;
+    let tries = 0;
+    const tick = async () => {
+      if (cancelled) return;
+      tries++;
+      try {
+        const res = await fetch(`/api/lyrics/advance/${song.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && data.lyrics && data.lyrics.length > 0) {
+            setLyrics(data.lyrics);
+            setLyricsStatus(data.lyricsStatus ?? "draft");
+            setGeneratingLyrics(false);
+            return;
+          }
+          if (!cancelled && (data.jobStatus === "none" || data.jobStatus === "failed")) {
+            setGeneratingLyrics(false);
+            return;
+          }
+          if (!cancelled) setGeneratingLyrics(true);
+        }
+      } catch { /* ignora e tenta de novo */ }
+      if (!cancelled && tries < 40) setTimeout(tick, 5000);
+      else if (!cancelled) setGeneratingLyrics(false);
+    };
+    const t = setTimeout(tick, 1500);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [song.id, isAuth]);
+
+  async function reportCifra() {
+    if (reported) return;
+    setReported(true);
+    try {
+      await fetch(`/api/songs/${song.id}/chords/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "" }),
+      });
+    } catch { /* silencioso */ }
+  }
+
+  const hasChords = Boolean(chords && chords.length > 0);
+  const isDraft = chordsStatus === "draft";
+  const hasLyrics = Boolean(lyrics && lyrics.length > 0);
+  const lyricsIsDraft = lyricsStatus === "draft";
 
   // Auto-scroll: enquanto `autoScroll` estiver ativo, rola o container da cifra
   // suavemente, na velocidade definida em `scrollSpd` (px por tick).
@@ -185,11 +326,20 @@ export default function SongPlayer({ song, stems, isPro = false, header, footer 
           )}
         </div>
 
+        {/* ── Trilha-guia da banda: aviso de pré-mute ── */}
+        {soloInstrument && isPro && stems.some(s => s.instrument === soloInstrument) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "rgba(255,154,0,0.08)", border: "1px solid rgba(255,154,0,0.25)", borderRadius: 8, fontSize: 13, color: "var(--muted)" }}>
+            <span style={{ fontSize: 16 }}>🎧</span>
+            <span>Modo banda: sua trilha vem no ar e as demais entram silenciadas. Reative qualquer uma na mesa quando quiser.</span>
+          </div>
+        )}
+
         {/* ── Player WaveSurfer ── */}
         <WavePlayer
           audioUrl={song.audioUrl}
           stems={stems}
           isPro={isPro}
+          soloInstrument={soloInstrument}
           songTitle={song.title}
           songArtist={song.artist}
           onTimeUpdate={setCurrentTime}
@@ -203,11 +353,42 @@ export default function SongPlayer({ song, stems, isPro = false, header, footer 
             <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
               {/* Toolbar */}
               <div style={{ borderBottom: "1px solid var(--border)", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontWeight: 700, fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)" }}>CIFRA</span>
-                {song.chords && song.chords.length > 0 && (
-                  <span style={{ background: "rgba(29,185,84,0.15)", color: "var(--accent)", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4 }}>
-                    ● SINCRONIZADA
-                  </span>
+                {/* Alternância Cifra / Letra */}
+                <div style={{ display: "flex", gap: 4 }}>
+                  {(["chords", "lyrics"] as const).map((m) => (
+                    <button key={m} onClick={() => setViewMode(m)}
+                      style={{ background: viewMode === m ? "var(--accent)" : "var(--surface2)", color: viewMode === m ? "#000" : "var(--muted)", border: "1px solid var(--border2)", borderRadius: 6, padding: "3px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", cursor: "pointer" }}>
+                      {m === "chords" ? "CIFRA" : "LETRA"}
+                    </button>
+                  ))}
+                </div>
+                {viewMode === "chords" ? (
+                  <>
+                    {hasChords && isDraft && (
+                      <span style={{ background: "rgba(245,158,11,0.15)", color: "#b45309", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4 }}>● AUTOMÁTICA · não revisada</span>
+                    )}
+                    {hasChords && !isDraft && (
+                      <span style={{ background: "rgba(255,154,0,0.15)", color: "var(--accent)", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4 }}>● SINCRONIZADA</span>
+                    )}
+                    {isPro && !editing && (
+                      <button onClick={() => setEditing(true)} style={{ background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", color: "var(--text)", fontWeight: 600 }}>✎ Sugerir correção</button>
+                    )}
+                    {isAuth && hasChords && (
+                      <button onClick={reportCifra} disabled={reported} style={{ background: "none", border: "none", color: reported ? "var(--accent)" : "var(--muted2)", fontSize: 12, cursor: reported ? "default" : "pointer", fontWeight: 600 }}>{reported ? "✓ Reportada" : "⚑ Reportar erro"}</button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {hasLyrics && lyricsIsDraft && (
+                      <span style={{ background: "rgba(245,158,11,0.15)", color: "#b45309", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4 }}>● AUTOMÁTICA · não revisada</span>
+                    )}
+                    {hasLyrics && !lyricsIsDraft && (
+                      <span style={{ background: "rgba(255,154,0,0.15)", color: "var(--accent)", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4 }}>● SINCRONIZADA</span>
+                    )}
+                    {isPro && !editingLyrics && hasLyrics && (
+                      <button onClick={() => setEditingLyrics(true)} style={{ background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", color: "var(--text)", fontWeight: 600 }}>✎ Sugerir correção</button>
+                    )}
+                  </>
                 )}
                 <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
                   <button onClick={() => setFontSize(v => Math.max(11, v - 1))} style={{ background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", color: "var(--text)", fontWeight: 600 }}>A-</button>
@@ -220,12 +401,35 @@ export default function SongPlayer({ song, stems, isPro = false, header, footer 
                 ref={cifraRef}
                 style={{ padding: "20px 24px", overflowY: "auto", maxHeight: "calc(100vh - 280px)", minHeight: 520 }}
               >
-                {song.chords && song.chords.length > 0
-                  ? <ChordDisplay sections={song.chords} currentTime={currentTime} fontSize={fontSize} />
-                  : song.cifraText
-                    ? <CifraText text={song.cifraText} fontSize={fontSize} />
-                    : <p style={{ color: "var(--muted)", fontStyle: "italic", textAlign: "center", marginTop: 40 }}>Cifra não disponível.</p>
-                }
+                {viewMode === "chords" ? (
+                  editing
+                    ? <ChordEditor
+                        songId={song.id}
+                        initial={chords ?? []}
+                        onCancel={() => setEditing(false)}
+                        onSaved={(secs) => { setChords(secs); setChordsStatus("validated"); setEditing(false); }}
+                      />
+                    : hasChords
+                      ? <ChordDisplay sections={chords!} currentTime={currentTime} fontSize={fontSize} />
+                      : song.cifraText
+                        ? <CifraText text={song.cifraText} fontSize={fontSize} />
+                        : generating
+                          ? <p style={{ color: "var(--muted)", fontStyle: "italic", textAlign: "center", marginTop: 40 }}>Gerando cifra automática… isso pode levar alguns minutos.</p>
+                          : <p style={{ color: "var(--muted)", fontStyle: "italic", textAlign: "center", marginTop: 40 }}>Cifra não disponível.</p>
+                ) : (
+                  editingLyrics
+                    ? <LyricsEditor
+                        songId={song.id}
+                        initial={lyrics ?? []}
+                        onCancel={() => setEditingLyrics(false)}
+                        onSaved={(ls) => { setLyrics(ls); setLyricsStatus("validated"); setEditingLyrics(false); }}
+                      />
+                    : hasLyrics
+                      ? <LyricsDisplay lines={lyrics!} currentTime={currentTime} fontSize={fontSize} />
+                      : generatingLyrics
+                        ? <p style={{ color: "var(--muted)", fontStyle: "italic", textAlign: "center", marginTop: 40 }}>Gerando letra automática… isso pode levar alguns minutos.</p>
+                        : <p style={{ color: "var(--muted)", fontStyle: "italic", textAlign: "center", marginTop: 40 }}>Letra não disponível.</p>
+                )}
               </div>
             </div>
           </div>
@@ -273,7 +477,7 @@ export default function SongPlayer({ song, stems, isPro = false, header, footer 
 
             {/* Pro upsell */}
             {!isPro && (
-              <div style={{ background: "linear-gradient(135deg, #ffffff 0%, #eafbf1 100%)", border: "1px solid rgba(29,185,84,0.25)", borderRadius: 12, padding: 16, textAlign: "center" }}>
+              <div style={{ background: "linear-gradient(135deg, #ffffff 0%, #fff4e0 100%)", border: "1px solid rgba(255,154,0,0.25)", borderRadius: 12, padding: 16, textAlign: "center" }}>
                 <span className="pro-badge" style={{ display: "inline-block", marginBottom: 10 }}>PRO</span>
                 <p style={{ color: "var(--muted)", fontSize: 12, lineHeight: 1.5, margin: "0 0 12px" }}>Stems, pitch shift e loop A-B</p>
                 <Link href="/planos" className="btn-primary" style={{ padding: "8px 16px", fontSize: 12, display: "block" }}>

@@ -1,17 +1,27 @@
 import Link from "next/link";
-import Image from "next/image";
 import { auth } from "@/auth";
 import UserMenu from "./UserMenu";
-
-const NAV = [
-  { label: "Explorar", href: "/" },
-  { label: "Gêneros",  href: "/#catalogo" },
-  { label: "Planos",   href: "/planos" },
-];
+import BrandLogo from "./BrandLogo";
 
 export default async function SiteHeader() {
   const session = await auth();
   const user = session?.user;
+
+  // Nav dinâmica: itens de músicas/setlists/bandas só para logados;
+  // Moderação só para admin.
+  const nav = [
+    { label: "Home", href: "/" },
+    ...(user
+      ? [
+          { label: "Enviar", href: "/upload" },
+          { label: "Minhas Músicas", href: "/perfil" },
+          { label: "Compartilhadas", href: "/compartilhadas" },
+          { label: "Setlists", href: "/setlists" },
+          { label: "Bandas", href: "/bandas" },
+        ]
+      : []),
+    ...(user?.role === "admin" ? [{ label: "Moderação", href: "/admin/moderacao" }] : []),
+  ];
 
   return (
     <header style={{
@@ -24,27 +34,26 @@ export default async function SiteHeader() {
     }}>
       <div style={{
         maxWidth: 1200, margin: "0 auto", padding: "0 24px",
-        height: 72, display: "flex", alignItems: "center", gap: 40,
+        height: 76, display: "flex", alignItems: "center", gap: 40,
       }}>
-        {/* Logo */}
-        <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <Image src="/logo-bts.png" alt="BTS" width={40} height={40} style={{ borderRadius: 10 }} />
-          <div style={{ lineHeight: 1.15 }}>
-            <div style={{ fontWeight: 800, fontSize: 11, color: "var(--text)", letterSpacing: "0.12em" }}>BACKING</div>
-            <div style={{ fontWeight: 800, fontSize: 11, color: "var(--accent)", letterSpacing: "0.12em" }}>TRACK STORE</div>
-          </div>
+        {/* Logo — pick + wordmark (BRD-001) */}
+        <Link href="/" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+          <BrandLogo size={32} variant="dark" />
         </Link>
 
         {/* Nav */}
-        <nav style={{ display: "flex", gap: 24, flex: 1 }}>
-          {NAV.map(({ label, href }) => (
+        <nav style={{ display: "flex", gap: 28, flex: 1, flexWrap: "wrap" }}>
+          {nav.map(({ label, href }) => (
             <Link key={label} href={href} className="nav-link">{label}</Link>
           ))}
         </nav>
 
         {/* Busca rápida */}
-        <Link href="/#catalogo" aria-label="Buscar músicas" title="Buscar" className="nav-link" style={{ fontSize: 17, display: "flex", alignItems: "center" }}>
-          🔍
+        <Link href="/#catalogo" aria-label="Buscar músicas" title="Buscar" className="nav-link" style={{ display: "flex", alignItems: "center" }}>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.5-3.5" />
+          </svg>
         </Link>
 
         {/* Auth */}
@@ -52,19 +61,19 @@ export default async function SiteHeader() {
           <UserMenu user={{ name: user.name ?? null, email: user.email ?? "", image: user.image ?? null, role: user.role }} />
         ) : (
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <Link href="/entrar" className="nav-link" style={{ fontWeight: 600 }}>Entrar</Link>
-            <span
-              aria-disabled="true"
-              title="Em breve — ainda não vendemos planos durante o beta"
-              style={{
-                padding: "8px 20px", fontSize: 13, fontWeight: 600, borderRadius: 14,
-                background: "var(--surface3)", color: "var(--muted2)",
-                cursor: "not-allowed", display: "inline-flex", alignItems: "center", gap: 6,
-                border: "1px solid var(--border2)",
-              }}
-            >
-              Seja Pro <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.06em" }}>(em breve)</span>
-            </span>
+            <Link href="/entrar" style={{
+              padding: "10px 22px", fontSize: 13, fontWeight: 600, borderRadius: 8,
+              border: "1px solid var(--border2)", color: "var(--text)", background: "var(--surface)",
+            }}>
+              Entrar
+            </Link>
+            <Link href="/entrar" style={{
+              padding: "10px 22px", fontSize: 13, fontWeight: 700, borderRadius: 8,
+              background: "var(--text)", color: "#fff",
+              display: "inline-flex", alignItems: "center",
+            }}>
+              Começar grátis
+            </Link>
           </div>
         )}
       </div>
