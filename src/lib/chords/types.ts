@@ -1,0 +1,32 @@
+/**
+ * Contrato do provider de detecção de cifra (Fase 1.5, Frente C).
+ *
+ * Diferente da separação (Replicate, webhook), o Music.ai trabalha por FILA
+ * ASSÍNCRONA com POLLING: você cria um job e fica consultando o status até
+ * terminar. Por isso a interface tem `poll` em vez de `parseWebhook`.
+ */
+
+export interface ChordSection {
+  section: string; // rótulo do trecho ("Verso", "Refrão"… ou vazio p/ auto)
+  timecode: number; // segundos a partir do início
+  chords: string; // "Am G F E"
+}
+
+export interface ChordDetectionSubmitResult {
+  providerJobId: string;
+}
+
+export type ChordPollResult =
+  | { status: "running" }
+  | { status: "done"; sections: ChordSection[] }
+  | { status: "failed"; error: string };
+
+export interface ChordDetectionProvider {
+  readonly name: string;
+  /** true se as env vars necessárias estão presentes. */
+  isConfigured(): boolean;
+  /** Cria o job de detecção sobre a URL de áudio dada. */
+  submit(audioUrl: string): Promise<ChordDetectionSubmitResult>;
+  /** Consulta o job; devolve running/done(seções)/failed. */
+  poll(providerJobId: string): Promise<ChordPollResult>;
+}
