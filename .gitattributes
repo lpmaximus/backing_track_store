@@ -1,0 +1,16 @@
+# Normaliza fim de linha: repositório sempre em LF, evita o ruído CRLF↔LF
+# que aparece ao editar no Windows/OneDrive.
+* text=auto eol=lf
+
+# Binários — nunca normalizar
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.mp3 binary
+*.wav binary
+*.pdf binary
