@@ -20,6 +20,7 @@ type EditableBody = {
   key?: string;
   bpm?: number;
   shared?: boolean;
+  thumbnailUrl?: string | null;
 };
 
 const LIMITS = { title: 255, artist: 255, genre: 100, key: 10 } as const;
@@ -94,6 +95,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     set.shared = Boolean(body.shared);
   }
 
+  // Thumbnail: aceita null (limpar) ou uma URL pública do NOSSO bucket R2.
+  // Rejeita URLs externas — o objeto tem que estar hospedado por nós.
+  let oldThumbToDelete: string | null = null;
+  if (body.thumbnailUrl !== undefined) {
+    if (body.thumbnailUrl === null || body.thumbnailUrl === "") {
+      set.thumbnailUrl = null;
+      oldThumbToDelete = owned.song.thumbnailUrl ?? null;
+    } else {
+      const key = keyFromPublicUrl(String(body.thumbnailUrl));
+      if (!key || !key.startsWith("images/")) {
+        return NextResponse.json({ error: "Thumbnail inválida" }, { status: 400 });
+      }
+      set.thumbnailUrl = String(body.thumbnailUrl);
+      if (owned.song.thumbnailUrl && owned.song.thumbnailUrl !== body.thumbnailUrl) {
+        oldThumbToDelete = owned.song.thumbnailUrl;
+      }
+    }
+  }
+
   if (Object.keys(set).length === 0) {
     return NextResponse.json({ error: "Nada para atualizar" }, { status: 400 });
   }
@@ -113,7 +133,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         key: songs.key,
         bpm: songs.bpm,
         shared: songs.shared,
+        thumbnailUrl: songs.thumbnailUrl,
       });
+
+    // Best-effort: remove a thumbnail antiga do R2 quando foi trocada/limpa.
+    if (oldThumbToDelete) {
+      const oldKey = keyFromPublicUrl(oldThumbToDelete);
+      if (oldKey) {
+        deleteObject(oldKey).catch((e) =>
+          console.warn("[PATCH song] falha ao remover thumbnail antiga", oldKey, e),
+        );
+      }
+    }
+
     return NextResponse.json(updated);
   } catch (err) {
     console.error("[PATCH /api/songs/:id]", err);

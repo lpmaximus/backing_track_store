@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { isProRole } from "@/src/lib/roles";
 
 type CommentItem = {
   id: number;
@@ -26,7 +27,8 @@ export default function Comments({ songId }: { songId: number }) {
   const [sending, setSending] = useState(false);
   const [error,   setError]   = useState("");
 
-  const isPro = session?.user?.role === "pro" || session?.user?.role === "admin";
+  // Pro/ProBand/admin podem comentar (comment_publication). Ver src/lib/roles.ts.
+  const isPro = isProRole(session?.user?.role);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,7 +147,7 @@ export default function Comments({ songId }: { songId: number }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
                   <span style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{c.userName ?? "Usuario"}</span>
-                  {(c.userRole === "pro" || c.userRole === "admin") && <span className="pro-badge" style={{ fontSize: 9 }}>PRO</span>}
+                  {isProRole(c.userRole) && <span className="pro-badge" style={{ fontSize: 9 }}>PRO</span>}
                   <span style={{ color: "var(--muted2)", fontSize: 12 }}>{formatDate(c.createdAt)}</span>
                 </div>
                 <p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>

@@ -1,9 +1,11 @@
 "use client";
 
 import type * as React from "react";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { isProRole, roleLabel } from "@/src/lib/roles";
 
 type MySong = {
   id: number;
@@ -68,7 +70,8 @@ export default function PerfilContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songs]);
 
-  const isPro = session?.user?.role === "pro" || session?.user?.role === "admin";
+  const isPro = isProRole(session?.user?.role);
+  const tier = roleLabel(session?.user?.role);
   const readySongs = songs.filter(s => s.processingStatus === "ready");
 
   // ── Ações ────────────────────────────────────────────────────────────────
@@ -152,7 +155,15 @@ export default function PerfilContent() {
             <div style={{ minWidth: 0 }}>
               <h1 style={{ fontWeight: 900, fontSize: 22, margin: "0 0 2px", color: "var(--text)", display: "flex", alignItems: "center", gap: 8 }}>
                 {session.user.name ?? "Meu perfil"}
-                {isPro && <span className="pro-badge">PRO</span>}
+                {isPro ? (
+                  <span className="pro-badge">{tier}</span>
+                ) : (
+                  <span style={{
+                    background: "var(--surface3)", color: "var(--muted)",
+                    fontSize: 10, fontWeight: 800, letterSpacing: "0.08em",
+                    padding: "3px 8px", borderRadius: 6, border: "1px solid var(--border2)",
+                  }}>{tier}</span>
+                )}
               </h1>
               <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>{session.user.email}</p>
             </div>
@@ -202,7 +213,10 @@ export default function PerfilContent() {
 }
 
 // ─── Card de uma música ──────────────────────────────────────────────────────
-type EditValues = { title: string; artist: string; genre: string; key: string; bpm: string };
+type EditValues = { title: string; artist: string; genre: string; key: string; bpm: string; thumbnailUrl?: string | null };
+
+const THUMB_MAX_BYTES = 4 * 1024 * 1024; // 4 MB
+const THUMB_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 
 function SongCard({
   song, editing, busy, onEdit, onCancelEdit, onSave, onToggleShare, onRemove,
@@ -219,13 +233,59 @@ function SongCard({
   const [form, setForm] = useState<EditValues>({
     title: song.title, artist: song.artist, genre: song.genre, key: song.key, bpm: String(song.bpm),
   });
+  const [thumbUrl, setThumbUrl] = useState<string | null>(song.thumbnailUrl);
+  const [uploadingThumb, setUploadingThumb] = useState(false);
+  const [thumbError, setThumbError] = useState("");
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (editing) {
       setForm({ title: song.title, artist: song.artist, genre: song.genre, key: song.key, bpm: String(song.bpm) });
+      setThumbUrl(song.thumbnailUrl);
+      setThumbError("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
+
+  // Troca de capa: presign → PUT direto no R2 → guarda a publicUrl (só grava
+  // no banco quando o usuário clicar em Salvar, junto do resto do formulário).
+  async function handleThumbFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite reescolher o mesmo arquivo
+    if (!file) return;
+    setThumbError("");
+    if (!THUMB_TYPES.has(file.type)) {
+      setThumbError("Use JPG, PNG ou WEBP.");
+      return;
+    }
+    if (file.size > THUMB_MAX_BYTES) {
+      setThumbError("Imagem muito grande (máx. 4 MB).");
+      return;
+    }
+    setUploadingThumb(true);
+    try {
+      const presign = await fetch(`/api/songs/${song.id}/thumbnail`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentType: file.type }),
+      });
+      const pd = await presign.json().catch(() => ({}));
+      if (!presign.ok) { setThumbError(pd.error ?? "Falha ao preparar upload."); return; }
+
+      const put = await fetch(pd.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!put.ok) { setThumbError("Falha ao enviar a imagem."); return; }
+
+      setThumbUrl(pd.publicUrl);
+    } catch {
+      setThumbError("Erro de conexão. Tente novamente.");
+    } finally {
+      setUploadingThumb(false);
+    }
+  }
 
   const iconBtn: React.CSSProperties = {
     background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 8,
@@ -296,6 +356,41 @@ function SongCard({
       {/* Form de edição */}
       {editing && (
         <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Capa / thumbnail */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: 10, overflow: "hidden", flexShrink: 0,
+              background: "var(--surface2)", border: "1px solid var(--border2)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26,
+            }}>
+              {thumbUrl
+                ? <Image src={thumbUrl} alt="Capa" width={64} height={64} style={{ objectFit: "cover", width: "100%", height: "100%" }} />
+                : "🎸"}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+              <span style={{ color: "var(--muted)", fontSize: 11, fontWeight: 600 }}>Capa da música</span>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleThumbFile}
+                  style={{ display: "none" }}
+                />
+                <button type="button" onClick={() => fileRef.current?.click()} disabled={busy || uploadingThumb} style={iconBtn}>
+                  {uploadingThumb ? "Enviando..." : (thumbUrl ? "Trocar imagem" : "Adicionar imagem")}
+                </button>
+                {thumbUrl && !uploadingThumb && (
+                  <button type="button" onClick={() => setThumbUrl(null)} disabled={busy}
+                    style={{ ...iconBtn, color: "var(--danger)" }}>
+                    Remover
+                  </button>
+                )}
+              </div>
+              {thumbError && <span style={{ color: "var(--danger)", fontSize: 12 }}>{thumbError}</span>}
+              <span style={{ color: "var(--muted2)", fontSize: 11 }}>JPG, PNG ou WEBP · até 4 MB</span>
+            </div>
+          </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {field("Título", "title")}
             {field("Artista", "artist")}
@@ -308,10 +403,10 @@ function SongCard({
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button onClick={onCancelEdit} disabled={busy} style={iconBtn}>Cancelar</button>
             <button
-              onClick={() => onSave(form)}
-              disabled={busy}
+              onClick={() => onSave({ ...form, thumbnailUrl: thumbUrl })}
+              disabled={busy || uploadingThumb}
               className="btn-primary"
-              style={{ padding: "7px 18px", fontSize: 13, opacity: busy ? 0.6 : 1 }}
+              style={{ padding: "7px 18px", fontSize: 13, opacity: (busy || uploadingThumb) ? 0.6 : 1 }}
             >
               {busy ? "Salvando..." : "Salvar"}
             </button>

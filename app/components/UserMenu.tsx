@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
+import { isProRole, roleLabel } from "@/src/lib/roles";
 
 type Props = {
   user: { name: string | null; email: string; image: string | null; role: string };
@@ -11,7 +12,8 @@ type Props = {
 
 export default function UserMenu({ user }: Props) {
   const [open, setOpen] = useState(false);
-  const isPro = user.role === "pro" || user.role === "admin";
+  const isPro = isProRole(user.role);
+  const tier = roleLabel(user.role);
 
   return (
     <div style={{ position: "relative" }}>
@@ -24,7 +26,15 @@ export default function UserMenu({ user }: Props) {
             {(user.name ?? user.email).charAt(0).toUpperCase()}
           </div>
         )}
-        {isPro && <span className="pro-badge">PRO</span>}
+        {isPro ? (
+          <span className="pro-badge">{tier}</span>
+        ) : (
+          <span style={{
+            background: "var(--surface3)", color: "var(--muted)",
+            fontSize: 10, fontWeight: 800, letterSpacing: "0.08em",
+            padding: "3px 8px", borderRadius: 6, border: "1px solid var(--border2)",
+          }}>{tier}</span>
+        )}
       </button>
 
       {open && (
@@ -36,8 +46,19 @@ export default function UserMenu({ user }: Props) {
             padding: 8, minWidth: 240, maxWidth: 320, boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
           }}>
             <div style={{ padding: "8px 12px 12px", borderBottom: "1px solid var(--border)" }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {user.name ?? "Usuario"}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                <span style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {user.name ?? "Usuario"}
+                </span>
+                {isPro ? (
+                  <span className="pro-badge" style={{ flexShrink: 0 }}>{tier}</span>
+                ) : (
+                  <span style={{
+                    background: "var(--surface3)", color: "var(--muted)",
+                    fontSize: 9, fontWeight: 800, letterSpacing: "0.08em",
+                    padding: "2px 7px", borderRadius: 6, border: "1px solid var(--border2)", flexShrink: 0,
+                  }}>{tier}</span>
+                )}
               </div>
               <div style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user.email}</div>
             </div>

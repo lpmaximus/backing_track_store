@@ -23,3 +23,21 @@ export function decideProAccess(input: {
 }): boolean {
   return isProRole(input.role) || input.hasActiveBandAccess;
 }
+
+/**
+ * Rótulo curto da categoria do usuário, para exibição na UI (badge do header,
+ * perfil, etc.). PURO — pode ser usado no client. `isActiveBandMember` só muda
+ * o resultado quando role='free' (Free vs. Free Banda); para os demais roles é
+ * ignorado. Espelha resolveUserType() de src/lib/permissions.ts.
+ */
+export function roleLabel(
+  role?: string | null,
+  isActiveBandMember = false,
+): string {
+  switch (role) {
+    case "admin":   return "ADMIN";
+    case "proband": return "PRO BAND";
+    case "pro":     return "PRO";
+    default:        return isActiveBandMember ? "BANDA" : "FREE";
+  }
+}

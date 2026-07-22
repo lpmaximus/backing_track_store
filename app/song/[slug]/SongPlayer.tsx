@@ -488,8 +488,9 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
           </div>
         </div>
 
-        {/* Banner publicitário (apenas Free, fora do player) */}
-        <AdBanner variant="compact" />
+        {/* Banner publicitário (apenas Free, fora do player). Usa o isPro
+            efetivo (inclui ProBand e integrante de banda), não só o role. */}
+        {!isPro && <AdBanner variant="compact" />}
 
         {/* Comentarios */}
         <Comments songId={song.id} />

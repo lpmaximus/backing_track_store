@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { isProRole } from "@/src/lib/roles";
 
 /**
  * Banner estático exibido apenas para usuários do plano Free (incluindo visitantes
@@ -22,7 +23,8 @@ import Link from "next/link";
  */
 export default function AdBanner({ variant = "default" }: { variant?: "default" | "compact" }) {
   const { data: session } = useSession();
-  const isPro = session?.user?.role === "pro" || session?.user?.role === "admin";
+  // Pro/ProBand/admin não veem anúncios (ProBand herda o acesso Pro).
+  const isPro = isProRole(session?.user?.role);
 
   if (isPro) return null;
 
