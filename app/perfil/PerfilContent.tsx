@@ -297,7 +297,7 @@ function SongCard({
     <label style={{ display: "flex", flexDirection: "column", gap: 4, flex: opts?.width ? `0 0 ${opts.width}px` : 1, minWidth: 0 }}>
       <span style={{ color: "var(--muted)", fontSize: 11, fontWeight: 600 }}>{label}</span>
       <input
-        value={form[key]}
+        value={form[key] ?? ""}
         type={opts?.type ?? "text"}
         onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
         style={{ background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 6, padding: "7px 10px", fontSize: 13, color: "var(--text)", width: "100%" }}
