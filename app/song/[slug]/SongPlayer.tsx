@@ -229,6 +229,7 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
   const [scrollSpd,   setScrollSpd]     = useState(0.4);
   const [fontSize,    setFontSize]       = useState(14);
   const cifraRef = useRef<HTMLDivElement | null>(null);
+  const prevFontRef = useRef(14); // guarda a fonte antes da tela cheia
 
   // ── Cifra colaborativa (Frentes C/D) ──
   const { status: authStatus } = useSession();
@@ -375,6 +376,14 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
     return () => window.removeEventListener("keydown", onEsc);
   }, [fullscreen]);
 
+  // Ao entrar na tela cheia, sobe a fonte pro máximo (24px); ao sair, restaura.
+  // (fontSize fora das deps de propósito: deixa o A-/A+ ajustar durante a tela cheia.)
+  useEffect(() => {
+    if (fullscreen) { prevFontRef.current = fontSize; setFontSize(24); }
+    else { setFontSize(prevFontRef.current); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullscreen]);
+
   const handleAutoScrollToggle = () => {
     setAutoScroll(v => !v);
   };
@@ -455,7 +464,7 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
               {/* Content */}
               <div
                 ref={cifraRef}
-                style={{ padding: "20px 24px", overflow: "auto", ...(fullscreen ? { flex: 1 } : { maxHeight: "calc(100vh - 280px)", minHeight: 520 }) }}
+                style={{ padding: "20px 24px", overflow: "auto", ...(fullscreen ? { flex: 1, display: "flex", flexDirection: "column", alignItems: "center" } : { maxHeight: "calc(100vh - 280px)", minHeight: 520 }) }}
               >
                 {editing
                   ? <ChordEditor
