@@ -10,6 +10,7 @@ export interface ChordSection {
   section: string; // rótulo do trecho ("Verso", "Refrão"… ou vazio p/ auto)
   timecode: number; // segundos a partir do início
   chords: string; // "Am G F E"
+  times?: number[]; // tempo (s) de cada acorde em `chords` — p/ cifra sobre a sílaba
 }
 
 export interface ChordDetectionSubmitResult {

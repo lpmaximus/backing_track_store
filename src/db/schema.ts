@@ -277,9 +277,20 @@ export interface ChordSection {
   section: string;    // "Verso" | "Refrão" | "Ponte" etc.
   timecode: number;   // segundos a partir do início
   chords: string;     // "Am G F E"
+  times?: number[];   // tempo (s) de cada acorde em `chords` — cifra sobre a sílaba
+}
+
+export interface LyricsWord {
+  text: string;   // a palavra
+  start: number;  // segundos — início da palavra
+  end: number;    // segundos — fim da palavra
 }
 
 export interface LyricsLine {
   time: number;   // segundos a partir do início (início da linha)
   text: string;   // texto da linha cantada
+  // Tempo por palavra (WhisperX). Opcional: só existe em letras transcritas com
+  // alinhamento por palavra — é o que permite posicionar o acorde sobre a sílaba
+  // certa (cifra estilo CifraClub). Letras antigas (só linha) não têm.
+  words?: LyricsWord[];
 }

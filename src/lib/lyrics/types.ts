@@ -7,9 +7,16 @@
  * como rascunho e é refinada pela comunidade (mesmo modelo da cifra).
  */
 
+export interface LyricsWord {
+  text: string;  // a palavra
+  start: number; // segundos — início da palavra
+  end: number;   // segundos — fim da palavra
+}
+
 export interface LyricsLine {
   time: number; // segundos a partir do início (início da linha)
   text: string; // texto da linha cantada
+  words?: LyricsWord[]; // tempo por palavra (WhisperX) — permite cifra sobre a sílaba
 }
 
 export interface LyricsSubmitResult {

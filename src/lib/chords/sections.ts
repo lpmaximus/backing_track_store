@@ -36,6 +36,7 @@ export function toSections(chords: DetectedChord[]): ChordSection[] {
       section: "",
       timecode: Math.round(group[0].start),
       chords: group.map((g) => g.label).join(" "),
+      times: group.map((g) => g.start), // tempo de cada acorde (p/ cifra sobre a sílaba)
     });
   }
   return sections;
