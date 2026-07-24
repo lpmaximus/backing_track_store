@@ -80,37 +80,57 @@ async function runBackfill(req: NextRequest) {
         ),
       );
 
-    const hasChordJob = new Set(existingJobs.filter((j) => j.stage === "chord_detection").map((j) => j.songId));
-    const hasLyricsJob = new Set(existingJobs.filter((j) => j.stage === "lyrics_detection").map((j) => j.songId));
+    // Só bloqueia quem já tem job NÃO-falho (pending/running/done). Jobs 'failed'
+    // (ex.: 429 do Replicate) são reprocessados — é o retry automático.
+    const hasChordJob = new Set(existingJobs.filter((j) => j.stage === "chord_detection" && j.status !== "failed").map((j) => j.songId));
+    const hasLyricsJob = new Set(existingJobs.filter((j) => j.stage === "lyrics_detection" && j.status !== "failed").map((j) => j.songId));
+
+    // Teto de submissões por chamada: respeita o "burst" do Replicate e evita
+    // timeout da função serverless. Se sobrar, é só chamar o backfill de novo.
+    const MAX_SUBMITS = 5;
+    let submitted = 0;
+
+    // Cria o job e submete; apaga jobs 'failed' antigos do mesmo estágio (não acumula).
+    async function createJob(
+      songId: number,
+      stage: "chord_detection" | "lyrics_detection",
+      providerName: string,
+      submit: () => Promise<{ providerJobId: string }>,
+    ): Promise<boolean> {
+      await db.delete(processingJobs).where(and(
+        eq(processingJobs.songId, songId),
+        eq(processingJobs.stage, stage),
+        eq(processingJobs.status, "failed"),
+      ));
+      const [job] = await db
+        .insert(processingJobs)
+        .values({ songId, provider: providerName, stage, status: "pending" })
+        .returning();
+      try {
+        const { providerJobId } = await submit();
+        await db.update(processingJobs).set({ providerJobId, status: "running" }).where(eq(processingJobs.id, job.id));
+        return true;
+      } catch (submitErr) {
+        console.error(`[jobs/backfill] ${stage} submit song#${songId}`, submitErr);
+        await db.update(processingJobs).set({ status: "failed", errorMessage: String(submitErr).slice(0, 500) }).where(eq(processingJobs.id, job.id));
+        return false;
+      }
+    }
 
     for (const song of ready) {
       summary.scanned++;
+      if (submitted >= MAX_SUBMITS) { summary.skipped++; continue; }
       const songStems = allStems.filter((s) => s.songId === song.id);
       let touched = false;
 
       // ── Cifra ──
       const alreadyHasChords = Boolean(song.chords && song.chords.length > 0);
-      if (chordsOn && !alreadyHasChords && !hasChordJob.has(song.id)) {
+      if (chordsOn && !alreadyHasChords && !hasChordJob.has(song.id) && submitted < MAX_SUBMITS) {
         const harmony = songStems.find((s) => s.instrument === "harmony") ?? songStems[0];
         if (harmony) {
-          const [chordJob] = await db
-            .insert(processingJobs)
-            .values({ songId: song.id, provider: chordProvider.name, stage: "chord_detection", status: "pending" })
-            .returning();
-          try {
-            const { providerJobId } = await chordProvider.submit(harmony.audioUrl);
-            await db
-              .update(processingJobs)
-              .set({ providerJobId, status: "running" })
-              .where(eq(processingJobs.id, chordJob.id));
-            summary.chordJobsCreated++;
-            touched = true;
-          } catch (submitErr) {
-            console.error(`[jobs/backfill] chord submit song#${song.id}`, submitErr);
-            await db
-              .update(processingJobs)
-              .set({ status: "failed", errorMessage: String(submitErr).slice(0, 500) })
-              .where(eq(processingJobs.id, chordJob.id));
+          submitted++;
+          if (await createJob(song.id, "chord_detection", chordProvider.name, () => chordProvider.submit(harmony.audioUrl))) {
+            summary.chordJobsCreated++; touched = true;
           }
         }
       }
@@ -118,32 +138,17 @@ async function runBackfill(req: NextRequest) {
       // ── Letra ──
       const alreadyHasLyrics = Boolean(song.lyrics && song.lyrics.length > 0);
       const vocal = songStems.find((s) => s.instrument === "vocal");
-      if (lyricsOn && !alreadyHasLyrics && !hasLyricsJob.has(song.id) && vocal) {
-        const [lyricsJob] = await db
-          .insert(processingJobs)
-          .values({ songId: song.id, provider: lyricsProvider.name, stage: "lyrics_detection", status: "pending" })
-          .returning();
-        try {
-          const { providerJobId } = await lyricsProvider.submit(vocal.audioUrl);
-          await db
-            .update(processingJobs)
-            .set({ providerJobId, status: "running" })
-            .where(eq(processingJobs.id, lyricsJob.id));
-          summary.lyricsJobsCreated++;
-          touched = true;
-        } catch (submitErr) {
-          console.error(`[jobs/backfill] lyrics submit song#${song.id}`, submitErr);
-          await db
-            .update(processingJobs)
-            .set({ status: "failed", errorMessage: String(submitErr).slice(0, 500) })
-            .where(eq(processingJobs.id, lyricsJob.id));
+      if (lyricsOn && !alreadyHasLyrics && !hasLyricsJob.has(song.id) && vocal && submitted < MAX_SUBMITS) {
+        submitted++;
+        if (await createJob(song.id, "lyrics_detection", lyricsProvider.name, () => lyricsProvider.submit(vocal.audioUrl))) {
+          summary.lyricsJobsCreated++; touched = true;
         }
       }
 
       if (!touched) summary.skipped++;
     }
 
-    return NextResponse.json({ ok: true, ...summary });
+    return NextResponse.json({ ok: true, ...summary, submitted, capped: submitted >= MAX_SUBMITS });
   } catch (err) {
     console.error("[POST /api/jobs/backfill]", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
