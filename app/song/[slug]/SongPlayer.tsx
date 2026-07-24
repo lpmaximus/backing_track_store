@@ -102,7 +102,7 @@ function ChordDisplay({ sections, currentTime, fontSize }: { sections: ChordSect
       {sections.map((sec, i) => {
         const isActive = i === activeIdx;
         return (
-          <div key={i} style={{
+          <div key={i} data-t={sec.timecode} style={{
             marginBottom: 18,
             padding: "10px 14px",
             borderRadius: 8,
@@ -208,7 +208,7 @@ function CifraView({ sections, lyrics, currentTime, fontSize }: {
         const isActive = i === activeIdx;
 
         return (
-          <div key={i} style={{ marginBottom: 12, padding: "2px 8px", borderRadius: 6, background: isActive ? "rgba(255,154,0,0.10)" : "transparent" }}>
+          <div key={i} data-t={t0} style={{ marginBottom: 12, padding: "2px 8px", borderRadius: 6, background: isActive ? "rgba(255,154,0,0.10)" : "transparent" }}>
             {chordLine.trim() && (
               <div style={{ whiteSpace: "pre", color: "var(--chord)", fontWeight: 700 }}>{chordLine}</div>
             )}
@@ -226,10 +226,13 @@ function CifraView({ sections, lyrics, currentTime, fontSize }: {
 export default function SongPlayer({ song, stems, isPro = false, soloInstrument = null, header, footer }: Props) {
   const [currentTime, setCurrentTime]   = useState(0);
   const [autoScroll,  setAutoScroll]    = useState(false);
+  const [autoFollow,  setAutoFollow]    = useState(false); // segue o andamento real da música
   const [scrollSpd,   setScrollSpd]     = useState(0.4);
   const [fontSize,    setFontSize]       = useState(14);
   const cifraRef = useRef<HTMLDivElement | null>(null);
   const prevFontRef = useRef(14); // guarda a fonte antes da tela cheia
+  const anchorsRef = useRef<{ time: number; top: number }[]>([]); // âncoras tempo→posição (modo Automático)
+  const followTargetRef = useRef(0);
 
   // ── Cifra colaborativa (Frentes C/D) ──
   const { status: authStatus } = useSession();
@@ -356,6 +359,51 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
     return () => clearInterval(id);
   }, [autoScroll, scrollSpd]);
 
+  // ── Modo Automático: rola seguindo o andamento REAL da música ──
+  // Reconstrói o mapa tempo→posição (cada linha tem data-t = seu tempo).
+  useEffect(() => {
+    const el = cifraRef.current;
+    if (!el) { anchorsRef.current = []; return; }
+    const nodes = Array.from(el.querySelectorAll<HTMLElement>("[data-t]"));
+    anchorsRef.current = nodes
+      .map((n) => ({ time: Number(n.dataset.t), top: n.offsetTop }))
+      .filter((a) => Number.isFinite(a.time))
+      .sort((a, b) => a.time - b.time);
+  }, [chords, lyrics, fontSize, fullscreen]);
+
+  // A cada avanço do tempo, calcula a posição-alvo (interpola entre as linhas).
+  useEffect(() => {
+    if (!autoFollow) return;
+    const el = cifraRef.current;
+    const anchors = anchorsRef.current;
+    if (!el || anchors.length === 0) return;
+    let i = 0;
+    for (let k = 0; k < anchors.length; k++) { if (anchors[k].time <= currentTime) i = k; else break; }
+    const a = anchors[i];
+    const b = anchors[i + 1];
+    let top = a.top;
+    if (b && b.time > a.time) {
+      const f = Math.max(0, Math.min(1, (currentTime - a.time) / (b.time - a.time)));
+      top = a.top + (b.top - a.top) * f;
+    }
+    // Mantém a linha atual a ~35% do topo da área visível.
+    followTargetRef.current = Math.max(0, top - el.clientHeight * 0.35);
+  }, [currentTime, autoFollow]);
+
+  // Loop suave (rAF) que aproxima o scroll da posição-alvo enquanto o modo está ligado.
+  useEffect(() => {
+    if (!autoFollow) return;
+    const el = cifraRef.current;
+    if (!el) return;
+    let raf = 0;
+    const tick = () => {
+      el.scrollTop += (followTargetRef.current - el.scrollTop) * 0.12;
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [autoFollow]);
+
   // Atalho de teclado "A" para ligar/desligar o auto-scroll
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -385,7 +433,12 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
   }, [fullscreen]);
 
   const handleAutoScrollToggle = () => {
+    setAutoFollow(false);
     setAutoScroll(v => !v);
+  };
+  const handleAutoFollowToggle = () => {
+    setAutoScroll(false);
+    setAutoFollow(v => !v);
   };
 
   return (
@@ -485,12 +538,15 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
               {/* Controles flutuantes na tela cheia */}
               {fullscreen && (
                 <div style={{ borderTop: "1px solid var(--border)", padding: "10px 16px", display: "flex", alignItems: "center", gap: 14, background: "var(--surface)", flexWrap: "wrap" }}>
-                  <button onClick={handleAutoScrollToggle} style={{ background: autoScroll ? "var(--accent)" : "transparent", color: autoScroll ? "#000" : "var(--text)", border: `1.5px solid ${autoScroll ? "var(--accent)" : "var(--border2)"}`, borderRadius: 8, padding: "8px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                    {autoScroll ? "⏸ Pausar" : "▶ Iniciar"}
+                  <button onClick={handleAutoFollowToggle} title="Acompanha o andamento real da música" style={{ background: autoFollow ? "var(--accent)" : "transparent", color: autoFollow ? "#000" : "var(--text)", border: `1.5px solid ${autoFollow ? "var(--accent)" : "var(--border2)"}`, borderRadius: 8, padding: "8px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                    🎵 Automático
                   </button>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 180, maxWidth: 360 }}>
+                  <button onClick={handleAutoScrollToggle} style={{ background: autoScroll ? "var(--accent)" : "transparent", color: autoScroll ? "#000" : "var(--text)", border: `1.5px solid ${autoScroll ? "var(--accent)" : "var(--border2)"}`, borderRadius: 8, padding: "8px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                    {autoScroll ? "⏸ Pausar" : "▶ Manual"}
+                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 160, maxWidth: 320, opacity: autoFollow ? 0.4 : 1 }}>
                     <span style={{ color: "var(--muted)", fontSize: 12 }}>Lento</span>
-                    <input type="range" min={0.1} max={3} step={0.1} value={scrollSpd} onChange={e => setScrollSpd(Number(e.target.value))} style={{ flex: 1 }} />
+                    <input type="range" min={0.1} max={3} step={0.1} value={scrollSpd} disabled={autoFollow} onChange={e => setScrollSpd(Number(e.target.value))} style={{ flex: 1 }} />
                     <span style={{ color: "var(--muted)", fontSize: 12 }}>Rápido</span>
                     <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, minWidth: 38 }}>{scrollSpd}x</span>
                   </div>
@@ -507,6 +563,18 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
             <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
               <p style={{ fontWeight: 700, fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)", margin: "0 0 12px" }}>AUTO-SCROLL</p>
               <button
+                onClick={handleAutoFollowToggle}
+                title="Acompanha o andamento real da música — nem rápido nem devagar"
+                style={{
+                  background: autoFollow ? "var(--accent)" : "transparent",
+                  color: autoFollow ? "#000" : "var(--text)",
+                  border: `1.5px solid ${autoFollow ? "var(--accent)" : "var(--border2)"}`,
+                  borderRadius: 8, width: "100%", padding: "9px 0", fontWeight: 700, fontSize: 13, cursor: "pointer", marginBottom: 8, transition: "all 0.2s",
+                }}
+              >
+                {autoFollow ? "🎵 Automático · ligado" : "🎵 Automático"}
+              </button>
+              <button
                 onClick={handleAutoScrollToggle}
                 style={{
                   background: autoScroll ? "var(--accent)" : "transparent",
@@ -515,7 +583,7 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
                   borderRadius: 8, width: "100%", padding: "9px 0", fontWeight: 700, fontSize: 13, cursor: "pointer", marginBottom: 14, transition: "all 0.2s",
                 }}
               >
-                {autoScroll ? "⏸ Pausar" : "▶ Iniciar"}
+                {autoScroll ? "⏸ Pausar" : "▶ Manual"}
               </button>
               <p style={{ color: "var(--muted)", fontSize: 12, margin: "0 0 6px" }}>Velocidade: <strong style={{ color: "var(--text)" }}>{scrollSpd}x</strong></p>
               <input type="range" min={0.1} max={3} step={0.1} value={scrollSpd} onChange={e => setScrollSpd(Number(e.target.value))} style={{ width: "100%" }} />
