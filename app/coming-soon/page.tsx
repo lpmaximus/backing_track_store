@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import BrandLogo from "../components/BrandLogo";
 
 export default function ComingSoonPage() {
   const [email, setEmail]     = useState("");
@@ -46,14 +47,9 @@ export default function ComingSoonPage() {
     }}>
 
       {/* Logo */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/LogoBTS_small.png"
-        alt="Backing Track Store"
-        width={200}
-        height={200}
-        style={{ display: "block", marginBottom: 40 }}
-      />
+      <div style={{ marginBottom: 40 }}>
+        <BrandLogo size={56} variant="light" />
+      </div>
 
       {/* Headline */}
       <h1 style={{

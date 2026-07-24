@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 0 120 120" width="120" height="120">
+  <!-- Marca oficial BRD-001: pick (laranja) + waveform (escura).
+       Laranja no pick garante contraste em abas claras e escuras. -->
+  <path d="M50 4 C76 4 96 20 96 44 C96 74 70 104 50 116 C30 104 4 74 4 44 C4 20 24 4 50 4 Z" fill="#FF9A00"/>
+  <g fill="#0D0D0F">
+    <rect x="26" y="48" width="4" height="12" rx="2"/>
+    <rect x="33" y="42" width="4" height="24" rx="2"/>
+    <rect x="40" y="34" width="4" height="40" rx="2"/>
+    <rect x="47" y="26" width="4" height="56" rx="2"/>
+    <rect x="54" y="34" width="4" height="40" rx="2"/>
+    <rect x="61" y="42" width="4" height="24" rx="2"/>
+    <rect x="68" y="48" width="4" height="12" rx="2"/>
+  </g>
+</svg>

@@ -321,9 +321,6 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
               {song.artist} · {song.genre} · Tom: <strong style={{ color: "var(--text)" }}>{song.key}</strong> · {song.bpm} BPM
             </p>
           </div>
-          {isPro && (
-            <span className="pro-badge" style={{ marginTop: 8 }}>PRO</span>
-          )}
         </div>
 
         {/* ── Trilha-guia da banda: aviso de pré-mute ── */}

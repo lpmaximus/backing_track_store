@@ -46,3 +46,11 @@ scripts/
 
 # scripts descartáveis de migração/debug (rodados localmente)
 _*.mjs
+
+# BTC/Cog: o clone do repo (com pesos ~24MB) e áudios de teste não vão pro git.
+# O modelo já está publicado no Replicate; cog.yaml/predict.py/README bastam.
+meu_teste/
+replicate/btc-chords/BTC-ISMIR19/
+replicate/btc-chords/*.mp3
+replicate/btc-chords/.cog/
+**/__pycache__/
