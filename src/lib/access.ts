@@ -22,6 +22,11 @@ const ACTIVE_SUB_STATUSES = new Set(["active", "trialing"]);
  * individual já concede; só consulta bandas quando necessário.
  */
 export async function hasProAccess(userId: number, role?: string | null): Promise<boolean> {
+  // Beta/captação: libera a experiência Pro (mixer de stems, velocidade, pitch,
+  // setlists, sem anúncios) para TODO usuário logado. A cota de uploads/mês NÃO
+  // muda (é por role em checkUploadQuota), então o Free segue com 3/mês.
+  // Reverter = remover a env BETA_FULL_ACCESS.
+  if (process.env.BETA_FULL_ACCESS === "true" && userId) return true;
   if (isProRole(role)) return true;
   if (!userId) return false;
 
