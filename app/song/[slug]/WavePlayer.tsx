@@ -168,10 +168,12 @@ export default function WavePlayer({
   const [mixPeaks,  setMixPeaks]  = useState<number[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryKey,  setRetryKey]  = useState(0);
+  const [loop,      setLoop]      = useState(false); // repetir a música até parar
 
   // Refs espelho para uso dentro do loop de animação / callbacks
   const speedRef = useRef(speed);   useEffect(() => { speedRef.current = speed; }, [speed]);
   const durRef   = useRef(0);       useEffect(() => { durRef.current = duration; }, [duration]);
+  const loopRef  = useRef(false);   useEffect(() => { loopRef.current = loop; }, [loop]);
 
   const posNow = useCallback(() => {
     const e = engineRef.current;
@@ -259,6 +261,16 @@ export default function WavePlayer({
       if (!e) return;
       const pos = posNow();
       if (pos >= durRef.current && durRef.current > 0) {
+        if (loopRef.current) {
+          // Repetir: reinicia do zero sem parar (o scroll Automático volta ao topo sozinho).
+          e.offset = 0;
+          const at = e.Tone.now() + 0.02;
+          Object.values(e.players).forEach(p => { p.playbackRate = speedRef.current; try { p.stop(); } catch {} p.start(at, 0); });
+          e.ctxStart = at;
+          setCurrent(0); onTimeUpdate?.(0);
+          rafRef.current = requestAnimationFrame(tick);
+          return;
+        }
         // fim: para e volta ao início
         Object.values(e.players).forEach(p => { try { p.stop(); } catch {} });
         e.playing = false; e.offset = 0;
@@ -453,6 +465,21 @@ export default function WavePlayer({
     </button>
   );
 
+  const LoopButton = (
+    <button onClick={() => setLoop(v => !v)} disabled={!ready} aria-label="Repetir" title="Repetir a música até parar"
+      style={{
+        width: 34, height: 34, borderRadius: "50%",
+        background: loop ? "var(--accent)" : "var(--surface2)",
+        border: `1px solid ${loop ? "var(--accent)" : "var(--border2)"}`,
+        color: loop ? "#000" : (ready ? "var(--text)" : "var(--muted2)"),
+        fontSize: 14, fontWeight: 700, cursor: ready ? "pointer" : "default",
+        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+      }}
+    >
+      🔁
+    </button>
+  );
+
   const skipBtn = (delta: number, label: string, aria: string) => (
     <button onClick={() => skip(delta)} disabled={!ready} aria-label={aria} title={aria}
       style={{
@@ -494,6 +521,7 @@ export default function WavePlayer({
               {skipBtn(-10, "«", "Voltar 10 segundos")}
               {PlayButton}
               {skipBtn(10, "»", "Avançar 10 segundos")}
+              {LoopButton}
               <span style={{ color: "var(--muted)", fontSize: 12, fontFamily: "var(--font-mono, monospace)", minWidth: 92 }}>
                 {formatTime(current)} / {formatTime(duration)}
               </span>
@@ -574,6 +602,7 @@ export default function WavePlayer({
                 {skipBtn(-10, "«", "Voltar 10 segundos")}
                 {PlayButton}
                 {skipBtn(10, "»", "Avançar 10 segundos")}
+              {LoopButton}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{songTitle}</div>
                   <div style={{ color: "var(--muted)", fontSize: 12 }}>{songArtist}</div>
