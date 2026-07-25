@@ -14,8 +14,9 @@
  * motor expõe (fase, tempo, próxima música) e desenha.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useStageEngine, type StageSong } from "./useStageEngine";
 import { CifraView, CifraText } from "@/app/song/[slug]/CifraView";
 
@@ -110,6 +111,23 @@ function StagePlayerReady({
     currentIndex, currentSong, nextSong, phase, currentTime, duration, gapRemaining,
     loadError, total, togglePlayPause, skipNext, skipPrev, skipGap,
   } = engine;
+  const router = useRouter();
+
+  // Atalhos de teclado: em palco escuro, achar o botão certo com o dedo é
+  // mais difícil do que apertar espaço/seta — e Esc para sair é o padrão que
+  // a tela cheia da cifra (SongPlayer.tsx) já usa.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { router.push(`/setlists/${setlistId}`); return; }
+      const target = e.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
+      if (e.code === "Space") { e.preventDefault(); togglePlayPause(); }
+      else if (e.key === "ArrowRight") { skipNext(); }
+      else if (e.key === "ArrowLeft") { skipPrev(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [router, setlistId, togglePlayPause, skipNext, skipPrev]);
 
   const cifraRef = useRef<HTMLDivElement | null>(null);
   const anchorsRef = useRef<{ time: number; top: number }[]>([]);
@@ -175,10 +193,24 @@ function StagePlayerReady({
 
   if (!currentSong) return null;
 
+  // CifraView/ChordDiagram (compartilhados com a página da música) usam as
+  // variáveis CSS do tema CLARO do site (--text escuro, pensado p/ fundo
+  // branco). Sem sobrescrever aqui, a linha "ativa" da cifra (que usa
+  // var(--text)) fica quase preta sobre o fundo preto do palco — some da
+  // tela. Redefinindo as mesmas variáveis neste escopo, tudo que os
+  // componentes compartilhados desenham herda as cores certas para o palco.
+  const stageVars = {
+    "--bg": BG, "--surface": SURFACE, "--surface2": "#1F1F24", "--surface3": "#26262C",
+    "--border": "#26262C", "--border2": "#33333A",
+    "--text": TEXT, "--muted": MUTED, "--muted2": "#6B6B70",
+    "--chord": ACCENT, "--accent": ACCENT, "--accent2": "#E68A00",
+    "--primary": ACCENT, "--danger": "#ff6b6b", "--pro": ACCENT,
+  } as CSSProperties;
+
   return (
-    <div style={{ minHeight: "100vh", background: BG, color: TEXT, fontFamily: FONT, display: "flex", flexDirection: "column" }}>
+    <div style={{ ...stageVars, height: "100vh", overflow: "hidden", background: BG, color: TEXT, fontFamily: FONT, display: "flex", flexDirection: "column" }}>
       {/* Top bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 20px", borderBottom: `1px solid #222226`, flexWrap: "wrap" }}>
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 12, padding: "14px 20px", borderBottom: `1px solid #222226`, flexWrap: "wrap" }}>
         <Link href={`/setlists/${setlistId}`} style={{ color: MUTED, fontSize: 14, fontWeight: 600 }}>✕ Sair</Link>
         <span style={{ color: MUTED, fontSize: 14, marginLeft: 8 }}>{setlistName || "Setlist"}</span>
         <span style={{ marginLeft: "auto", color: ACCENT, fontWeight: 800, fontSize: 16 }}>
@@ -191,7 +223,7 @@ function StagePlayerReady({
       </div>
 
       {/* Song header */}
-      <div style={{ padding: "20px 24px 8px", display: "flex", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
+      <div style={{ flexShrink: 0, padding: "20px 24px 8px", display: "flex", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: "clamp(24px, 4vw, 40px)", fontWeight: 900, margin: 0 }}>{currentSong.title}</h1>
         <span style={{ color: MUTED, fontSize: 18 }}>{currentSong.artist}</span>
         <span style={{ marginLeft: "auto", display: "flex", gap: 18, fontSize: 20, fontWeight: 700 }}>
@@ -206,10 +238,13 @@ function StagePlayerReady({
         </div>
       )}
 
-      {/* Cifra — ocupa o resto da tela */}
+      {/* Cifra — ocupa o resto da tela. minHeight:0 é necessário: sem ele, um
+          item flex nunca encolhe abaixo do tamanho do próprio conteúdo, e
+          "overflow:auto" não tem efeito — a página inteira cresce e empurra
+          o transporte para fora da tela (era exatamente o bug relatado). */}
       <div
         ref={cifraRef}
-        style={{ flex: 1, overflow: "auto", padding: "8px 24px 24px", position: "relative" }}
+        style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "8px 24px 24px", position: "relative" }}
       >
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
           {(currentSong.chords && currentSong.chords.length > 0) || (currentSong.lyrics && currentSong.lyrics.length > 0) ? (
@@ -240,7 +275,7 @@ function StagePlayerReady({
       )}
 
       {/* Transporte grande */}
-      <div style={{ borderTop: "1px solid #222226", padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ flexShrink: 0, borderTop: "1px solid #222226", padding: "16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
         {/* Progresso */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ color: MUTED, fontSize: 14, minWidth: 44, fontVariantNumeric: "tabular-nums" }}>{formatTime(currentTime)}</span>
