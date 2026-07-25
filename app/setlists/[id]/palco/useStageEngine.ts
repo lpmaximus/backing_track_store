@@ -85,11 +85,18 @@ export function useStageEngine(songs: StageSong[]) {
   const [currentTime, setCurrentTime] = useState(0);
   const [gapRemaining, setGapRemaining] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Contador sem outro propósito além de forçar um novo render quando um
+  // buffer termina de carregar — "ready" mora numa ref (buffersRef), então o
+  // React não sabe sozinho que precisa recalcular `currentReady` abaixo. Sem
+  // isto, o botão de play só atualizava a aparência quando outra coisa (fase,
+  // erro) também mudava de estado.
+  const [, setLoadTick] = useState(0);
 
   const buffersRef = useRef<Map<number, SongBuffer>>(new Map());
   const loadingRef = useRef<Set<number>>(new Set());
   const rafRef = useRef<number | null>(null);
   const gapTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const waitTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const phaseRef = useRef<StagePhase>("idle");
   const currentIndexRef = useRef(0);
@@ -179,6 +186,7 @@ export function useStageEngine(songs: StageSong[]) {
     };
     buffersRef.current.set(index, buffer);
     loadingRef.current.delete(index);
+    setLoadTick((t) => t + 1); // ver comentário no state acima
 
     if (index === currentIndexRef.current) {
       if (failed) setLoadError("Não foi possível carregar o áudio desta música.");
@@ -207,6 +215,7 @@ export function useStageEngine(songs: StageSong[]) {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (gapTimerRef.current) clearInterval(gapTimerRef.current);
+      if (waitTimerRef.current) clearInterval(waitTimerRef.current);
       for (const buf of buffersRef.current.values()) disposeBuffer(buf);
       buffersRef.current.clear();
       releaseWakeLock();
@@ -243,10 +252,14 @@ export function useStageEngine(songs: StageSong[]) {
       releaseWakeLock();
       return;
     }
+    // Continuar tocando sozinho é o ponto central do modo palco — sem isto, a
+    // troca de música só atualiza a tela e a próxima fica esperando o usuário
+    // apertar play de novo (mesma classe de bug do "play não sai som").
+    wantsAutoplayRef.current = true;
     setCurrentIndex(nextIndex);
     setCurrentTime(0);
-    // playSong (definida abaixo) é chamada pelo efeito que observa currentIndex
-    // em modo "playing": ver startCurrentWhenReady.
+    // playBuffer(nextIndex) é chamado pelo efeito que observa currentIndex,
+    // via waitAndPlay — logo abaixo.
   }, [stopRaf, total, releaseWakeLock]);
 
   const startGap = useCallback((seconds: number) => {
@@ -307,32 +320,57 @@ export function useStageEngine(songs: StageSong[]) {
     return true;
   }, [songs, applyPitch, stopRaf, tick]);
 
-  // Quando o índice muda enquanto tocávamos, entra em "loading" até a música
-  // ficar pronta (pode não estar: se o usuário pulou manualmente para longe da
-  // janela pré-carregada) e então dá play sozinha.
+  // Espera a música ficar pronta (ou falhar) e então dá play — chamada tanto
+  // por play() quanto pela troca de índice (skipNext/skipPrev/goTo). Fica num
+  // ref, não num efeito preso a [currentIndex]: um efeito só reage a MUDANÇA
+  // de índice, e não disparava quando o usuário apertava play na MESMA música
+  // que já estava carregando — é o bug do "play não sai som, fica carregando
+  // pra sempre" (a música terminava de carregar em segundo plano, mas nada
+  // acionava o playBuffer depois).
   const wantsAutoplayRef = useRef(false);
-  useEffect(() => {
-    if (!wantsAutoplayRef.current) return;
-    const buf = buffersRef.current.get(currentIndex);
+  const waitAndPlay = useCallback((index: number) => {
+    if (waitTimerRef.current) { clearInterval(waitTimerRef.current); waitTimerRef.current = null; }
+    const buf = buffersRef.current.get(index);
     if (buf?.ready) {
       wantsAutoplayRef.current = false;
-      playBuffer(currentIndex);
-    } else {
-      setPhase("loading");
-      const id = setInterval(() => {
-        const b = buffersRef.current.get(currentIndex);
-        if (b?.ready) {
-          clearInterval(id);
-          wantsAutoplayRef.current = false;
-          playBuffer(currentIndex);
-        } else if (b?.failed) {
-          clearInterval(id);
-          wantsAutoplayRef.current = false;
-          setLoadError("Não foi possível carregar o áudio desta música.");
-        }
-      }, 300);
-      return () => clearInterval(id);
+      playBuffer(index);
+      return;
     }
+    if (buf?.failed) {
+      wantsAutoplayRef.current = false;
+      setLoadError("Não foi possível carregar o áudio desta música.");
+      return;
+    }
+    setPhase("loading");
+    loadSong(index); // no-op se já estiver carregando (guard em loadSong)
+    waitTimerRef.current = setInterval(() => {
+      if (index !== currentIndexRef.current) {
+        // o usuário pulou para outra música enquanto esta ainda carregava.
+        if (waitTimerRef.current) clearInterval(waitTimerRef.current);
+        waitTimerRef.current = null;
+        return;
+      }
+      const b = buffersRef.current.get(index);
+      if (b?.ready) {
+        if (waitTimerRef.current) clearInterval(waitTimerRef.current);
+        waitTimerRef.current = null;
+        wantsAutoplayRef.current = false;
+        playBuffer(index);
+      } else if (b?.failed) {
+        if (waitTimerRef.current) clearInterval(waitTimerRef.current);
+        waitTimerRef.current = null;
+        wantsAutoplayRef.current = false;
+        setLoadError("Não foi possível carregar o áudio desta música.");
+      }
+    }, 300);
+  }, [playBuffer, loadSong]);
+
+  // Navegação (skipNext/skipPrev/goTo) muda o índice enquanto se está tocando
+  // — aqui sim faz sentido reagir à mudança, para a próxima música dar play
+  // sozinha assim que estiver pronta.
+  useEffect(() => {
+    if (!wantsAutoplayRef.current) return;
+    waitAndPlay(currentIndex);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex]);
 
@@ -343,20 +381,13 @@ export function useStageEngine(songs: StageSong[]) {
     requestWakeLock();
     setLoadError(null);
     wantsAutoplayRef.current = true;
-    // Força o efeito acima a rodar mesmo se o índice não mudou.
-    const buf = buffersRef.current.get(currentIndex);
-    if (buf?.ready) {
-      wantsAutoplayRef.current = false;
-      playBuffer(currentIndex);
-    } else {
-      setPhase("loading");
-      loadSong(currentIndex);
-    }
-  }, [currentIndex, playBuffer, requestWakeLock, loadSong]);
+    waitAndPlay(currentIndex);
+  }, [currentIndex, requestWakeLock, waitAndPlay]);
 
   const pause = useCallback(() => {
     stopRaf();
     if (gapTimerRef.current) clearInterval(gapTimerRef.current);
+    if (waitTimerRef.current) { clearInterval(waitTimerRef.current); waitTimerRef.current = null; }
     const buf = buffersRef.current.get(currentIndex);
     if (buf) {
       buf.offset = posNow(buf);
@@ -377,6 +408,7 @@ export function useStageEngine(songs: StageSong[]) {
     if (index < 0 || index >= total) return;
     stopRaf();
     if (gapTimerRef.current) clearInterval(gapTimerRef.current);
+    if (waitTimerRef.current) { clearInterval(waitTimerRef.current); waitTimerRef.current = null; }
     const cur = buffersRef.current.get(currentIndex);
     if (cur) { Object.values(cur.players).forEach((p) => { try { p.stop(); } catch { /* noop */ } }); cur.playing = false; cur.offset = 0; }
     const wasPlaying = phase === "playing" || phase === "gap" || phase === "loading";
@@ -393,6 +425,7 @@ export function useStageEngine(songs: StageSong[]) {
   const stop = useCallback(() => {
     stopRaf();
     if (gapTimerRef.current) clearInterval(gapTimerRef.current);
+    if (waitTimerRef.current) { clearInterval(waitTimerRef.current); waitTimerRef.current = null; }
     for (const buf of buffersRef.current.values()) disposeBuffer(buf);
     buffersRef.current.clear();
     releaseWakeLock();

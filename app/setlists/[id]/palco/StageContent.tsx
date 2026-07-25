@@ -109,8 +109,12 @@ function StagePlayerReady({
   const engine = useStageEngine(songs);
   const {
     currentIndex, currentSong, nextSong, phase, currentTime, duration, gapRemaining,
-    loadError, total, togglePlayPause, skipNext, skipPrev, skipGap,
+    loadError, total, currentReady, togglePlayPause, skipNext, skipPrev, skipGap,
   } = engine;
+  // Só dá pra tocar quando o áudio da música atual estiver de fato pronto —
+  // fora isso, apertar play só entra na fila (waitAndPlay, no motor) e o
+  // botão precisa deixar isso visível, não parecer travado.
+  const canPlay = currentReady || phase === "playing" || phase === "gap";
   const router = useRouter();
 
   // Atalhos de teclado: em palco escuro, achar o botão certo com o dedo é
@@ -174,15 +178,17 @@ function StagePlayerReady({
 
   const pct = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
 
-  const bigBtn = useCallback((onClick: () => void, label: string, primary = false) => (
+  const bigBtn = useCallback((onClick: () => void, label: string, primary = false, disabled = false) => (
     <button
       onClick={onClick}
+      disabled={disabled}
       style={{
         minWidth: primary ? 92 : 64, height: primary ? 92 : 64, borderRadius: "50%",
-        background: primary ? ACCENT : SURFACE, color: primary ? "#000" : TEXT,
+        background: disabled ? "#2A2A30" : primary ? ACCENT : SURFACE,
+        color: disabled ? "#5A5A62" : primary ? "#000" : TEXT,
         border: primary ? "none" : "2px solid #2A2A30", fontSize: primary ? 34 : 22,
-        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-        fontWeight: 700,
+        cursor: disabled ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+        fontWeight: 700, opacity: disabled ? 0.6 : 1, transition: "opacity 0.2s, background 0.2s",
       }}
       aria-label={label}
       title={label}
@@ -287,11 +293,22 @@ function StagePlayerReady({
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 22 }}>
           {bigBtn(skipPrev, "⏮")}
-          {bigBtn(togglePlayPause, phase === "playing" ? "❚❚" : phase === "loading" ? "…" : "▶", true)}
+          {bigBtn(
+            togglePlayPause,
+            phase === "playing" ? "❚❚" : !canPlay ? "…" : "▶",
+            true,
+            !canPlay,
+          )}
           {bigBtn(skipNext, "⏭")}
         </div>
 
-        {nextSong && phase !== "gap" && (
+        {!canPlay && (
+          <p style={{ textAlign: "center", color: ACCENT, fontSize: 13, fontWeight: 600, margin: 0 }}>
+            ⏳ Carregando áudio desta música — o play libera assim que estiver pronto.
+          </p>
+        )}
+
+        {canPlay && nextSong && phase !== "gap" && (
           <p style={{ textAlign: "center", color: MUTED, fontSize: 14, margin: 0 }}>
             A seguir: <strong style={{ color: TEXT }}>{nextSong.title}</strong> · Tom {nextSong.key} · {nextSong.bpm} BPM
           </p>
