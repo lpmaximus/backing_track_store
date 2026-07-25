@@ -26,6 +26,11 @@ type Props = {
   // coluna direita). O player só LÊ esses valores pra o motor de áudio.
   speed?: number;
   pitch?: number;
+  // Trecho a estudar (S1 / ADR-BTS-005): quando o integrante abre a música pela
+  // atribuição do ensaio, o player já entra em loop A–B no pedaço combinado.
+  // Em segundos; ignorado se end <= start. Ver page.tsx (?loop=início-fim).
+  loopStart?: number | null;
+  loopEnd?: number | null;
 };
 
 // ─── Aparência por instrumento ────────────────────────────────────────────────
@@ -136,6 +141,7 @@ type Engine = {
 
 export default function WavePlayer({
   audioUrl, stems, isPro = false, soloInstrument = null, songTitle, songArtist, onTimeUpdate, onDurationReady, speed = 1, pitch = 0,
+  loopStart = null, loopEnd = null,
 }: Props) {
   // Faixas de áudio a carregar. Com stems, cada stem é uma faixa; senão, o mix.
   const tracks: Track[] = useMemo(() => {
@@ -173,10 +179,20 @@ export default function WavePlayer({
   const [retryKey,  setRetryKey]  = useState(0);
   const [loop,      setLoop]      = useState(false); // repetir a música até parar
 
+  // Trecho a estudar (loop A–B). Nasce do deep link da atribuição do ensaio e
+  // pode ser dispensado com um clique — o músico costuma querer ouvir a música
+  // inteira depois de fechar o pedaço difícil.
+  const validRegion =
+    loopStart != null && loopEnd != null && loopEnd > loopStart
+      ? { start: Math.max(0, loopStart), end: loopEnd }
+      : null;
+  const [region, setRegion] = useState<{ start: number; end: number } | null>(validRegion);
+
   // Refs espelho para uso dentro do loop de animação / callbacks
-  const speedRef = useRef(speed);   useEffect(() => { speedRef.current = speed; }, [speed]);
-  const durRef   = useRef(0);       useEffect(() => { durRef.current = duration; }, [duration]);
-  const loopRef  = useRef(false);   useEffect(() => { loopRef.current = loop; }, [loop]);
+  const speedRef  = useRef(speed);   useEffect(() => { speedRef.current = speed; }, [speed]);
+  const durRef    = useRef(0);       useEffect(() => { durRef.current = duration; }, [duration]);
+  const loopRef   = useRef(false);   useEffect(() => { loopRef.current = loop; }, [loop]);
+  const regionRef = useRef(region);  useEffect(() => { regionRef.current = region; }, [region]);
 
   const posNow = useCallback(() => {
     const e = engineRef.current;
@@ -231,10 +247,15 @@ export default function WavePlayer({
         }
       }
 
+      // Com trecho a estudar, a agulha já nasce no início do pedaço.
+      const reg = regionRef.current;
+      const startOffset = reg && reg.start < dur ? reg.start : 0;
+
       engineRef.current = {
         Tone, players, vols, master, pitch: pitchNode,
-        duration: dur, offset: 0, ctxStart: 0, playing: false, pitchActive: false,
+        duration: dur, offset: startOffset, ctxStart: 0, playing: false, pitchActive: false,
       };
+      if (startOffset > 0) { setCurrent(startOffset); onTimeUpdate?.(startOffset); }
       setPeaks(pk);
       setMixPeaks(mergePeaks(Object.values(pk)));
       setDuration(dur);
@@ -263,6 +284,19 @@ export default function WavePlayer({
       const e = engineRef.current;
       if (!e) return;
       const pos = posNow();
+
+      // Trecho a estudar: volta ao início do pedaço em vez de seguir a música.
+      const reg = regionRef.current;
+      if (reg && pos >= reg.end) {
+        e.offset = reg.start;
+        const at = e.Tone.now() + 0.02;
+        Object.values(e.players).forEach(p => { p.playbackRate = speedRef.current; try { p.stop(); } catch {} p.start(at, reg.start); });
+        e.ctxStart = at;
+        setCurrent(reg.start); onTimeUpdate?.(reg.start);
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
       if (pos >= durRef.current && durRef.current > 0) {
         if (loopRef.current) {
           // Repetir: reinicia do zero sem parar (o scroll Automático volta ao topo sozinho).
@@ -528,6 +562,20 @@ export default function WavePlayer({
               <span style={{ color: "var(--muted)", fontSize: 12, fontFamily: "var(--font-mono, monospace)", minWidth: 92 }}>
                 {formatTime(current)} / {formatTime(duration)}
               </span>
+              {region && (
+                <button
+                  onClick={() => setRegion(null)}
+                  title="Tocar a música inteira"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px",
+                    borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    background: "rgba(255,154,0,0.12)", border: "1px solid rgba(255,154,0,0.35)",
+                    color: "var(--accent)", whiteSpace: "nowrap",
+                  }}
+                >
+                  🎯 Trecho {formatTime(region.start)}–{formatTime(region.end)} · sair
+                </button>
+              )}
               <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ color: "var(--muted)", fontSize: 13 }}>Volume Master</span>
                 <input type="range" min={0} max={1} step={0.05} value={volume}

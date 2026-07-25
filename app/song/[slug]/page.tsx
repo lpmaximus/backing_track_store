@@ -24,10 +24,10 @@ export default async function SongPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ solo?: string }>;
+  searchParams: Promise<{ solo?: string; loop?: string }>;
 }) {
   const { slug } = await params;
-  const { solo } = await searchParams;
+  const { solo, loop } = await searchParams;
   const [song] = await db.select().from(songsTable).where(eq(songsTable.slug, slug)).limit(1);
   if (!song) notFound();
   // Takedown/moderação: música bloqueada some do site (R3 / ADR-BTS-003).
@@ -46,12 +46,25 @@ export default async function SongPage({
   // player vir com só a trilha do integrante no ar (pré-muta as outras).
   const soloInstrument = solo?.trim() || null;
 
+  // Trecho a estudar (S1 / ADR-BTS-005): ?loop=início-fim em segundos, vindo da
+  // escalação do ensaio. Entrada é da URL — valida antes de passar ao player.
+  const [loopStart, loopEnd] = (() => {
+    const m = loop?.match(/^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/);
+    if (!m) return [null, null] as const;
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return [null, null] as const;
+    return [a, b] as const;
+  })();
+
   return (
     <SongPlayer
       song={song}
       stems={stems}
       isPro={isPro}
       soloInstrument={soloInstrument}
+      loopStart={loopStart}
+      loopEnd={loopEnd}
       header={<SiteHeader />}
       footer={<SiteFooter />}
     />

@@ -56,6 +56,10 @@ type Props = {
   // Trilha-guia da banda: instrumento do integrante. Quando definido, o player
   // vem com só essa trilha no ar (pré-muta as outras). Ver page.tsx (?solo=).
   soloInstrument?: string | null;
+  // Trecho a estudar vindo da escalação do ensaio (S1 / ADR-BTS-005). Só
+  // repassa ao WavePlayer, que faz o loop A–B. Ver page.tsx (?loop=).
+  loopStart?: number | null;
+  loopEnd?: number | null;
   // Renderizados pelo componente pai (Server Component) e passados como nó pronto —
   // SiteHeader usa auth()/db (Neon) e NÃO pode ser importado por um "use client",
   // senão o bundler leva neon() para o browser ("No database connection string...").
@@ -262,7 +266,7 @@ function CifraView({ sections, lyrics, currentTime, fontSize }: {
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-export default function SongPlayer({ song, stems, isPro = false, soloInstrument = null, header, footer }: Props) {
+export default function SongPlayer({ song, stems, isPro = false, soloInstrument = null, loopStart = null, loopEnd = null, header, footer }: Props) {
   const [currentTime, setCurrentTime]   = useState(0);
   const [autoScroll,  setAutoScroll]    = useState(false);
   const [autoFollow,  setAutoFollow]    = useState(false); // segue o andamento real da música
@@ -556,6 +560,8 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
           onTimeUpdate={setCurrentTime}
           speed={speed}
           pitch={pitch}
+          loopStart={loopStart}
+          loopEnd={loopEnd}
         />
         <Metronome beats={beats} currentTime={currentTime} enabled={metronome} />
 

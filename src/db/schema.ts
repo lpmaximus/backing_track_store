@@ -203,6 +203,83 @@ export const bandMembers = pgTable("band_members", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ─── Ensaios e shows (Fase S1 / ADR-BTS-005) ──────────────────────────────────
+// O Setlist é o REPERTÓRIO; o Evento é a OCORRÊNCIA datada que aponta para ele
+// (D1). Um setlist tem N ensaios e N shows. "Modo Estudo" e "Modo Show" são abas
+// da interface, não entidades separadas (D2).
+export const setlistEvents = pgTable("setlist_events", {
+  id: serial("id").primaryKey(),
+  setlistId: integer("setlist_id")
+    .notNull()
+    .references(() => setlists.id, { onDelete: "cascade" }),
+  // null = sessão de estudo pessoal do Pro (evento sem participantes, D6)
+  bandId: integer("band_id").references(() => bands.id, { onDelete: "cascade" }),
+  // rehearsal (Ensaio) | show (Show) | practice (Sessão de estudo do Pro solo) — D15
+  type: varchar("type", { length: 20 }).notNull().default("rehearsal"),
+  title: varchar("title", { length: 200 }).notNull(),
+  startsAt: timestamp("starts_at").notNull(),
+  durationMin: integer("duration_min"),
+  location: varchar("location", { length: 200 }),
+  agenda: text("agenda"), // objetivo do ensaio, escrito ANTES
+  minutes: text("minutes"), // ata, escrita DEPOIS
+  createdBy: integer("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Confirmação de presença (D3). O convite é para a BANDA, não para o ensaio —
+// aqui só se responde "vou / não vou / talvez".
+export const setlistEventAttendance = pgTable("setlist_event_attendance", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id")
+    .notNull()
+    .references(() => setlistEvents.id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 10 }).notNull(), // yes | no | maybe
+  respondedAt: timestamp("responded_at").notNull().defaultNow(),
+});
+
+// Pauta (antes) e ata (depois) do mesmo ensaio. O que fica como `repeat` entra
+// pré-selecionado no ensaio seguinte.
+export const setlistEventItems = pgTable("setlist_event_items", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id")
+    .notNull()
+    .references(() => setlistEvents.id, { onDelete: "cascade" }),
+  setlistSongId: integer("setlist_song_id")
+    .notNull()
+    .references(() => setlistSongs.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 10 }).notNull().default("planned"), // planned | done | repeat
+  note: text("note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Escalação + status de prontidão (D4). `readiness` é a ÚNICA informação que
+// sobe do integrante para o líder — só o próprio escalado pode alterá-la.
+export const setlistAssignments = pgTable("setlist_assignments", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id")
+    .notNull()
+    .references(() => setlistEvents.id, { onDelete: "cascade" }),
+  setlistSongId: integer("setlist_song_id")
+    .notNull()
+    .references(() => setlistSongs.id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  instrument: varchar("instrument", { length: 50 }), // vem do cadastro do membro
+  focus: text("focus"), // "solo a partir de 1:45"
+  loopStartSec: integer("loop_start_sec"),
+  loopEndSec: integer("loop_end_sec"),
+  readiness: varchar("readiness", { length: 10 }).notNull().default("todo"), // todo | studying | ready
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // ─── Processing jobs (Fase 1.5) ───────────────────────────────────────────────
 // Pipeline assíncrono de separação/transcrição via provider externo.
 export const processingJobs = pgTable("processing_jobs", {
@@ -268,6 +345,14 @@ export type Band = typeof bands.$inferSelect;
 export type NewBand = typeof bands.$inferInsert;
 export type BandMember = typeof bandMembers.$inferSelect;
 export type NewBandMember = typeof bandMembers.$inferInsert;
+export type SetlistEvent = typeof setlistEvents.$inferSelect;
+export type NewSetlistEvent = typeof setlistEvents.$inferInsert;
+export type SetlistEventAttendance = typeof setlistEventAttendance.$inferSelect;
+export type NewSetlistEventAttendance = typeof setlistEventAttendance.$inferInsert;
+export type SetlistEventItem = typeof setlistEventItems.$inferSelect;
+export type NewSetlistEventItem = typeof setlistEventItems.$inferInsert;
+export type SetlistAssignment = typeof setlistAssignments.$inferSelect;
+export type NewSetlistAssignment = typeof setlistAssignments.$inferInsert;
 export type ProcessingJob = typeof processingJobs.$inferSelect;
 export type NewProcessingJob = typeof processingJobs.$inferInsert;
 export type CifraEditHistory = typeof cifraEditHistory.$inferSelect;

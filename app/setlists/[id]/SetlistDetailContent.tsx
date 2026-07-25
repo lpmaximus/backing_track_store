@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AddSongPicker, { AddedItem } from "./AddSongPicker";
+import SetlistEvents from "./SetlistEvents";
 
 type Setlist = {
   id: number;
@@ -331,6 +332,10 @@ export default function SetlistDetailContent({ id }: { id: string }) {
               ))}
             </div>
           )}
+
+          {/* Ensaios e shows (S1 / ADR-BTS-005). Em setlist pessoal vira
+              "Sessões de estudo" — mesmo objeto, sem participantes (D6). */}
+          <SetlistEvents setlistId={id} isBand={!!setlist.bandId} canManage={canEdit} />
 
           {/* Mural da banda — todo integrante ativo comenta (R2) */}
           {setlist.bandId && <SetlistComments setlistId={id} />}
