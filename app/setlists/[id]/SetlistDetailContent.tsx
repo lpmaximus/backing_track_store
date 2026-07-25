@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AddSongPicker, { AddedItem } from "./AddSongPicker";
 import SetlistEvents from "./SetlistEvents";
+import SetlistMixer from "./SetlistMixer";
+import { totalDuration, formatDuration } from "@/src/lib/mix";
 
 type Setlist = {
   id: number;
@@ -23,6 +25,10 @@ type SongItem = {
   id: number;          // id da linha setlist_songs
   position: number;
   notes: string | null;
+  // Preparo do repertório (S2 / ADR-BTS-005)
+  transposeSemitones: number;
+  speed: string | number;
+  gapSeconds: number;
   songId: number;
   slug: string;
   title: string;
@@ -30,6 +36,7 @@ type SongItem = {
   genre: string;
   key: string;
   bpm: number;
+  duration: number;
   thumbnailUrl: string | null;
 };
 
@@ -51,6 +58,7 @@ export default function SetlistDetailContent({ id }: { id: string }) {
   const [itemNoteDraft, setItemNoteDraft] = useState("");
 
   const [showAddPanel, setShowAddPanel] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
 
   // Acesso efetivo pela resposta do servidor (hasProAccess + acesso de banda).
   const [denied, setDenied] = useState(false);
@@ -96,6 +104,27 @@ export default function SetlistDetailContent({ id }: { id: string }) {
       }
     } finally {
       setSavingMeta(false);
+    }
+  }
+
+  // Duplicar (S2): leva repertório, mixagem padrão e preparo; NÃO leva ensaios,
+  // escalação nem prontidão — isso é história daquela ocorrência.
+  async function handleDuplicate() {
+    if (duplicating) return;
+    const name = prompt("Nome da cópia:", `${setlist?.name ?? "Setlist"} (cópia)`);
+    if (name === null) return;
+    setDuplicating(true);
+    try {
+      const res = await fetch(`/api/setlists/${id}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (res.ok) router.push(`/setlists/${data.setlist.id}`);
+      else alert(data.error ?? "Não foi possível duplicar");
+    } finally {
+      setDuplicating(false);
     }
   }
 
@@ -218,13 +247,27 @@ export default function SetlistDetailContent({ id }: { id: string }) {
                   {setlist.notes && (
                     <p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap" }}>{setlist.notes}</p>
                   )}
-                  <p style={{ color: "var(--muted2)", fontSize: 12, margin: "8px 0 0" }}>{songs.length} {songs.length === 1 ? "musica" : "musicas"}</p>
+                  {/* Duração total = músicas + intervalos (S2). Montar um set
+                      de 45 min sem calculadora é o ponto. */}
+                  <p style={{ color: "var(--muted2)", fontSize: 12, margin: "8px 0 0" }}>
+                    {songs.length} {songs.length === 1 ? "musica" : "musicas"}
+                    {songs.length > 0 && (
+                      <> · <strong style={{ color: "var(--muted)" }}>
+                        {formatDuration(totalDuration(songs.map(s => ({ duration: s.duration, gapSeconds: s.gapSeconds }))))}
+                      </strong></>
+                    )}
+                  </p>
                 </div>
                 {canEdit && (
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                     <button onClick={() => setEditingName(true)}
                       style={{ padding: "7px 14px", fontSize: 12, borderRadius: 8, border: "1px solid var(--border2)", background: "transparent", color: "var(--text)", cursor: "pointer", fontWeight: 600 }}>
                       Editar
+                    </button>
+                    <button onClick={handleDuplicate} disabled={duplicating}
+                      style={{ padding: "7px 14px", fontSize: 12, borderRadius: 8, border: "1px solid var(--border2)", background: "transparent", color: "var(--text)", cursor: "pointer", fontWeight: 600 }}
+                      title="Cria uma cópia do repertório com a mixagem e o preparo, sem os ensaios">
+                      {duplicating ? "..." : "Duplicar"}
                     </button>
                     <button onClick={handleDeleteSetlist}
                       style={{ padding: "7px 14px", fontSize: 12, borderRadius: 8, border: "1px solid rgba(239,68,68,0.3)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontWeight: 600 }}>
@@ -278,7 +321,11 @@ export default function SetlistDetailContent({ id }: { id: string }) {
                       </div>
                     )}
                     <Link
-                      href={setlist.viewerInstrument ? `/song/${s.slug}?solo=${encodeURIComponent(setlist.viewerInstrument)}` : `/song/${s.slug}`}
+                      /* Abrir pelo setlist = TOCAR JUNTO: aplica a mixagem, o
+                         tom e a velocidade preparados, e muta a trilha do
+                         próprio integrante. O modo "ouvir como é" (?solo=)
+                         fica no botão ▶ Estudar da escalação do ensaio. */
+                      href={`/song/${s.slug}?sl=${s.id}`}
                       style={{ flex: 1, minWidth: 0, color: "inherit" }}
                     >
                       <p style={{ fontWeight: 700, fontSize: 15, color: "var(--text)", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</p>
@@ -332,6 +379,10 @@ export default function SetlistDetailContent({ id }: { id: string }) {
               ))}
             </div>
           )}
+
+          {/* Mixagem em tela única (S2 / ADR-BTS-005): M/S/volume por stem,
+              mais tom, velocidade e intervalo de cada música. */}
+          {songs.length > 0 && <SetlistMixer setlistId={id} />}
 
           {/* Ensaios e shows (S1 / ADR-BTS-005). Em setlist pessoal vira
               "Sessões de estudo" — mesmo objeto, sem participantes (D6). */}

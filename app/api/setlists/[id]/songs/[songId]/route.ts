@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db, setlists, setlistSongs } from "@/src/db";
 import { eq, and } from "drizzle-orm";
 import { hasProAccess } from "@/src/lib/access";
+import { clampTranspose, parseSpeed } from "@/src/lib/mix";
 
 async function loadOwnedSetlist(id: number, userId: number) {
   const [setlist] = await db.select().from(setlists).where(eq(setlists.id, id)).limit(1);
@@ -36,10 +37,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       .limit(1);
     if (!item) return NextResponse.json({ error: "Item nao encontrado" }, { status: 404 });
 
-    const { position, notes } = await req.json() as { position?: number; notes?: string | null };
+    const { position, notes, transposeSemitones, speed, gapSeconds } = await req.json() as {
+      position?: number;
+      notes?: string | null;
+      transposeSemitones?: number;
+      speed?: number;
+      gapSeconds?: number;
+    };
     const updates: Partial<typeof setlistSongs.$inferInsert> = {};
     if (position !== undefined) updates.position = position;
     if (notes !== undefined) updates.notes = notes?.trim() || null;
+
+    // Preparo do repertório (S2 / ADR-BTS-005). Limites vêm de src/lib/mix.ts —
+    // fora deles o pitch shift do player degrada audivelmente.
+    if (transposeSemitones !== undefined) {
+      updates.transposeSemitones = clampTranspose(transposeSemitones);
+    }
+    if (speed !== undefined) {
+      updates.speed = parseSpeed(speed).toFixed(2);
+    }
+    if (gapSeconds !== undefined) {
+      const g = Number(gapSeconds);
+      updates.gapSeconds = Number.isFinite(g) ? Math.max(0, Math.min(60, Math.round(g))) : 0;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "Nada para atualizar" }, { status: 400 });
+    }
 
     const [updated] = await db.update(setlistSongs).set(updates).where(eq(setlistSongs.id, itemId)).returning();
     await db.update(setlists).set({ updatedAt: new Date() }).where(eq(setlists.id, setlistId));

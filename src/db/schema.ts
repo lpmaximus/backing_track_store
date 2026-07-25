@@ -7,6 +7,7 @@ import {
   serial,
   varchar,
   jsonb,
+  numeric,
 } from "drizzle-orm/pg-core";
 
 // ─── Songs ────────────────────────────────────────────────────────────────────
@@ -156,7 +157,44 @@ export const setlistSongs = pgTable("setlist_songs", {
     .references(() => songs.id, { onDelete: "cascade" }),
   position: integer("position").notNull().default(0),
   notes: text("notes"), // anotação por música (ex: "tocar 1 tom abaixo")
+  // ─── Preparo do repertório (Fase S2 / ADR-BTS-005) ───────────────────────
+  // Tom e velocidade saem do campo de notas e viram dados: o player já suporta
+  // os dois, e "tocar 1 tom abaixo" escrito à mão não afeta o áudio.
+  transposeSemitones: integer("transpose_semitones").notNull().default(0),
+  // numeric no banco → o driver devolve string; converter na borda.
+  speed: numeric("speed", { precision: 3, scale: 2 }).notNull().default("1.00"),
+  // Respiro antes da próxima música no modo palco. 0 = emenda.
+  gapSeconds: integer("gap_seconds").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ─── Mixagem do setlist (Fase S2 / ADR-BTS-005, D5) ───────────────────────────
+// Camada 1 das três: o padrão que o líder define na aba Mixagem. Uma linha por
+// stem por música — cinco por música no pipeline atual.
+export const setlistSongMix = pgTable("setlist_song_mix", {
+  id: serial("id").primaryKey(),
+  setlistSongId: integer("setlist_song_id")
+    .notNull()
+    .references(() => setlistSongs.id, { onDelete: "cascade" }),
+  stemKey: varchar("stem_key", { length: 50 }).notNull(), // vocal | drums | bass | guitar | harmony
+  state: varchar("state", { length: 10 }).notNull().default("on"), // on | mute | solo
+  volume: integer("volume").notNull().default(100), // 0–100
+});
+
+// Camada 3: o ajuste pessoal, que só o dono vê. Camada 2 (auto-mute do
+// instrumento do integrante) é derivada de band_members.instrument e não tem
+// tabela — ver src/lib/mix.ts.
+export const setlistSongMixUser = pgTable("setlist_song_mix_user", {
+  id: serial("id").primaryKey(),
+  setlistSongId: integer("setlist_song_id")
+    .notNull()
+    .references(() => setlistSongs.id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  stemKey: varchar("stem_key", { length: 50 }).notNull(),
+  state: varchar("state", { length: 10 }).notNull().default("on"),
+  volume: integer("volume").notNull().default(100),
 });
 
 // Comentários no repertório da banda (R2 / ADR-BTS-002).
@@ -345,6 +383,10 @@ export type Band = typeof bands.$inferSelect;
 export type NewBand = typeof bands.$inferInsert;
 export type BandMember = typeof bandMembers.$inferSelect;
 export type NewBandMember = typeof bandMembers.$inferInsert;
+export type SetlistSongMix = typeof setlistSongMix.$inferSelect;
+export type NewSetlistSongMix = typeof setlistSongMix.$inferInsert;
+export type SetlistSongMixUser = typeof setlistSongMixUser.$inferSelect;
+export type NewSetlistSongMixUser = typeof setlistSongMixUser.$inferInsert;
 export type SetlistEvent = typeof setlistEvents.$inferSelect;
 export type NewSetlistEvent = typeof setlistEvents.$inferInsert;
 export type SetlistEventAttendance = typeof setlistEventAttendance.$inferSelect;

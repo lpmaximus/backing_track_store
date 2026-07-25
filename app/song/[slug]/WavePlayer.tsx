@@ -31,6 +31,10 @@ type Props = {
   // Em segundos; ignorado se end <= start. Ver page.tsx (?loop=início-fim).
   loopStart?: number | null;
   loopEnd?: number | null;
+  // Mixagem do setlist já resolvida no servidor (S2 / ADR-BTS-005): estado e
+  // volume por stem. Aplicada uma vez, quando o motor fica pronto — é soft,
+  // como o pré-mute do ?solo=: o usuário mexe na mesa depois se quiser.
+  initialMix?: { stemKey: string; state: string; volume: number }[] | null;
 };
 
 // ─── Aparência por instrumento ────────────────────────────────────────────────
@@ -141,7 +145,7 @@ type Engine = {
 
 export default function WavePlayer({
   audioUrl, stems, isPro = false, soloInstrument = null, songTitle, songArtist, onTimeUpdate, onDurationReady, speed = 1, pitch = 0,
-  loopStart = null, loopEnd = null,
+  loopStart = null, loopEnd = null, initialMix = null,
 }: Props) {
   // Faixas de áudio a carregar. Com stems, cada stem é uma faixa; senão, o mix.
   const tracks: Track[] = useMemo(() => {
@@ -442,6 +446,33 @@ export default function WavePlayer({
     setMuted(Object.fromEntries(tracks.filter(t => t.key !== soloInstrument).map(t => [t.key, true])));
     soloAppliedRef.current = true;
   }, [ready, soloInstrument, tracks]);
+
+  // ── Mixagem do setlist (S2) ───────────────────────────────────────────────
+  // Aplica mudo, solo e volume que vieram resolvidos do servidor. Uma vez só,
+  // ao ficar pronto — depois a mesa é do usuário. Não roda junto com o
+  // ?solo= (modo "ouvir como é"), que já define o estado das trilhas.
+  const mixAppliedRef = useRef(false);
+  useEffect(() => {
+    if (mixAppliedRef.current) return;
+    if (!ready || !initialMix || initialMix.length === 0 || soloInstrument) return;
+
+    const known = new Set(tracks.map(t => t.key));
+    const nextMuted: Record<string, boolean> = {};
+    const nextSoloed: Record<string, boolean> = {};
+    const nextVol: Record<string, number> = {};
+
+    for (const m of initialMix) {
+      if (!known.has(m.stemKey)) continue;
+      if (m.state === "mute") nextMuted[m.stemKey] = true;
+      if (m.state === "solo") nextSoloed[m.stemKey] = true;
+      if (m.volume !== 100) nextVol[m.stemKey] = Math.max(0, Math.min(100, m.volume)) / 100;
+    }
+
+    if (Object.keys(nextMuted).length) setMuted(nextMuted);
+    if (Object.keys(nextSoloed).length) setSoloed(nextSoloed);
+    if (Object.keys(nextVol).length) setTrackVol(prev => ({ ...prev, ...nextVol }));
+    mixAppliedRef.current = true;
+  }, [ready, initialMix, soloInstrument, tracks]);
 
   // ── Atalho espaço ─────────────────────────────────────────────────────────
   useEffect(() => {

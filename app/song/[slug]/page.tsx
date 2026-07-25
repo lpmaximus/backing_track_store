@@ -1,8 +1,18 @@
 import { notFound } from "next/navigation";
-import { db, songs as songsTable, stems as stemsTable } from "@/src/db";
-import { eq } from "drizzle-orm";
+import {
+  db,
+  songs as songsTable,
+  stems as stemsTable,
+  setlistSongs,
+  setlistSongMix,
+  setlistSongMixUser,
+  setlists,
+} from "@/src/db";
+import { and, eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { hasProAccess } from "@/src/lib/access";
+import { resolveSetlistRole } from "@/src/lib/events";
+import { resolveMix, parseSpeed, clampTranspose, type ResolvedStem } from "@/src/lib/mix";
 import SongPlayer from "./SongPlayer";
 import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
@@ -24,10 +34,10 @@ export default async function SongPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ solo?: string; loop?: string }>;
+  searchParams: Promise<{ solo?: string; loop?: string; sl?: string }>;
 }) {
   const { slug } = await params;
-  const { solo, loop } = await searchParams;
+  const { solo, loop, sl } = await searchParams;
   const [song] = await db.select().from(songsTable).where(eq(songsTable.slug, slug)).limit(1);
   if (!song) notFound();
   // Takedown/moderação: música bloqueada some do site (R3 / ADR-BTS-003).
@@ -57,6 +67,67 @@ export default async function SongPage({
     return [a, b] as const;
   })();
 
+  // ── Mixagem do setlist (S2 / ADR-BTS-005) ──────────────────────────────────
+  // ?sl=<setlistSongId> diz "abri esta música PELO setlist X". Sem isso a
+  // música vem no mix original — o preparo do líder não vaza para o catálogo.
+  let setlistMix: ResolvedStem[] | null = null;
+  let setlistName: string | null = null;
+  let mixTranspose = 0;
+  let mixSpeed = 1;
+
+  const setlistSongId = Number(sl);
+  if (setlistSongId && session?.user) {
+    const userId = Number(session.user.id);
+    const [item] = await db
+      .select({
+        id: setlistSongs.id,
+        setlistId: setlistSongs.setlistId,
+        songId: setlistSongs.songId,
+        transposeSemitones: setlistSongs.transposeSemitones,
+        speed: setlistSongs.speed,
+      })
+      .from(setlistSongs)
+      .where(and(eq(setlistSongs.id, setlistSongId), eq(setlistSongs.songId, song.id)))
+      .limit(1);
+
+    if (item) {
+      // Reusa a autorização dos ensaios: dono, líder ou membro ativo. Sem isto,
+      // qualquer logado leria a mixagem de um setlist alheio pelo ID na URL.
+      const role = await resolveSetlistRole(item.setlistId, userId);
+      if (role.kind === "leader" || role.kind === "member") {
+        const layer1 = await db
+          .select({ stemKey: setlistSongMix.stemKey, state: setlistSongMix.state, volume: setlistSongMix.volume })
+          .from(setlistSongMix)
+          .where(eq(setlistSongMix.setlistSongId, item.id));
+
+        const layer3 = await db
+          .select({ stemKey: setlistSongMixUser.stemKey, state: setlistSongMixUser.state, volume: setlistSongMixUser.volume })
+          .from(setlistSongMixUser)
+          .where(
+            and(
+              eq(setlistSongMixUser.setlistSongId, item.id),
+              eq(setlistSongMixUser.userId, userId),
+            ),
+          );
+
+        // Camada 2 (auto-mute) só quando NÃO se pediu o modo "ouvir como é":
+        // ?solo= isola a trilha do integrante e é o oposto de tocar junto.
+        const autoMute = soloInstrument ? null : role.instrument;
+
+        setlistMix = resolveMix(stems.map((s) => s.instrument), layer1, autoMute, layer3);
+        mixTranspose = clampTranspose(item.transposeSemitones ?? 0);
+        mixSpeed = parseSpeed(item.speed);
+
+        const [sName] = await db
+          .select({ name: setlists.name })
+          .from(setlists)
+          .where(eq(setlists.id, item.setlistId))
+          .limit(1);
+        setlistName = sName?.name ?? null;
+      }
+    }
+  }
+
   return (
     <SongPlayer
       song={song}
@@ -65,6 +136,10 @@ export default async function SongPage({
       soloInstrument={soloInstrument}
       loopStart={loopStart}
       loopEnd={loopEnd}
+      setlistMix={setlistMix}
+      setlistName={setlistName}
+      setlistTranspose={mixTranspose}
+      setlistSpeed={mixSpeed}
       header={<SiteHeader />}
       footer={<SiteFooter />}
     />

@@ -13,6 +13,7 @@ import CifraEditor from "./CifraEditor";
 import Metronome from "./Metronome";
 import AdBanner from "@/app/components/AdBanner";
 import type { Stem } from "./WavePlayer";
+import type { ResolvedStem } from "@/src/lib/mix";
 
 type LyricsWord = { text: string; start: number; end: number };
 type LyricsLine = { time: number; text: string; words?: LyricsWord[] };
@@ -60,6 +61,12 @@ type Props = {
   // repassa ao WavePlayer, que faz o loop A–B. Ver page.tsx (?loop=).
   loopStart?: number | null;
   loopEnd?: number | null;
+  // Mixagem resolvida do setlist (S2 / ADR-BTS-005). Vem pronta do servidor,
+  // já com as três camadas aplicadas. Null = música aberta fora de um setlist.
+  setlistMix?: ResolvedStem[] | null;
+  setlistName?: string | null;
+  setlistTranspose?: number;
+  setlistSpeed?: number;
   // Renderizados pelo componente pai (Server Component) e passados como nó pronto —
   // SiteHeader usa auth()/db (Neon) e NÃO pode ser importado por um "use client",
   // senão o bundler leva neon() para o browser ("No database connection string...").
@@ -266,7 +273,11 @@ function CifraView({ sections, lyrics, currentTime, fontSize }: {
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-export default function SongPlayer({ song, stems, isPro = false, soloInstrument = null, loopStart = null, loopEnd = null, header, footer }: Props) {
+export default function SongPlayer({
+  song, stems, isPro = false, soloInstrument = null, loopStart = null, loopEnd = null,
+  setlistMix = null, setlistName = null, setlistTranspose = 0, setlistSpeed = 1,
+  header, footer,
+}: Props) {
   const [currentTime, setCurrentTime]   = useState(0);
   const [autoScroll,  setAutoScroll]    = useState(false);
   const [autoFollow,  setAutoFollow]    = useState(false); // segue o andamento real da música
@@ -298,8 +309,10 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
   const [lyricsStatus, setLyricsStatus]         = useState<string>(song.lyricsStatus ?? "validated");
   const [generatingLyrics, setGeneratingLyrics] = useState(false);
   const [fullscreen, setFullscreen]             = useState(false);
-  const [speed, setSpeed]                       = useState(1);
-  const [pitch, setPitch]                       = useState(0);
+  // Tom e velocidade nascem do preparo do setlist quando a música é aberta por
+  // ele (S2). O usuário continua livre para mexer nos dois depois.
+  const [speed, setSpeed]                       = useState(setlistSpeed);
+  const [pitch, setPitch]                       = useState(setlistTranspose);
   const [metronome, setMetronome]               = useState(false);
   const [songKey, setSongKey]                   = useState(song.key ?? "");
   const [songBpm, setSongBpm]                   = useState(song.bpm ? String(song.bpm) : "");
@@ -545,7 +558,26 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
         {soloInstrument && isPro && stems.some(s => s.instrument === soloInstrument) && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "rgba(255,154,0,0.08)", border: "1px solid rgba(255,154,0,0.25)", borderRadius: 8, fontSize: 13, color: "var(--muted)" }}>
             <span style={{ fontSize: 16 }}>🎧</span>
-            <span>Modo banda: sua trilha vem no ar e as demais entram silenciadas. Reative qualquer uma na mesa quando quiser.</span>
+            <span><strong>Ouvir como é:</strong> sua trilha vem no ar e as demais entram silenciadas, para aprender a parte. Reative qualquer uma na mesa quando quiser.</span>
+          </div>
+        )}
+
+        {/* ── Mixagem do setlist aplicada (S2) ──
+            Sempre visível quando há mix: é a diferença entre "o som mudou" e
+            "o som mudou porque o líder preparou assim". */}
+        {setlistMix && isPro && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "rgba(255,154,0,0.08)", border: "1px solid rgba(255,154,0,0.25)", borderRadius: 8, fontSize: 13, color: "var(--muted)", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 16 }}>🎚️</span>
+            <span>
+              Mixagem {setlistName ? <>do setlist <strong>{setlistName}</strong></> : "do setlist"} aplicada
+              {setlistMix.some(m => m.source === "auto") && <> · sua trilha entra mutada para você tocar junto</>}
+              {setlistTranspose !== 0 && <> · tom {setlistTranspose > 0 ? `+${setlistTranspose}` : setlistTranspose}</>}
+              {setlistSpeed !== 1 && <> · {setlistSpeed.toFixed(2)}× de velocidade</>}
+              .
+            </span>
+            <Link href={`/song/${song.slug}`} style={{ color: "var(--accent)", fontWeight: 600, marginLeft: "auto" }}>
+              usar o mix original
+            </Link>
           </div>
         )}
 
@@ -562,6 +594,7 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
           pitch={pitch}
           loopStart={loopStart}
           loopEnd={loopEnd}
+          initialMix={setlistMix}
         />
         <Metronome beats={beats} currentTime={currentTime} enabled={metronome} />
 

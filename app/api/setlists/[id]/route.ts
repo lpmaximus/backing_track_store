@@ -51,6 +51,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         id: setlistSongs.id,
         position: setlistSongs.position,
         notes: setlistSongs.notes,
+        // Preparo do repertório (S2): alimenta a duração total e os selos de
+        // tom/velocidade na lista.
+        transposeSemitones: setlistSongs.transposeSemitones,
+        speed: setlistSongs.speed,
+        gapSeconds: setlistSongs.gapSeconds,
         songId: songs.id,
         slug: songs.slug,
         title: songs.title,
@@ -58,6 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         genre: songs.genre,
         key: songs.key,
         bpm: songs.bpm,
+        duration: songs.duration,
         thumbnailUrl: songs.thumbnailUrl,
       })
       .from(setlistSongs)

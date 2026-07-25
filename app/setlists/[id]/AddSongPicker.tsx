@@ -19,6 +19,11 @@ export type AddedItem = {
   id: number;
   position: number;
   notes: string | null;
+  // Preparo do repertório (S2 / ADR-BTS-005): a música entra sem transposição,
+  // em velocidade normal e sem intervalo. `duration` alimenta a soma do setlist.
+  transposeSemitones: number;
+  speed: string | number;
+  gapSeconds: number;
   songId: number;
   slug: string;
   title: string;
@@ -26,6 +31,7 @@ export type AddedItem = {
   genre: string;
   key: string;
   bpm: number;
+  duration: number;
   thumbnailUrl: string | null;
 };
 

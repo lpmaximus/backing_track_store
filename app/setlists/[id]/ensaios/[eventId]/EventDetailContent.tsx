@@ -146,8 +146,10 @@ function formatWhen(iso: string) {
 }
 
 /**
- * Deep link do player a partir da atribuição: o instrumento entra mutado
- * (?solo= já existente) e o trecho abre em loop.
+ * Deep link do "▶ Estudar" da escalação — modo OUVIR COMO É: ?solo= isola a
+ * trilha do instrumento (as outras entram silenciadas) e ?loop= abre no trecho
+ * combinado. Para tocar JUNTO com a banda, o link é ?sl=<setlistSongId>, que
+ * aplica a mixagem do setlist e muta a própria trilha.
  */
 function songHref(slug: string, instrument: string | null, start: number | null, end: number | null) {
   const p = new URLSearchParams();
@@ -730,11 +732,14 @@ function Pauta({
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {song && (
+                      /* Tocar junto: aplica a mixagem do setlist e muta a
+                         própria trilha. Difere do ▶ Estudar do cartão, que
+                         isola a trilha para aprender a parte de ouvido. */
                       <Link
-                        href={songHref(song.slug, data.viewerInstrument, null, null)}
+                        href={`/song/${song.slug}?sl=${item.setlistSongId}`}
                         style={{ padding: "5px 12px", fontSize: 12, borderRadius: 8, border: "1px solid var(--border2)", color: "var(--text)", fontWeight: 600 }}
                       >
-                        ▶ Ouvir
+                        ▶ Tocar junto
                       </Link>
                     )}
                     {isLeader && (

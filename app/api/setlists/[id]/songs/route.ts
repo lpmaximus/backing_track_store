@@ -54,6 +54,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         id: created.id,
         position: created.position,
         notes: created.notes,
+        // Preparo do repertório (S2): devolvidos para a lista já somar a
+        // duração total sem precisar recarregar a setlist inteira.
+        transposeSemitones: created.transposeSemitones,
+        speed: created.speed,
+        gapSeconds: created.gapSeconds,
         songId: song.id,
         slug: song.slug,
         title: song.title,
@@ -61,6 +66,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         genre: song.genre,
         key: song.key,
         bpm: song.bpm,
+        duration: song.duration,
         thumbnailUrl: song.thumbnailUrl,
       },
     }, { status: 201 });
