@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react";
 import Comments from "./Comments";
 import ChordToken from "./ChordDiagram";
 import AddToSetlist from "./AddToSetlist";
-import ChordEditor from "./ChordEditor";
+import CifraEditor from "./CifraEditor";
 import AdBanner from "@/app/components/AdBanner";
 import type { Stem } from "./WavePlayer";
 
@@ -162,15 +162,17 @@ function wordOffsets(text: string, words?: LyricsWord[]): { start: number; col: 
   return res;
 }
 
-/** Monta a string da linha de acordes com cada acorde na sua coluna (sem sobrepor). */
-function buildChordLine(placements: { col: number; chord: string }[]): string {
-  let line = "";
+/** Posiciona cada acorde na sua coluna (em nº de caracteres), empurrando pra
+ *  direita se sobrepor. Colunas em `ch` alinham com a letra monoespaçada. */
+function layoutChords(placements: { col: number; chord: string }[]): { col: number; chord: string }[] {
+  const out: { col: number; chord: string }[] = [];
+  let cursor = 0;
   for (const p of [...placements].sort((a, b) => a.col - b.col)) {
-    const col = p.col <= line.length ? line.length + (line ? 1 : 0) : p.col;
-    while (line.length < col) line += " ";
-    line += p.chord;
+    const col = Math.max(p.col, cursor);
+    out.push({ col, chord: p.chord });
+    cursor = col + p.chord.length + 1; // +1 = espaço mínimo entre acordes
   }
-  return line;
+  return out;
 }
 
 function CifraView({ sections, lyrics, currentTime, fontSize }: {
@@ -204,13 +206,19 @@ function CifraView({ sections, lyrics, currentTime, fontSize }: {
           }
           return { col, chord: e.chord };
         });
-        const chordLine = buildChordLine(placements);
+        const placed = layoutChords(placements);
         const isActive = i === activeIdx;
 
         return (
           <div key={i} data-t={t0} style={{ marginBottom: 12, padding: "2px 8px", borderRadius: 6, background: isActive ? "rgba(255,154,0,0.10)" : "transparent" }}>
-            {chordLine.trim() && (
-              <div style={{ whiteSpace: "pre", color: "var(--chord)", fontWeight: 700 }}>{chordLine}</div>
+            {placed.length > 0 && (
+              <div style={{ position: "relative", whiteSpace: "pre", height: Math.round(fontSize * 1.5) }}>
+                {placed.map((p, k) => (
+                  <span key={k} style={{ position: "absolute", left: `${p.col}ch`, bottom: 0 }}>
+                    <ChordToken name={p.chord} color="var(--chord)" fontSize={fontSize} marginRight={0} />
+                  </span>
+                ))}
+              </div>
             )}
             <div style={{ whiteSpace: "pre", color: isActive ? "var(--text)" : "var(--muted)", fontWeight: isActive ? 700 : 400 }}>
               {line.text || " "}
@@ -501,8 +509,8 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
                 ) : hasChords ? (
                   <span style={{ background: "rgba(255,154,0,0.15)", color: "var(--accent)", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4 }}>● SINCRONIZADA</span>
                 ) : null}
-                {isPro && !editing && hasChords && (
-                  <button onClick={() => setEditing(true)} style={{ background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", color: "var(--text)", fontWeight: 600 }}>✎ Sugerir correção</button>
+                {isPro && !editing && (
+                  <button onClick={() => setEditing(true)} style={{ background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 6, padding: "3px 10px", fontSize: 12, cursor: "pointer", color: "var(--text)", fontWeight: 600 }}>✎ Corrigir letra/cifra</button>
                 )}
                 {isAuth && hasChords && (
                   <button onClick={reportCifra} disabled={reported} style={{ background: "none", border: "none", color: reported ? "var(--accent)" : "var(--muted2)", fontSize: 12, cursor: reported ? "default" : "pointer", fontWeight: 600 }}>{reported ? "✓ Reportada" : "⚑ Reportar erro"}</button>
@@ -520,11 +528,13 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
                 style={{ padding: "20px 24px", overflow: "auto", ...(fullscreen ? { flex: 1, display: "flex", flexDirection: "column", alignItems: "center" } : { maxHeight: "calc(100vh - 280px)", minHeight: 520 }) }}
               >
                 {editing
-                  ? <ChordEditor
+                  ? <CifraEditor
                       songId={song.id}
-                      initial={chords ?? []}
+                      initialLyrics={lyrics ?? []}
+                      initialChords={chords ?? []}
+                      currentTime={currentTime}
                       onCancel={() => setEditing(false)}
-                      onSaved={(secs) => { setChords(secs); setChordsStatus("validated"); setEditing(false); }}
+                      onSaved={(ls, cs) => { setLyrics(ls); setLyricsStatus("validated"); setChords(cs); setChordsStatus("validated"); setEditing(false); }}
                     />
                   : (hasChords || hasLyrics)
                     ? <CifraView sections={chords ?? []} lyrics={lyrics} currentTime={currentTime} fontSize={fontSize} />
