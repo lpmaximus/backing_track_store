@@ -1,139 +1,9 @@
 import Link from "next/link";
-import Image from "next/image";
-import { db, songs as songsTable } from "@/src/db";
-import { eq, ilike, or, and } from "drizzle-orm";
 import SiteHeader from "./components/SiteHeader";
 import SiteFooter from "./components/SiteFooter";
-import AdBanner from "./components/AdBanner";
 import HeroCarousel from "./components/HeroCarousel";
 
-const GENRES = [
-  "Todos","Rock","Pop","MPB","Bossa Nova","Samba",
-  "Jazz","Funk","Forró","Gospel","Reggae","Blues",
-];
-
-const GENRE_EMOJI: Record<string, string> = {
-  Rock: "🎸", Pop: "🎤", MPB: "🇧🇷", "Bossa Nova": "🎷",
-  Samba: "🥁", Jazz: "🎺", Funk: "🕺", Forró: "🪗",
-  Gospel: "✝️", Reggae: "🌿", Blues: "😢",
-};
-
-type SongRow = typeof songsTable.$inferSelect;
-
-function CatalogSection({ songs, q, genre }: { songs: SongRow[]; q: string; genre: string }) {
-  return (
-    <div id="catalogo" style={{ maxWidth: 1200, margin: "0 auto", padding: "56px 24px 48px" }}>
-
-      <div className="kicker">CATÁLOGO</div>
-      <h2 style={{ fontSize: "clamp(26px, 3.5vw, 40px)", fontWeight: 800, letterSpacing: "-1px", margin: "12px 0 26px", color: "var(--text)" }}>
-        Qual música você quer tocar hoje?
-      </h2>
-
-      {/* Search */}
-      <form method="GET" style={{ marginBottom: 24 }}>
-        <div style={{ background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 10, display: "flex", alignItems: "center", padding: "0 16px", gap: 10, maxWidth: 440 }}>
-          <span style={{ color: "var(--muted)", fontSize: 16 }}>🔍</span>
-          <input
-            name="q" defaultValue={q} placeholder="Buscar música ou artista..."
-            style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 14, padding: "12px 0" }}
-          />
-          {q && <Link href="/" style={{ color: "var(--muted)", fontSize: 13 }}>✕</Link>}
-        </div>
-      </form>
-
-      {/* Genre pills */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 28 }}>
-        {GENRES.map(g => (
-          <Link key={g}
-            href={`/?genre=${encodeURIComponent(g)}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-            style={{
-              padding: "8px 18px", borderRadius: 500, fontSize: 13, fontWeight: 600,
-              border: g === genre ? "1px solid var(--text)" : "1px solid var(--border2)",
-              background: g === genre ? "var(--text)" : "var(--surface)",
-              color: g === genre ? "#fff" : "var(--muted)",
-              display: "inline-flex", alignItems: "center", gap: 5,
-              transition: "background 0.15s, color 0.15s, border-color 0.15s",
-            }}
-          >
-            {GENRE_EMOJI[g] && <span style={{ fontSize: 14 }}>{GENRE_EMOJI[g]}</span>}
-            {g}
-          </Link>
-        ))}
-      </div>
-
-      <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--text)", margin: "0 0 18px" }}>
-        {q ? `Resultados para "${q}"` : genre !== "Todos" ? `${GENRE_EMOJI[genre] ?? ""} ${genre}` : "🔥 Em alta agora"}
-      </h3>
-
-      {/* Banner publicitário (apenas Free) */}
-      <div style={{ marginBottom: 24 }}>
-        <AdBanner />
-      </div>
-
-      {/* Song grid */}
-      {songs.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "80px 0", color: "var(--muted)" }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-          <p style={{ fontSize: 16, marginBottom: 12 }}>Nenhuma música encontrada.</p>
-          <Link href="/" style={{ color: "var(--accent)", fontWeight: 600 }}>Ver todas →</Link>
-        </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-          {songs.map(song => (
-            <Link key={song.id} href={`/song/${song.slug}`} className="song-card">
-              <div style={{ width: 56, height: 56, borderRadius: 8, background: "var(--surface3)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>
-                {song.thumbnailUrl
-                  ? <Image src={song.thumbnailUrl} alt={song.artist} width={56} height={56} style={{ objectFit: "cover", width: "100%", height: "100%" }} />
-                  : (GENRE_EMOJI[song.genre] ?? "🎵")
-                }
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {song.title}
-                </div>
-                <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {song.artist}
-                </div>
-                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                  <span style={{ background: "var(--surface3)", color: "var(--muted)", fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 4 }}>{song.key}</span>
-                  <span style={{ background: "var(--surface3)", color: "var(--muted)", fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 4 }}>{song.bpm} BPM</span>
-                  {song.audioUrl && (
-                    <span style={{ background: "rgba(255,154,0,0.15)", color: "var(--accent)", fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4 }}>▶ Base</span>
-                  )}
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default async function HomePage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ q?: string; genre?: string }>;
-}) {
-  const params = await searchParams;
-  const q     = params?.q     ?? "";
-  const genre = params?.genre ?? "Todos";
-
-  const conditions = [eq(songsTable.published, true)];
-  if (genre && genre !== "Todos") conditions.push(eq(songsTable.genre, genre));
-  if (q) {
-    const cond = or(ilike(songsTable.title, `%${q}%`), ilike(songsTable.artist, `%${q}%`));
-    if (cond) conditions.push(cond);
-  }
-
-  const songs = await db
-    .select()
-    .from(songsTable)
-    .where(and(...conditions))
-    .orderBy(songsTable.title);
-
-  const isSearch = !!(q || (genre && genre !== "Todos"));
-
+export default function HomePage() {
   return (
     <>
       <SiteHeader />
@@ -152,19 +22,15 @@ export default async function HomePage({
             BETA
           </span>
           <p style={{ color: "#fff", fontSize: 13, margin: 0, lineHeight: 1.5 }}>
-            Estamos em fase de testes — <strong>ainda não vendemos planos</strong>. Explore o catálogo livre enquanto evoluímos a plataforma com você.
+            Estamos em fase de testes — <strong>ainda não vendemos planos</strong>. Explore o site livremente enquanto evoluímos a plataforma com você.
           </p>
         </div>
       </div>
 
       <main style={{ minHeight: "100vh", background: "var(--bg)" }}>
 
-        {/* Busca ativa: só o catálogo */}
-        {isSearch && <CatalogSection songs={songs} q={q} genre={genre} />}
-
         {/* HERO — centrado, padrão layout-6 */}
-        {!isSearch && (
-          <section style={{ maxWidth: 1200, margin: "0 auto", padding: "88px 24px 64px", textAlign: "center" }}>
+        <section style={{ maxWidth: 1200, margin: "0 auto", padding: "88px 24px 64px", textAlign: "center" }}>
             <h1 style={{
               fontSize: "clamp(44px, 7vw, 88px)", fontWeight: 800, lineHeight: 1.02,
               margin: "0 0 26px", color: "var(--text)", letterSpacing: "-0.03em",
@@ -176,7 +42,7 @@ export default async function HomePage({
               ajuste a mix e toque junto — direto no navegador.
             </p>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center" }}>
-              <Link href="#catalogo" className="btn-primary" style={{ fontSize: 15, padding: "16px 34px" }}>
+              <Link href="/catalogo" className="btn-primary" style={{ fontSize: 15, padding: "16px 34px" }}>
                 Explorar músicas
               </Link>
               <Link href="/como-funciona" className="btn-ghost" style={{ fontSize: 15, padding: "16px 34px" }}>
@@ -193,11 +59,9 @@ export default async function HomePage({
             {/* Carrossel de destaques */}
             <HeroCarousel />
           </section>
-        )}
 
         {/* VÍDEO EM LOOP — seção escura (padrão layout-6) */}
-        {!isSearch && (
-          <section className="videosec">
+        <section className="videosec">
             <div className="videosec-inner">
               <div>
                 <div className="kicker">RECURSOS</div>
@@ -214,11 +78,9 @@ export default async function HomePage({
               </div>
             </div>
           </section>
-        )}
 
         {/* COMO FUNCIONA */}
-        {!isSearch && (
-          <section style={{ maxWidth: 1200, margin: "0 auto", padding: "80px 24px" }}>
+        <section style={{ maxWidth: 1200, margin: "0 auto", padding: "80px 24px" }}>
             <div className="kicker">COMO FUNCIONA</div>
             <h2 style={{ fontSize: "clamp(30px, 4vw, 48px)", fontWeight: 800, letterSpacing: "-1.5px", margin: "14px 0 0", lineHeight: 1.08, color: "var(--text)" }}>
               Da música completa<br />ao seu palco em minutos.
@@ -271,11 +133,9 @@ export default async function HomePage({
               ))}
             </div>
           </section>
-        )}
 
         {/* PARA BANDAS — seção escura com mixer mock */}
-        {!isSearch && (
-          <section className="bandsec">
+        <section className="bandsec">
             <div className="bandsec-inner">
               <div>
                 <div className="kicker">PARA BANDAS</div>
@@ -308,14 +168,9 @@ export default async function HomePage({
               </div>
             </div>
           </section>
-        )}
-
-        {/* CATÁLOGO — depois das seções de marketing */}
-        {!isSearch && <CatalogSection songs={songs} q={q} genre={genre} />}
 
         {/* PLANOS — 3 cards, padrão layout-6 (assinaturas desativadas no beta) */}
-        {!isSearch && (
-          <section style={{ maxWidth: 1200, margin: "0 auto", padding: "80px 24px 96px" }}>
+        <section style={{ maxWidth: 1200, margin: "0 auto", padding: "80px 24px 96px" }}>
             <div className="kicker">PLANOS</div>
             <h2 style={{ fontSize: "clamp(30px, 4vw, 48px)", fontWeight: 800, letterSpacing: "-1.5px", margin: "14px 0 0", lineHeight: 1.08, color: "var(--text)" }}>
               Comece grátis.<br />Cresça com a sua banda.
@@ -391,7 +246,6 @@ export default async function HomePage({
               Estamos em beta — os planos pagos ainda não estão à venda. Valores sujeitos a ajuste no lançamento.
             </p>
           </section>
-        )}
       </main>
 
       <SiteFooter />

@@ -1,0 +1,109 @@
+import Link from "next/link";
+import Image from "next/image";
+import type { songs as songsTable } from "@/src/db";
+import AdBanner from "./AdBanner";
+
+export const GENRES = [
+  "Todos","Rock","Pop","MPB","Bossa Nova","Samba",
+  "Jazz","Funk","Forró","Gospel","Reggae","Blues",
+];
+
+export const GENRE_EMOJI: Record<string, string> = {
+  Rock: "🎸", Pop: "🎤", MPB: "🇧🇷", "Bossa Nova": "🎷",
+  Samba: "🥁", Jazz: "🎺", Funk: "🕺", Forró: "🪗",
+  Gospel: "✝️", Reggae: "🌿", Blues: "😢",
+};
+
+type SongRow = typeof songsTable.$inferSelect;
+
+/** Catálogo completo — busca + filtro de gênero + grid de músicas.
+ *  Vive na rota /catalogo (BUY-002: retirado da landing page). */
+export default function CatalogSection({ songs, q, genre }: { songs: SongRow[]; q: string; genre: string }) {
+  return (
+    <div id="catalogo" style={{ maxWidth: 1200, margin: "0 auto", padding: "56px 24px 48px" }}>
+
+      <div className="kicker">CATÁLOGO</div>
+      <h2 style={{ fontSize: "clamp(26px, 3.5vw, 40px)", fontWeight: 800, letterSpacing: "-1px", margin: "12px 0 26px", color: "var(--text)" }}>
+        Qual música você quer tocar hoje?
+      </h2>
+
+      {/* Search */}
+      <form method="GET" style={{ marginBottom: 24 }}>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 10, display: "flex", alignItems: "center", padding: "0 16px", gap: 10, maxWidth: 440 }}>
+          <span style={{ color: "var(--muted)", fontSize: 16 }}>🔍</span>
+          <input
+            name="q" defaultValue={q} placeholder="Buscar música ou artista..."
+            style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 14, padding: "12px 0" }}
+          />
+          {q && <Link href="/catalogo" style={{ color: "var(--muted)", fontSize: 13 }}>✕</Link>}
+        </div>
+      </form>
+
+      {/* Genre pills */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 28 }}>
+        {GENRES.map(g => (
+          <Link key={g}
+            href={`/catalogo?genre=${encodeURIComponent(g)}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+            style={{
+              padding: "8px 18px", borderRadius: 500, fontSize: 13, fontWeight: 600,
+              border: g === genre ? "1px solid var(--text)" : "1px solid var(--border2)",
+              background: g === genre ? "var(--text)" : "var(--surface)",
+              color: g === genre ? "#fff" : "var(--muted)",
+              display: "inline-flex", alignItems: "center", gap: 5,
+              transition: "background 0.15s, color 0.15s, border-color 0.15s",
+            }}
+          >
+            {GENRE_EMOJI[g] && <span style={{ fontSize: 14 }}>{GENRE_EMOJI[g]}</span>}
+            {g}
+          </Link>
+        ))}
+      </div>
+
+      <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--text)", margin: "0 0 18px" }}>
+        {q ? `Resultados para "${q}"` : genre !== "Todos" ? `${GENRE_EMOJI[genre] ?? ""} ${genre}` : "🔥 Em alta agora"}
+      </h3>
+
+      {/* Banner publicitário (apenas Free) */}
+      <div style={{ marginBottom: 24 }}>
+        <AdBanner />
+      </div>
+
+      {/* Song grid */}
+      {songs.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "80px 0", color: "var(--muted)" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+          <p style={{ fontSize: 16, marginBottom: 12 }}>Nenhuma música encontrada.</p>
+          <Link href="/catalogo" style={{ color: "var(--accent)", fontWeight: 600 }}>Ver todas →</Link>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+          {songs.map(song => (
+            <Link key={song.id} href={`/song/${song.slug}`} className="song-card">
+              <div style={{ width: 56, height: 56, borderRadius: 8, background: "var(--surface3)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>
+                {song.thumbnailUrl
+                  ? <Image src={song.thumbnailUrl} alt={song.artist} width={56} height={56} style={{ objectFit: "cover", width: "100%", height: "100%" }} />
+                  : (GENRE_EMOJI[song.genre] ?? "🎵")
+                }
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {song.title}
+                </div>
+                <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {song.artist}
+                </div>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  <span style={{ background: "var(--surface3)", color: "var(--muted)", fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 4 }}>{song.key}</span>
+                  <span style={{ background: "var(--surface3)", color: "var(--muted)", fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 4 }}>{song.bpm} BPM</span>
+                  {song.audioUrl && (
+                    <span style={{ background: "rgba(255,154,0,0.15)", color: "var(--accent)", fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4 }}>▶ Base</span>
+                  )}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

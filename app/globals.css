@@ -197,6 +197,35 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .mixmock .tagmute { font-size: 9px; font-weight: 800; color: var(--accent); width: 44px; text-align: right; }
 @media (max-width: 880px) { .bandsec-inner { grid-template-columns: 1fr; padding: 60px 24px; } }
 
+/* Header — nav completa em telas largas, hamburguer (MobileNav) abaixo de 880px */
+.mobile-nav-toggle { display: none; }
+@media (max-width: 880px) {
+  .header-row { gap: 16px !important; }
+  .desktop-nav { display: none !important; }
+  .mobile-nav-toggle { display: flex !important; }
+}
+@media (max-width: 480px) {
+  .auth-buttons a { padding: 8px 12px !important; font-size: 12px !important; }
+  .auth-buttons { gap: 6px !important; }
+}
+
+/* Cifra + sidebar do player — empilha em telas estreitas (tablet/celular) */
+@media (max-width: 880px) {
+  .player-content { flex-direction: column !important; }
+  .player-sidebar { width: 100% !important; }
+}
+
+/* Mixer multitrack — rolagem horizontal em vez de espremer os controles */
+@media (max-width: 640px) {
+  .mixer-tracks { overflow-x: auto; }
+  .mixer-track-row { min-width: 480px; }
+}
+
+/* Página /planos — cards e FAQ em 2 colunas fixas, empilha em telas estreitas */
+@media (max-width: 680px) {
+  .planos-grid, .planos-faq-grid { grid-template-columns: 1fr !important; }
+}
+
 /* Grid de colunas do rodapé — responsivo (marca + Produto + Sobre) */
 .footer-grid {
   display: grid;

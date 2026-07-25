@@ -41,7 +41,7 @@ export default function PlanosContent() {
 
       {/* Header */}
       <div style={{ textAlign: "center", marginBottom: 52 }}>
-        <h1 style={{ fontSize: 48, fontWeight: 900, color: "var(--text)", margin: "0 0 16px", letterSpacing: "-0.02em" }}>
+        <h1 style={{ fontSize: "clamp(32px, 8vw, 48px)", fontWeight: 900, color: "var(--text)", margin: "0 0 16px", letterSpacing: "-0.02em" }}>
           Escolha seu plano
         </h1>
         <p style={{ color: "var(--muted)", fontSize: 18, margin: 0 }}>
@@ -69,7 +69,7 @@ export default function PlanosContent() {
       </div>
 
       {/* Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 40 }}>
+      <div className="planos-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 40 }}>
 
         {/* Free */}
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: "28px 28px 32px" }}>
@@ -149,7 +149,7 @@ export default function PlanosContent() {
       </div>
 
       {/* FAQ */}
-      <div style={{ marginTop: 48, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div className="planos-faq-grid" style={{ marginTop: 48, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         {[
           { q: "Preciso de cartao de credito?", a: "Nao! Voce pode pagar com PIX ou boleto." },
           { q: "Como funciona o trial de 7 dias?", a: "Voce acessa tudo do Pro. A primeira cobranca so ocorre apos 7 dias." },

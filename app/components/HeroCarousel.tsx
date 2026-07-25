@@ -22,7 +22,7 @@ const SLIDES = [
     sub: "Sua mix, do seu jeito",
     desc: "Volume, mute e solo em cada stem. Silencie o seu instrumento e assuma o lugar dele na banda.",
     cta: "Testar o mixer",
-    href: "/#catalogo",
+    href: "/catalogo",
     img: "/carousel-2.jpg",
   },
   {

@@ -559,8 +559,8 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
         />
         <Metronome beats={beats} currentTime={currentTime} enabled={metronome} />
 
-        {/* ── Content: cifra + sidebar ── */}
-        <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+        {/* ── Content: cifra + sidebar (empilha em telas estreitas — .player-content) ── */}
+        <div className="player-content" style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
 
           {/* Cifra panel */}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -633,7 +633,7 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
           </div>
 
           {/* Sidebar */}
-          <div style={{ width: 210, flexShrink: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="player-sidebar" style={{ width: 210, flexShrink: 0, display: "flex", flexDirection: "column", gap: 12 }}>
 
             {/* Auto-scroll */}
             <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>

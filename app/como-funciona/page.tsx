@@ -163,7 +163,7 @@ export default function ComoFuncionaPage() {
               O catálogo está livre durante o beta — sem cadastro obrigatório para explorar.
             </p>
             <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-              <Link href="/#catalogo" className="btn-primary">Explorar músicas</Link>
+              <Link href="/catalogo" className="btn-primary">Explorar músicas</Link>
               <span className="btn-ghost" title="Em breve" style={{ cursor: "default", opacity: 0.6 }}>Ver planos</span>
             </div>
           </div>

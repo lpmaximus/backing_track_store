@@ -535,15 +535,15 @@ export default function WavePlayer({
               </div>
             </div>
 
-            {/* Faixas + playhead */}
-            <div style={{ position: "relative" }}>
+            {/* Faixas + playhead — rola horizontalmente em telas estreitas (.mixer-tracks) */}
+            <div className="mixer-tracks" style={{ position: "relative" }}>
               {tracks.map(t => {
                 const on = anySolo ? !!soloed[t.key] : !muted[t.key];
                 const isMuted = !!muted[t.key];
                 const isSolo = !!soloed[t.key];
                 const g = trackVol[t.key] ?? 1;
                 return (
-                  <div key={t.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 16px", borderBottom: "1px solid var(--border)" }}>
+                  <div key={t.key} className="mixer-track-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 16px", borderBottom: "1px solid var(--border)" }}>
                     {/* M / S */}
                     <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                       <button onClick={() => toggleMute(t.key)} aria-label={`Mudo ${t.label}`}
