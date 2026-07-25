@@ -15,9 +15,9 @@ export default async function SiteHeader() {
     { label: "Catálogo", href: "/catalogo" },
     ...(user
       ? [
-          { label: "Enviar", href: "/upload" },
-          { label: "Minhas Músicas", href: "/perfil" },
           { label: "Compartilhadas", href: "/compartilhadas" },
+          { label: "Minhas Músicas", href: "/perfil" },
+          { label: "Enviar", href: "/upload" },
           { label: "Setlists", href: "/setlists" },
           { label: "Bandas", href: "/bandas" },
         ]
