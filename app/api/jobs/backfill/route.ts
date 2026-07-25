@@ -128,7 +128,9 @@ async function runBackfill(req: NextRequest) {
 
       // ── Cifra (e/ou meta: bpm/tom/batidas) ──
       const alreadyHasChords = Boolean(song.chords && song.chords.length > 0);
-      const needsMeta = refreshMeta && !(song.beats && song.beats.length > 0);
+      // Critério = falta BPM (o que a detecção preenche de forma confiável). As
+      // batidas o app deriva do BPM (o stem de harmonia não dá beats por si só).
+      const needsMeta = refreshMeta && !(song.bpm && song.bpm > 0);
       // Roda se: falta cifra (fluxo normal) OU falta o meta (reanálise) — nesse
       // caso mesmo com cifra/job existente, pois só o meta será atualizado.
       if (chordsOn && submitted < MAX_SUBMITS && (needsMeta || (!alreadyHasChords && !hasChordJob.has(song.id)))) {

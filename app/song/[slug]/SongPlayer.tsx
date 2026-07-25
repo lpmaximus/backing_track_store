@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, type ReactNode } from "react";
+import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
@@ -289,9 +289,18 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
   const [speed, setSpeed]                       = useState(1);
   const [pitch, setPitch]                       = useState(0);
   const [metronome, setMetronome]               = useState(false);
-  const beats = song.beats ?? [];
   const [songKey, setSongKey]                   = useState(song.key ?? "");
   const [songBpm, setSongBpm]                   = useState(song.bpm ? String(song.bpm) : "");
+
+  // Batidas do metrônomo: usa as detectadas se houver; senão gera uma grade
+  // regular a partir do BPM + duração (stem de harmonia não produz beats sozinho).
+  const beats = useMemo(() => {
+    if (song.beats && song.beats.length > 0) return song.beats;
+    const bpm = Number(songBpm) || song.bpm || 0;
+    if (bpm <= 0 || !song.duration) return [];
+    const step = 60 / bpm;
+    return Array.from({ length: Math.floor(song.duration / step) }, (_, i) => Math.round(i * step * 1000) / 1000);
+  }, [song.beats, song.duration, song.bpm, songBpm]);
 
   async function saveMeta(patch: { key?: string; bpm?: number }) {
     try {
