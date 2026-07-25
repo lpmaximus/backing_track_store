@@ -279,6 +279,21 @@ export default function SetlistDetailContent({ id }: { id: string }) {
             )}
           </div>
 
+          {/* Executar — modo palco (S3 / ADR-BTS-005). Visível a todo mundo com
+              acesso ao setlist (não só o líder): no ensaio/show quem toca é a
+              banda inteira, não só quem edita o repertório. */}
+          {songs.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <Link
+                href={`/setlists/${id}/palco`}
+                className="btn-primary"
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 22px", fontSize: 14, fontWeight: 700 }}
+              >
+                ▶ Executar
+              </Link>
+            </div>
+          )}
+
           {/* Adicionar músicas */}
           {canEdit && (
             <div style={{ marginBottom: 20 }}>
