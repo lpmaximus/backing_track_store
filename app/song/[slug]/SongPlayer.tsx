@@ -553,7 +553,7 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
               {/* Content */}
               <div
                 ref={cifraRef}
-                style={{ padding: "20px 24px", overflow: "auto", ...(fullscreen ? { flex: 1, display: "flex", flexDirection: "column", alignItems: "center" } : { maxHeight: "calc(100vh - 280px)", minHeight: 520 }) }}
+                style={{ position: "relative", padding: "20px 24px", overflow: "auto", ...(fullscreen ? { flex: 1, display: "flex", flexDirection: "column", alignItems: "center" } : { maxHeight: "calc(100vh - 280px)", minHeight: 520 }) }}
               >
                 {editing
                   ? <CifraEditor
