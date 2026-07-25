@@ -50,6 +50,8 @@ export const songs = pgTable("songs", {
   chordsSource: varchar("chords_source", { length: 20 }).notNull().default("admin"), // admin | auto | community
   // Estado de validação da cifra (admin sempre validated)
   chordsStatus: varchar("chords_status", { length: 20 }).notNull().default("validated"), // draft | validated
+  // Batidas detectadas (tempos em s) — p/ o metrônomo sincronizado. bpm/key acima.
+  beats: jsonb("beats").$type<number[]>(),
   // Moderação do catálogo (R3 / ADR-BTS-003): approved (visível), pending
   // (aguardando revisão), blocked (oculto por denúncia/disputa, sem apagar).
   moderationStatus: varchar("moderation_status", { length: 20 }).notNull().default("approved"), // approved | pending | blocked

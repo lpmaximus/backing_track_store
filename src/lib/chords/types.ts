@@ -17,9 +17,16 @@ export interface ChordDetectionSubmitResult {
   providerJobId: string;
 }
 
+/** Metadados extras que alguns providers detectam junto (BTC: bpm/tom/batidas). */
+export interface ChordMeta {
+  bpm?: number;
+  key?: string;
+  beats?: number[]; // tempos (s) de cada batida — p/ o metrônomo
+}
+
 export type ChordPollResult =
   | { status: "running" }
-  | { status: "done"; sections: ChordSection[] }
+  | { status: "done"; sections: ChordSection[]; meta?: ChordMeta }
   | { status: "failed"; error: string };
 
 export interface ChordDetectionProvider {

@@ -22,6 +22,10 @@ type Props = {
   songArtist: string;
   onTimeUpdate?: (t: number) => void;
   onDurationReady?: (d: number) => void;
+  // Velocidade e pitch são controlados pelo SongPlayer (controles ficam na
+  // coluna direita). O player só LÊ esses valores pra o motor de áudio.
+  speed?: number;
+  pitch?: number;
 };
 
 // ─── Aparência por instrumento ────────────────────────────────────────────────
@@ -131,7 +135,7 @@ type Engine = {
 };
 
 export default function WavePlayer({
-  audioUrl, stems, isPro = false, soloInstrument = null, songTitle, songArtist, onTimeUpdate, onDurationReady,
+  audioUrl, stems, isPro = false, soloInstrument = null, songTitle, songArtist, onTimeUpdate, onDurationReady, speed = 1, pitch = 0,
 }: Props) {
   // Faixas de áudio a carregar. Com stems, cada stem é uma faixa; senão, o mix.
   const tracks: Track[] = useMemo(() => {
@@ -159,8 +163,7 @@ export default function WavePlayer({
   const [current,   setCurrent]   = useState(0);
   const [duration,  setDuration]  = useState(0);
   const [volume,    setVolume]    = useState(0.85);
-  const [speed,     setSpeed]     = useState(1);
-  const [pitch,     setPitch]     = useState(0);
+  // speed/pitch agora vêm por prop (controlados pelo SongPlayer / coluna direita).
   const [trackVol,  setTrackVol]  = useState<Record<string, number>>({});
   const [muted,     setMuted]     = useState<Record<string, boolean>>({});
   const [soloed,    setSoloed]    = useState<Record<string, boolean>>({});
@@ -619,50 +622,7 @@ export default function WavePlayer({
         )}
       </div>
 
-      {/* ─── Velocidade ─── */}
-      {isPro ? (
-        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 18px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)" }}>VELOCIDADE</span>
-            <span className="pro-badge">PRO</span>
-            <span style={{ marginLeft: "auto", color: "var(--text)", fontWeight: 700, fontSize: 14 }}>{speed.toFixed(2)}x</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ color: "var(--muted)", fontSize: 12 }}>0.5x</span>
-            <input type="range" min={0.5} max={1.25} step={0.05} value={speed}
-              onChange={e => setSpeed(Number(e.target.value))} style={{ flex: 1 }} aria-label="Velocidade" />
-            <span style={{ color: "var(--muted)", fontSize: 12 }}>1.25x</span>
-            <button onClick={() => setSpeed(1)}
-              style={{ background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "var(--muted)", fontWeight: 600 }}>
-              Reset
-            </button>
-          </div>
-          <p style={{ color: "var(--muted2)", fontSize: 11, margin: "8px 0 0" }}>Tom preservado ao mudar a velocidade.</p>
-        </div>
-      ) : proGate("Controle de velocidade")}
-
-      {/* ─── Pitch shift ─── */}
-      {isPro ? (
-        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 18px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)" }}>PITCH SHIFT</span>
-            <span className="pro-badge">PRO</span>
-            <span style={{ marginLeft: "auto", color: "var(--text)", fontWeight: 700, fontSize: 14 }}>
-              {pitch > 0 ? `+${pitch}` : pitch} st
-            </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ color: "var(--muted)", fontSize: 12 }}>-6</span>
-            <input type="range" min={-6} max={6} step={1} value={pitch}
-              onChange={e => setPitch(Number(e.target.value))} style={{ flex: 1 }} aria-label="Pitch" />
-            <span style={{ color: "var(--muted)", fontSize: 12 }}>+6</span>
-            <button onClick={() => setPitch(0)}
-              style={{ background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "var(--muted)", fontWeight: 600 }}>
-              Reset
-            </button>
-          </div>
-        </div>
-      ) : proGate("Pitch shift em tempo real")}
+      {/* Velocidade e Pitch foram movidos pra a coluna direita (SongPlayer). */}
 
       {/* Gate de stems para quem não é PRO */}
       {!isPro && stems.length > 0 && proGate("Faixas isoladas (bateria, baixo, guitarra, vocal)")}

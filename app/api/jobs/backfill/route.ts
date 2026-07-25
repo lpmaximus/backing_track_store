@@ -35,6 +35,9 @@ async function runBackfill(req: NextRequest) {
 
   const url = new URL(req.url);
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 50, 1), 200);
+  // refreshMeta: reanalisa músicas que já têm cifra mas ainda não têm batidas
+  // (p/ preencher bpm/tom/beats). Não sobrescreve a cifra existente.
+  const refreshMeta = url.searchParams.get("refreshMeta") === "true";
 
   const chordProvider = getChordProvider();
   const lyricsProvider = getLyricsProvider();
@@ -123,9 +126,12 @@ async function runBackfill(req: NextRequest) {
       const songStems = allStems.filter((s) => s.songId === song.id);
       let touched = false;
 
-      // ── Cifra ──
+      // ── Cifra (e/ou meta: bpm/tom/batidas) ──
       const alreadyHasChords = Boolean(song.chords && song.chords.length > 0);
-      if (chordsOn && !alreadyHasChords && !hasChordJob.has(song.id) && submitted < MAX_SUBMITS) {
+      const needsMeta = refreshMeta && !(song.beats && song.beats.length > 0);
+      // Roda se: falta cifra (fluxo normal) OU falta o meta (reanálise) — nesse
+      // caso mesmo com cifra/job existente, pois só o meta será atualizado.
+      if (chordsOn && submitted < MAX_SUBMITS && (needsMeta || (!alreadyHasChords && !hasChordJob.has(song.id)))) {
         const harmony = songStems.find((s) => s.instrument === "harmony") ?? songStems[0];
         if (harmony) {
           submitted++;

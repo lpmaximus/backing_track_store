@@ -9,6 +9,7 @@ import Comments from "./Comments";
 import ChordToken from "./ChordDiagram";
 import AddToSetlist from "./AddToSetlist";
 import CifraEditor from "./CifraEditor";
+import Metronome from "./Metronome";
 import AdBanner from "@/app/components/AdBanner";
 import type { Stem } from "./WavePlayer";
 
@@ -43,6 +44,7 @@ type Song = {
   lyrics?: LyricsLine[] | null;
   lyricsStatus?: string | null;
   lyricsSource?: string | null;
+  beats?: number[] | null;
   published: boolean;
 };
 
@@ -284,6 +286,22 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
   const [lyricsStatus, setLyricsStatus]         = useState<string>(song.lyricsStatus ?? "validated");
   const [generatingLyrics, setGeneratingLyrics] = useState(false);
   const [fullscreen, setFullscreen]             = useState(false);
+  const [speed, setSpeed]                       = useState(1);
+  const [pitch, setPitch]                       = useState(0);
+  const [metronome, setMetronome]               = useState(false);
+  const beats = song.beats ?? [];
+  const [songKey, setSongKey]                   = useState(song.key ?? "");
+  const [songBpm, setSongBpm]                   = useState(song.bpm ? String(song.bpm) : "");
+
+  async function saveMeta(patch: { key?: string; bpm?: number }) {
+    try {
+      await fetch(`/api/songs/${song.id}/meta`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+    } catch { /* silencioso */ }
+  }
 
   // Frente C: se ainda não há cifra, faz poll do endpoint que finaliza a
   // detecção automática (Music.ai é assíncrono). Só para usuário logado.
@@ -519,7 +537,10 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
           songTitle={song.title}
           songArtist={song.artist}
           onTimeUpdate={setCurrentTime}
+          speed={speed}
+          pitch={pitch}
         />
+        <Metronome beats={beats} currentTime={currentTime} enabled={metronome} />
 
         {/* ── Content: cifra + sidebar ── */}
         <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
@@ -633,15 +654,74 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
               </p>
             </div>
 
+            {/* Prática: velocidade + pitch + metrônomo */}
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+              <p style={{ fontWeight: 700, fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)", margin: "0 0 12px" }}>PRÁTICA</p>
+              {isPro ? (
+                <>
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
+                      <span>Velocidade</span><strong style={{ color: "var(--text)" }}>{speed.toFixed(2)}x</strong>
+                    </div>
+                    <input type="range" min={0.5} max={1.25} step={0.05} value={speed} onChange={e => setSpeed(Number(e.target.value))} style={{ width: "100%" }} aria-label="Velocidade" />
+                  </div>
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
+                      <span>Tom (pitch)</span><strong style={{ color: "var(--text)" }}>{pitch > 0 ? `+${pitch}` : pitch} st</strong>
+                    </div>
+                    <input type="range" min={-6} max={6} step={1} value={pitch} onChange={e => setPitch(Number(e.target.value))} style={{ width: "100%" }} aria-label="Pitch" />
+                  </div>
+                </>
+              ) : (
+                <p style={{ fontSize: 12, color: "var(--muted2)", margin: 0 }}>Velocidade e pitch são recursos Pro.</p>
+              )}
+              <div style={{ borderTop: "1px solid var(--border)", marginTop: 12, paddingTop: 12 }}>
+                {beats.length > 0 ? (
+                  <>
+                    <button onClick={() => setMetronome(v => !v)}
+                      style={{ background: metronome ? "var(--accent)" : "transparent", color: metronome ? "#000" : "var(--text)", border: `1.5px solid ${metronome ? "var(--accent)" : "var(--border2)"}`, borderRadius: 8, width: "100%", padding: "8px 0", fontWeight: 700, fontSize: 13, cursor: "pointer", transition: "all 0.2s" }}>
+                      {metronome ? "🥁 Metrônomo · ligado" : "🥁 Metrônomo"}
+                    </button>
+                    <p style={{ fontSize: 11, color: "var(--muted2)", margin: "6px 0 0" }}>Dá play — o clique segue a música.</p>
+                  </>
+                ) : (
+                  <p style={{ fontSize: 11, color: "var(--muted2)", margin: 0 }}>Metrônomo: batidas ainda não detectadas nesta música.</p>
+                )}
+              </div>
+            </div>
+
             {/* Info */}
             <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
-              <p style={{ fontWeight: 700, fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)", margin: "0 0 12px" }}>INFORMAÇÕES</p>
-              {[["Tom", song.key], ["BPM", String(song.bpm)], ["Gênero", song.genre]].map(([label, value]) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                  <span style={{ color: "var(--muted)", fontSize: 13 }}>{label}</span>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{value}</span>
-                </div>
-              ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 12px" }}>
+                <p style={{ fontWeight: 700, fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)", margin: 0 }}>INFORMAÇÕES</p>
+                {isPro && <span style={{ fontSize: 10, color: "var(--muted2)" }}>· clique p/ corrigir</span>}
+              </div>
+              {(() => {
+                const rowStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } as const;
+                const labelStyle = { color: "var(--muted)", fontSize: 13 } as const;
+                const valStyle = { fontWeight: 700, fontSize: 13, color: "var(--text)" } as const;
+                const inputStyle = { width: 76, textAlign: "right" as const, fontWeight: 700, fontSize: 13, color: "var(--text)", background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 6, padding: "3px 8px", outline: "none" };
+                return (
+                  <>
+                    <div style={rowStyle}>
+                      <span style={labelStyle}>Tom</span>
+                      {isPro
+                        ? <input value={songKey} onChange={e => setSongKey(e.target.value)} onBlur={() => saveMeta({ key: songKey })} placeholder="?" style={inputStyle} aria-label="Tom" />
+                        : <span style={valStyle}>{songKey || "?"}</span>}
+                    </div>
+                    <div style={rowStyle}>
+                      <span style={labelStyle}>BPM</span>
+                      {isPro
+                        ? <input value={songBpm} inputMode="numeric" onChange={e => setSongBpm(e.target.value.replace(/[^0-9]/g, ""))} onBlur={() => songBpm && saveMeta({ bpm: Number(songBpm) })} placeholder="0" style={inputStyle} aria-label="BPM" />
+                        : <span style={valStyle}>{songBpm || "0"}</span>}
+                    </div>
+                    <div style={rowStyle}>
+                      <span style={labelStyle}>Gênero</span>
+                      <span style={valStyle}>{song.genre}</span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* Adicionar a setlist (Pro) */}

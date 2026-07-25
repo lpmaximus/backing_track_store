@@ -20,6 +20,7 @@ import type {
   ChordDetectionProvider,
   ChordDetectionSubmitResult,
   ChordPollResult,
+  ChordMeta,
 } from "./types";
 import { toSections, type DetectedChord } from "./sections";
 
@@ -101,6 +102,21 @@ function parseBtcChords(data: unknown): DetectedChord[] {
   return out;
 }
 
+/** Extrai bpm/tom/batidas do objeto de saída do BTC (quando presente). */
+function extractMeta(data: unknown): ChordMeta | undefined {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return undefined;
+  const o = data as Record<string, unknown>;
+  const meta: ChordMeta = {};
+  const bpm = Number(o.bpm);
+  if (Number.isFinite(bpm) && bpm > 0) meta.bpm = Math.round(bpm);
+  if (typeof o.key === "string" && o.key.trim()) meta.key = o.key.trim();
+  if (Array.isArray(o.beats)) {
+    const beats = o.beats.map(Number).filter((n) => Number.isFinite(n));
+    if (beats.length) meta.beats = beats;
+  }
+  return Object.keys(meta).length ? meta : undefined;
+}
+
 /** Se a saída for uma URL, baixa; tenta JSON e cai p/ texto (.lab). */
 async function resolveOutput(output: unknown): Promise<unknown> {
   if (typeof output === "string" && /^https?:\/\//i.test(output.trim())) {
@@ -165,7 +181,7 @@ export class BTCChordProvider implements ChordDetectionProvider {
       const resolved = await resolveOutput(job.output);
       const sections = toSections(parseBtcChords(resolved));
       if (sections.length === 0) return { status: "failed", error: "Nenhum acorde detectado" };
-      return { status: "done", sections };
+      return { status: "done", sections, meta: extractMeta(resolved) };
     } catch (err) {
       return { status: "failed", error: String(err).slice(0, 300) };
     }

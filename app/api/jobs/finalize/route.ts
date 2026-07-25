@@ -77,12 +77,16 @@ export async function GET(req: NextRequest) {
             summary.failed++;
             continue;
           }
-          // done — salva cifra automática (draft) a menos que já exista cifra da comunidade.
-          if (!(song.chords && song.chords.length > 0)) {
-            await db
-              .update(songs)
-              .set({ chords: result.sections, chordsSource: "auto", chordsStatus: "draft" })
-              .where(eq(songs.id, song.id));
+          // done — salva cifra automática (draft) + bpm/tom/batidas (quando vierem).
+          const setChords = !(song.chords && song.chords.length > 0);
+          const m = result.meta;
+          if (setChords || m?.bpm || m?.key || m?.beats) {
+            await db.update(songs).set({
+              ...(setChords ? { chords: result.sections, chordsSource: "auto" as const, chordsStatus: "draft" as const } : {}),
+              ...(m?.bpm ? { bpm: m.bpm } : {}),
+              ...(m?.key ? { key: m.key } : {}),
+              ...(m?.beats ? { beats: m.beats } : {}),
+            }).where(eq(songs.id, song.id));
           }
           await db
             .update(processingJobs)

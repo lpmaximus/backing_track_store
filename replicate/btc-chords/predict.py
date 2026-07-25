@@ -28,6 +28,24 @@ sys.path.insert(0, BTC_DIR)
 
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
+import librosa  # noqa: E402
+
+# Krumhansl-Kessler: perfis de tonalidade p/ estimar o tom a partir do chroma.
+_KS_MAJOR = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
+_KS_MINOR = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
+_NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+
+def estimate_key(chroma_mean: np.ndarray) -> str:
+    """Estima o tom (ex.: 'C', 'Am') correlacionando o chroma médio com os perfis KS."""
+    best_score, best_key = -2.0, "C"
+    for tonic in range(12):
+        for profile, suffix in ((_KS_MAJOR, ""), (_KS_MINOR, "m")):
+            rolled = np.roll(profile, tonic)
+            score = float(np.corrcoef(rolled, chroma_mean)[0, 1])
+            if score > best_score:
+                best_score, best_key = score, _NOTE_NAMES[tonic] + suffix
+    return best_key
 
 # Módulos do repo BTC.
 from btc_model import BTC_model  # noqa: E402
@@ -113,5 +131,20 @@ class Predictor(BasePredictor):
                 "chord": self.idx_to_chord[prev_chord],
             })
 
+        # ── BPM, batidas e tom (mesma execução, custo ~zero) ──────────────────
+        bpm = 0
+        key = ""
+        beats: list = []
+        try:
+            y, sr = librosa.load(str(audio), sr=22050, mono=True)
+            tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+            bpm = int(round(float(np.atleast_1d(tempo)[0])))
+            beats = [round(float(t), 3) for t in librosa.frames_to_time(beat_frames, sr=sr)]
+            chroma = librosa.feature.chroma_cqt(y=y, sr=sr).mean(axis=1)
+            key = estimate_key(chroma)
+        except Exception as e:  # noqa: BLE001
+            print("análise bpm/key/beats falhou:", e)
+
+        out = {"chords": results, "bpm": bpm, "key": key, "beats": beats}
         # Replicate serializa o retorno como JSON.
-        return json.loads(json.dumps(results))
+        return json.loads(json.dumps(out))
