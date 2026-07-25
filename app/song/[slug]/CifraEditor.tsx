@@ -19,14 +19,36 @@ function isChordLine(line: string): boolean {
   return toks.length > 0 && toks.every((t) => CHORD_RE.test(t));
 }
 
-/** Junta letra + cifra em linhas unificadas {tempo, texto, acordes}. */
+const isPositional = (s: string) => /^\s/.test(s) || /\s{2,}/.test(s);
+
+/** Monta a string da linha de acordes posicionando cada um na sua coluna. */
+function assembleChordLine(placements: { col: number; chord: string }[]): string {
+  let line = "";
+  let cursor = 0;
+  for (const p of [...placements].sort((a, b) => a.col - b.col)) {
+    const col = Math.max(p.col, cursor);
+    while (line.length < col) line += " ";
+    line += p.chord;
+    cursor = col + p.chord.length + 1;
+  }
+  return line;
+}
+
+/** Junta letra + cifra em linhas unificadas {tempo, texto, acordes POSICIONADOS}. */
 function buildRows(lyrics: LyricsLine[], chords: ChordSection[]): Row[] {
+  // Seções já POSICIONADAS (editadas) são preservadas; as AUTO viram eventos por tempo.
+  const alignedByTime = new Map<string, string>();
+  const autoSections: ChordSection[] = [];
+  for (const sec of chords) {
+    if (isPositional(sec.chords)) alignedByTime.set(sec.timecode.toFixed(1), sec.chords);
+    else autoSections.push(sec);
+  }
   const events: { time: number; chord: string }[] = [];
-  for (let s = 0; s < chords.length; s++) {
-    const toks = chords[s].chords.split(" ").filter(Boolean);
-    const t0 = chords[s].timecode;
-    const t1 = s + 1 < chords.length ? chords[s + 1].timecode : t0 + toks.length * 2;
-    const times = chords[s].times && chords[s].times!.length === toks.length ? chords[s].times! : null;
+  for (let s = 0; s < autoSections.length; s++) {
+    const toks = autoSections[s].chords.split(" ").filter(Boolean);
+    const t0 = autoSections[s].timecode;
+    const t1 = s + 1 < autoSections.length ? autoSections[s + 1].timecode : t0 + toks.length * 2;
+    const times = autoSections[s].times && autoSections[s].times!.length === toks.length ? autoSections[s].times! : null;
     toks.forEach((c, j) => events.push({ time: times ? times[j] : t0 + ((t1 - t0) * j) / toks.length, chord: c }));
   }
   events.sort((a, b) => a.time - b.time);
@@ -34,9 +56,15 @@ function buildRows(lyrics: LyricsLine[], chords: ChordSection[]): Row[] {
   if (lyrics.length) {
     return lyrics.map((l, i) => {
       const t0 = l.time;
+      const aligned = alignedByTime.get(t0.toFixed(1));
+      if (aligned) return { time: l.time, text: l.text, chords: aligned };
       const t1 = i + 1 < lyrics.length ? lyrics[i + 1].time : Infinity;
-      const chs = events.filter((e) => e.time >= t0 && e.time < t1).map((e) => e.chord).join(" ");
-      return { time: l.time, text: l.text, chords: chs };
+      const inLine = events.filter((e) => e.time >= t0 && e.time < t1);
+      const placements = inLine.map((e) => {
+        const frac = t1 === Infinity ? 0 : Math.max(0, Math.min(1, (e.time - t0) / (t1 - t0)));
+        return { col: Math.round(frac * Math.max(1, l.text.length)), chord: e.chord };
+      });
+      return { time: l.time, text: l.text, chords: assembleChordLine(placements) };
     });
   }
   if (chords.length) return chords.map((c) => ({ time: c.timecode, text: "", chords: c.chords }));
@@ -44,7 +72,7 @@ function buildRows(lyrics: LyricsLine[], chords: ChordSection[]): Row[] {
 }
 
 function rowsToText(rows: Row[]): string {
-  return rows.map((r) => `${r.chords}\n${r.text}`.replace(/^\n/, "")).join("\n\n");
+  return rows.map((r) => (r.chords.trim() ? `${r.chords}\n${r.text}` : r.text)).join("\n\n");
 }
 
 /** Faz parse do texto livre; reatribui tempos por ordem (mantém os antigos quando existem). */
@@ -53,8 +81,8 @@ function textToRows(text: string, prev: Row[]): Row[] {
   let pending = "";
   for (const raw of text.replace(/\r/g, "").split("\n")) {
     if (!raw.trim()) continue;
-    if (isChordLine(raw)) pending = pending ? `${pending} ${raw.trim()}` : raw.trim();
-    else { out.push({ time: 0, text: raw.trimEnd(), chords: pending }); pending = ""; }
+    if (isChordLine(raw)) pending = raw.replace(/\s+$/, ""); // preserva o recuo (posição)
+    else { out.push({ time: 0, text: raw.replace(/\s+$/, ""), chords: pending }); pending = ""; }
   }
   if (pending) out.push({ time: 0, text: "", chords: pending });
   let last = 0;
@@ -98,7 +126,7 @@ export default function CifraEditor({
     if (saving) return;
     const finalRows = mode === "texto" ? textToRows(text, rows) : rows;
     const lyrics = finalRows.filter((r) => r.text.trim()).map((r) => ({ time: Number(r.time) || 0, text: r.text.trim() }));
-    const chords = finalRows.filter((r) => r.chords.trim()).map((r) => ({ section: "", timecode: Number(r.time) || 0, chords: r.chords.trim() }));
+    const chords = finalRows.filter((r) => r.chords.trim()).map((r) => ({ section: "", timecode: Number(r.time) || 0, chords: r.chords.replace(/\s+$/, "") }));
     setSaving(true); setError("");
     try {
       const [rl, rc] = await Promise.all([

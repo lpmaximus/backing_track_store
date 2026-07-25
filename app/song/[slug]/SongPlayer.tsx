@@ -175,6 +175,20 @@ function layoutChords(placements: { col: number; chord: string }[]): { col: numb
   return out;
 }
 
+/** Lê uma linha de acordes POSICIONADA (com espaçamento) → {col,chord} por coluna. */
+function parseAligned(chordLine: string): { col: number; chord: string }[] {
+  const out: { col: number; chord: string }[] = [];
+  const re = /\S+/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(chordLine)) !== null) out.push({ col: m.index, chord: m[0] });
+  return out;
+}
+/** Linha foi posicionada pelo usuário (recuo/gaps) vs. lista simples "Bm E". */
+function isPositional(chordLine: string): boolean {
+  return /^\s/.test(chordLine) || /\s{2,}/.test(chordLine);
+}
+const timeKey = (t: number) => t.toFixed(1);
+
 function CifraView({ sections, lyrics, currentTime, fontSize }: {
   sections: ChordSection[]; lyrics: LyricsLine[] | null; currentTime: number; fontSize: number;
 }) {
@@ -183,7 +197,15 @@ function CifraView({ sections, lyrics, currentTime, fontSize }: {
     return <ChordDisplay sections={sections} currentTime={currentTime} fontSize={fontSize} />;
   }
 
-  const events = buildChordEvents(sections);
+  // Seções POSICIONADAS (editadas: espaçamento preservado, alinhadas ao tempo da
+  // linha) mandam sobre as AUTO (lista "Bm E", posicionadas por tempo).
+  const alignedByTime = new Map<string, string>();
+  const autoSections: ChordSection[] = [];
+  for (const sec of sections) {
+    if (isPositional(sec.chords)) alignedByTime.set(timeKey(sec.timecode), sec.chords);
+    else autoSections.push(sec);
+  }
+  const events = buildChordEvents(autoSections);
   const activeIdx = lyrics.reduce((best, l, i) => (l.time <= currentTime ? i : best), -1);
 
   return (
@@ -191,22 +213,28 @@ function CifraView({ sections, lyrics, currentTime, fontSize }: {
       {lyrics.map((line, i) => {
         const t0 = line.time;
         const t1 = i + 1 < lyrics.length ? lyrics[i + 1].time : Infinity;
-        const inLine = events.filter(e => e.time >= t0 && e.time < t1);
-        const woffs = wordOffsets(line.text, line.words);
 
-        const placements = inLine.map(e => {
-          let col: number;
-          if (woffs.length) {
-            let wo = woffs[0];
-            for (const w of woffs) { if (w.start <= e.time) wo = w; else break; }
-            col = wo.col;
-          } else {
-            const frac = t1 === Infinity ? 0 : Math.max(0, Math.min(1, (e.time - t0) / (t1 - t0)));
-            col = Math.round(frac * Math.max(1, line.text.length));
-          }
-          return { col, chord: e.chord };
-        });
-        const placed = layoutChords(placements);
+        const aligned = alignedByTime.get(timeKey(t0));
+        let placed: { col: number; chord: string }[];
+        if (aligned) {
+          placed = parseAligned(aligned); // posição EXATA que o usuário salvou
+        } else {
+          const inLine = events.filter(e => e.time >= t0 && e.time < t1);
+          const woffs = wordOffsets(line.text, line.words);
+          const placements = inLine.map(e => {
+            let col: number;
+            if (woffs.length) {
+              let wo = woffs[0];
+              for (const w of woffs) { if (w.start <= e.time) wo = w; else break; }
+              col = wo.col;
+            } else {
+              const frac = t1 === Infinity ? 0 : Math.max(0, Math.min(1, (e.time - t0) / (t1 - t0)));
+              col = Math.round(frac * Math.max(1, line.text.length));
+            }
+            return { col, chord: e.chord };
+          });
+          placed = layoutChords(placements);
+        }
         const isActive = i === activeIdx;
 
         return (
