@@ -135,16 +135,22 @@ class Predictor(BasePredictor):
         bpm = 0
         key = ""
         beats: list = []
+        meta_error = ""
         try:
-            y, sr = librosa.load(str(audio), sr=22050, mono=True)
+            # sr=None → sample rate NATIVO, sem reamostrar (evita a dependência
+            # resampy/soxr, que não está na imagem). beat_track/chroma aceitam qualquer sr.
+            y, sr = librosa.load(str(audio), sr=None, mono=True)
             tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
             bpm = int(round(float(np.atleast_1d(tempo)[0])))
             beats = [round(float(t), 3) for t in librosa.frames_to_time(beat_frames, sr=sr)]
             chroma = librosa.feature.chroma_cqt(y=y, sr=sr).mean(axis=1)
             key = estimate_key(chroma)
         except Exception as e:  # noqa: BLE001
+            meta_error = str(e)
             print("análise bpm/key/beats falhou:", e)
 
         out = {"chords": results, "bpm": bpm, "key": key, "beats": beats}
+        if meta_error:
+            out["meta_error"] = meta_error[:300]  # visível no output p/ debug
         # Replicate serializa o retorno como JSON.
         return json.loads(json.dumps(out))

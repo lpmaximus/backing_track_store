@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import Comments from "./Comments";
@@ -267,6 +268,13 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
   const [autoFollow,  setAutoFollow]    = useState(false); // segue o andamento real da música
   const [scrollSpd,   setScrollSpd]     = useState(0.4);
   const [fontSize,    setFontSize]       = useState(14);
+  const router = useRouter();
+  const goBack = () => {
+    // Volta pra página anterior; se a pessoa caiu direto na música (sem histórico
+    // interno — link compartilhado), cai no catálogo.
+    if (typeof window !== "undefined" && window.history.length > 1) router.back();
+    else router.push("/");
+  };
   const cifraRef = useRef<HTMLDivElement | null>(null);
   const prevFontRef = useRef(14); // guarda a fonte antes da tela cheia
   const anchorsRef = useRef<{ time: number; top: number }[]>([]); // âncoras tempo→posição (modo Automático)
@@ -519,9 +527,9 @@ export default function SongPlayer({ song, stems, isPro = false, soloInstrument 
             }
           </div>
           <div style={{ flex: 1 }}>
-            <Link href="/" style={{ color: "var(--muted)", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 8 }}>
-              ← Voltar ao catálogo
-            </Link>
+            <button onClick={goBack} style={{ background: "none", border: "none", padding: 0, color: "var(--muted)", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 8, cursor: "pointer" }}>
+              ← Voltar
+            </button>
             <h1 style={{ fontWeight: 900, fontSize: 26, margin: "0 0 5px", color: "var(--text)" }}>{song.title}</h1>
             <p style={{ color: "var(--muted)", fontSize: 14, margin: 0 }}>
               {song.artist} · {song.genre} · Tom: <strong style={{ color: "var(--text)" }}>{song.key}</strong> · {song.bpm} BPM
