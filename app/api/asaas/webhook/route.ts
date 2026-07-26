@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, users, subscriptions } from "@/src/db";
 import { eq } from "drizzle-orm";
+import { createNotification } from "@/src/lib/notifications";
 
 // Eventos que ativam Pro
 const PRO_EVENTS = new Set([
@@ -59,6 +60,13 @@ export async function POST(req: NextRequest) {
           .where(eq(subscriptions.asaasSubscriptionId, subscriptionId));
       }
       console.log(`[Asaas] User ${userId} → Pro ativo`);
+      await createNotification({
+        userId,
+        type: "system",
+        title: "Pagamento confirmado",
+        body: "Sua assinatura Pro está ativa. Aproveite o acesso completo.",
+        link: "/conta",
+      });
     }
 
     if (CANCEL_EVENTS.has(event.event)) {
@@ -70,6 +78,13 @@ export async function POST(req: NextRequest) {
           .where(eq(subscriptions.asaasSubscriptionId, subscriptionId));
       }
       console.log(`[Asaas] User ${userId} → Free (cancelado)`);
+      await createNotification({
+        userId,
+        type: "system",
+        title: "Assinatura cancelada",
+        body: "Sua assinatura Pro foi cancelada. Sua conta voltou para o plano Free.",
+        link: "/planos",
+      });
     }
 
     return NextResponse.json({ ok: true });

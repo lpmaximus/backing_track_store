@@ -20,7 +20,7 @@ export default auth((req: NextRequest & { auth: Session | null }) => {
   }
 
   // Rotas protegidas que exigem login
-  const protectedPaths = ["/setlist", "/perfil"];
+  const protectedPaths = ["/setlist", "/perfil", "/conta"];
   const isProtected = protectedPaths.some(p => pathname.startsWith(p));
 
   if (isProtected && !req.auth) {

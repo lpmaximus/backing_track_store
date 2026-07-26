@@ -334,6 +334,24 @@ export const processingJobs = pgTable("processing_jobs", {
   completedAt: timestamp("completed_at"),
 });
 
+// ─── Notificações (Área do Usuário) ───────────────────────────────────────────
+// Caixa de mensagens do usuário: avisos gerados automaticamente pelo sistema
+// (música pronta, pagamento, integrante de banda) e, no futuro, promoções.
+// Sempre por usuário (userId) — sem broadcast/tabela de destinatários por ora;
+// um aviso "pra todo mundo" seria inserido em lote (1 linha por usuário).
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 20 }).notNull().default("system"), // system | promo | band
+  title: varchar("title", { length: 200 }).notNull(),
+  body: text("body"),
+  link: text("link"), // rota interna opcional (ex: /song/slug, /bandas/1)
+  read: boolean("read").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // ─── Cifra colaborativa (Fase 1.5) ────────────────────────────────────────────
 export const cifraEditHistory = pgTable("cifra_edit_history", {
   id: serial("id").primaryKey(),
@@ -401,6 +419,8 @@ export type CifraEditHistory = typeof cifraEditHistory.$inferSelect;
 export type NewCifraEditHistory = typeof cifraEditHistory.$inferInsert;
 export type CifraReport = typeof cifraReports.$inferSelect;
 export type NewCifraReport = typeof cifraReports.$inferInsert;
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
 
 export interface ChordSection {
   section: string;    // "Verso" | "Refrão" | "Ponte" etc.

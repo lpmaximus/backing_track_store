@@ -5,9 +5,10 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { db, bands, bandMembers } from "@/src/db";
-import { and, eq } from "drizzle-orm";
+import { db, bands, bandMembers, users } from "@/src/db";
+import { and, eq, ne } from "drizzle-orm";
 import { MAX_BAND_MEMBERS } from "@/src/lib/bands";
+import { createNotification } from "@/src/lib/notifications";
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const session = await auth();
@@ -55,6 +56,33 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ to
       .where(eq(bandMembers.id, invite.id));
 
     const [band] = await db.select().from(bands).where(eq(bands.id, invite.bandId)).limit(1);
+
+    // Área do Usuário: avisa quem já estava na banda (líder + demais ativos)
+    // que um novo integrante entrou. Best-effort — não bloqueia a resposta.
+    try {
+      const [joined] = await db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+      const joinedName = joined?.name ?? joined?.email ?? "Um integrante";
+      const others = await db
+        .select({ userId: bandMembers.userId })
+        .from(bandMembers)
+        .where(and(eq(bandMembers.bandId, invite.bandId), eq(bandMembers.status, "active"), ne(bandMembers.userId, userId)));
+      await Promise.all(
+        others
+          .filter((m) => m.userId !== null)
+          .map((m) =>
+            createNotification({
+              userId: m.userId as number,
+              type: "band",
+              title: "Novo integrante na banda",
+              body: `${joinedName} entrou em ${band?.name ?? "sua banda"}.`,
+              link: `/bandas`,
+            }),
+          ),
+      );
+    } catch (notifyErr) {
+      console.error("[POST /api/bands/join/:token] notify", notifyErr);
+    }
+
     return NextResponse.json({ band });
   } catch (err) {
     console.error("[POST /api/bands/join/:token]", err);

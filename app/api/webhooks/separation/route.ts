@@ -18,6 +18,7 @@ import { getSeparationProvider } from "@/src/lib/separation";
 import { deleteObject, keyFromPublicUrl, putObjectFromUrl } from "@/src/lib/r2";
 import { getChordProvider } from "@/src/lib/chords";
 import { getLyricsProvider } from "@/src/lib/lyrics";
+import { createNotification } from "@/src/lib/notifications";
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -136,6 +137,18 @@ export async function POST(req: NextRequest) {
         .where(eq(songs.id, job.songId));
     } else {
       await db.update(songs).set({ processingStatus: "ready" }).where(eq(songs.id, job.songId));
+    }
+
+    // 4b. Área do Usuário: avisa quem enviou que a música já pode ser tocada.
+    //     Best-effort — não trava o pipeline se falhar (ver createNotification).
+    if (song?.sourceType === "user_upload" && song.uploadedByUserId) {
+      await createNotification({
+        userId: song.uploadedByUserId,
+        type: "system",
+        title: "Sua música está pronta",
+        body: `"${song.title}" já foi separada em stems e pode ser tocada.`,
+        link: `/song/${song.slug}`,
+      });
     }
 
     // 5. Frente C: dispara detecção de cifra sobre o stem de HARMONIA (permanente).
