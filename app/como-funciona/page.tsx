@@ -90,6 +90,24 @@ export default function ComoFuncionaPage() {
           </p>
         </section>
 
+        {/* VÍDEO DE DEMONSTRAÇÃO */}
+        <section style={{ maxWidth: 900, margin: "0 auto", padding: "0 24px 56px" }}>
+          <div style={{
+            borderRadius: 20, overflow: "hidden", border: "1px solid var(--border)",
+            background: "#000", boxShadow: "0 12px 40px rgba(0,0,0,0.12)",
+          }}>
+            <video
+              controls
+              preload="metadata"
+              playsInline
+              style={{ display: "block", width: "100%", height: "auto" }}
+            >
+              <source src="/video-demo.mp4" type="video/mp4" />
+              Seu navegador não suporta reprodução de vídeo.
+            </video>
+          </div>
+        </section>
+
         {/* PASSOS */}
         <section style={{ maxWidth: 1000, margin: "0 auto", padding: "24px 24px 56px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
