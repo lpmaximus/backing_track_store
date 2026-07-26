@@ -55,6 +55,13 @@ const STEM_COLORS: Record<string, string> = {
 };
 const DEFAULT_COLOR = "#8a8a8c";
 
+// ─── Amostra grátis (regra de divulgação) ────────────────────────────────────
+// Visitante sem cadastro NÃO tem isPro, mas ainda assim pode dar M/S nesses
+// instrumentos — é a "prévia" do recurso de stems, pensada pra conversão.
+// Os demais (hoje: baixo, vocal, harmony, melody) ficam travados até assinar.
+// Única fonte de verdade: mudar o que é liberado é só editar este Set.
+const GUEST_UNLOCKED_INSTRUMENTS = new Set(["drums", "guitar"]);
+
 function colorFor(instrument: string) { return STEM_COLORS[instrument] ?? DEFAULT_COLOR; }
 function iconFor(instrument: string) { return STEM_ICONS[instrument] ?? "🎵"; }
 
@@ -161,8 +168,11 @@ export default function WavePlayer({
     return [];
   }, [stems, audioUrl, songTitle]);
 
-  // Multitrack visível só para PRO com stems separados.
-  const showMultitrack = isPro && stems.length > 0;
+  // Multitrack aparece pra qualquer um com stems, inclusive visitante sem
+  // cadastro (efeito de divulgação: vê a mesa, ouve o mix completo). O que
+  // isPro passa a controlar é QUAIS canais podem ser mutados/solados dentro
+  // dela — ver `canControlTrack` — não a visão em si.
+  const showMultitrack = stems.length > 0;
   const hasAudio = tracks.length > 0;
 
   const engineRef = useRef<Engine | null>(null);
@@ -484,12 +494,24 @@ export default function WavePlayer({
     return () => window.removeEventListener("keydown", handler);
   }, [togglePlay]);
 
+  // Visitante sem cadastro só controla M/S nos instrumentos de amostra
+  // (GUEST_UNLOCKED_INSTRUMENTS); usuário Pro controla todos.
+  const canControlTrack = useCallback(
+    (instrument: string) => isPro || GUEST_UNLOCKED_INSTRUMENTS.has(instrument),
+    [isPro]
+  );
+
   // M e S são mutuamente exclusivos por faixa: ligar um desliga o outro.
+  // Guarda de novo aqui (além do `disabled` no botão) pra não depender só da UI.
   const toggleMute = (k: string) => {
+    const t = tracks.find(tr => tr.key === k);
+    if (t && !canControlTrack(t.instrument)) return;
     setMuted(p => ({ ...p, [k]: !p[k] }));
     setSoloed(p => (p[k] ? { ...p, [k]: false } : p));
   };
   const toggleSolo = (k: string) => {
+    const t = tracks.find(tr => tr.key === k);
+    if (t && !canControlTrack(t.instrument)) return;
     setSoloed(p => ({ ...p, [k]: !p[k] }));
     setMuted(p => (p[k] ? { ...p, [k]: false } : p));
   };
@@ -617,34 +639,54 @@ export default function WavePlayer({
             {/* Faixas + playhead — rola horizontalmente em telas estreitas (.mixer-tracks) */}
             <div className="mixer-tracks" style={{ position: "relative" }}>
               {tracks.map(t => {
-                const on = anySolo ? !!soloed[t.key] : !muted[t.key];
-                const isMuted = !!muted[t.key];
-                const isSolo = !!soloed[t.key];
+                const locked = !canControlTrack(t.instrument);
+                // Canal travado nunca é mutado pelo próprio visitante — toca
+                // junto no mix completo, que é exatamente a regra de divulgação.
+                const on = locked ? true : (anySolo ? !!soloed[t.key] : !muted[t.key]);
+                const isMuted = !locked && !!muted[t.key];
+                const isSolo = !locked && !!soloed[t.key];
                 const g = trackVol[t.key] ?? 1;
                 return (
                   <div key={t.key} className="mixer-track-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 16px", borderBottom: "1px solid var(--border)" }}>
-                    {/* M / S */}
+                    {/* M / S — travado (bloqueado) mostra cadeado no lugar dos botões */}
                     <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                      <button onClick={() => toggleMute(t.key)} aria-label={`Mudo ${t.label}`}
-                        style={{ width: 26, height: 26, borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                          background: isMuted ? "var(--danger)" : "var(--surface2)",
-                          border: `1px solid ${isMuted ? "var(--danger)" : "var(--border2)"}`,
-                          color: isMuted ? "#fff" : "var(--muted)" }}>M</button>
-                      <button onClick={() => toggleSolo(t.key)} aria-label={`Solo ${t.label}`}
-                        style={{ width: 26, height: 26, borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                          background: isSolo ? "var(--pro)" : "var(--surface2)",
-                          border: `1px solid ${isSolo ? "var(--pro)" : "var(--border2)"}`,
-                          color: isSolo ? "#000" : "var(--muted)" }}>S</button>
+                      {locked ? (
+                        <div title="Canal isolado disponível no plano Pro" aria-label={`${t.label} bloqueado — recurso Pro`}
+                          style={{ width: 56, height: 26, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center",
+                            background: "var(--surface2)", border: "1px solid var(--border2)", color: "var(--muted2)", fontSize: 12 }}>
+                          🔒
+                        </div>
+                      ) : (
+                        <>
+                          <button onClick={() => toggleMute(t.key)} aria-label={`Mudo ${t.label}`}
+                            style={{ width: 26, height: 26, borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                              background: isMuted ? "var(--danger)" : "var(--surface2)",
+                              border: `1px solid ${isMuted ? "var(--danger)" : "var(--border2)"}`,
+                              color: isMuted ? "#fff" : "var(--muted)" }}>M</button>
+                          <button onClick={() => toggleSolo(t.key)} aria-label={`Solo ${t.label}`}
+                            style={{ width: 26, height: 26, borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                              background: isSolo ? "var(--pro)" : "var(--surface2)",
+                              border: `1px solid ${isSolo ? "var(--pro)" : "var(--border2)"}`,
+                              color: isSolo ? "#000" : "var(--muted)" }}>S</button>
+                        </>
+                      )}
                     </div>
                     {/* ícone + nome */}
                     <div style={{ width: 118, display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
                       <span style={{ fontSize: 17, opacity: on ? 1 : 0.4 }}>{iconFor(t.instrument)}</span>
                       <span style={{ fontSize: 13, fontWeight: 600, color: on ? "var(--text)" : "var(--muted2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</span>
                     </div>
-                    {/* volume da faixa */}
-                    <input type="range" min={0} max={1} step={0.02} value={g}
-                      onChange={e => setTrackVol(p => ({ ...p, [t.key]: Number(e.target.value) }))}
-                      style={{ width: 64, flexShrink: 0 }} aria-label={`Volume ${t.label}`} />
+                    {/* volume da faixa — trava junto com M/S pra não dar isolamento "por fora" */}
+                    {locked ? (
+                      <a href="/planos" title="Ativar canal isolado no plano Pro"
+                        style={{ width: 64, flexShrink: 0, textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--accent)", textDecoration: "none", letterSpacing: "0.05em" }}>
+                        PRO
+                      </a>
+                    ) : (
+                      <input type="range" min={0} max={1} step={0.02} value={g}
+                        onChange={e => setTrackVol(p => ({ ...p, [t.key]: Number(e.target.value) }))}
+                        style={{ width: 64, flexShrink: 0 }} aria-label={`Volume ${t.label}`} />
+                    )}
                     {/* onda (clique = seek) */}
                     <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={onWaveClick}>
                       <WaveCanvas peaks={peaks[t.key] ?? []} color={colorFor(t.instrument)} height={40} dimmed={!on} />
@@ -703,8 +745,9 @@ export default function WavePlayer({
 
       {/* Velocidade e Pitch foram movidos pra a coluna direita (SongPlayer). */}
 
-      {/* Gate de stems para quem não é PRO */}
-      {!isPro && stems.length > 0 && proGate("Faixas isoladas (bateria, baixo, guitarra, vocal)")}
+      {/* Gate parcial: bateria e guitarra já vêm liberadas (amostra grátis) —
+          o upsell abaixo é sobre o que ainda falta (baixo, vocal e mais). */}
+      {!isPro && stems.length > 0 && proGate("Isolar baixo, vocal e mais controles")}
 
     </div>
   );
