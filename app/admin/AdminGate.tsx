@@ -12,6 +12,7 @@ const NAV = [
   { href: "/admin/audio", label: "🎵 Áudio" },
   { href: "/admin/moderacao", label: "📝 Cifras" },
   { href: "/admin/consumo", label: "📊 Consumo" },
+  { href: "/admin/mensagens", label: "📣 Mensagens" },
 ];
 
 // Valida a senha contra um endpoint admin (401 se errada).

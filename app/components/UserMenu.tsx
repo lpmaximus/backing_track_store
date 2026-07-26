@@ -40,7 +40,7 @@ export default function UserMenu({ user }: Props) {
             </div>
           )}
           {unread > 0 && (
-            <span style={{
+            <span className="notif-dot" style={{
               position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: "50%",
               background: "var(--accent)", border: "2px solid var(--surface)",
             }} />
