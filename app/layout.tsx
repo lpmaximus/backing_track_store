@@ -5,6 +5,9 @@ import { SessionProvider } from "next-auth/react";
 export const metadata: Metadata = {
   title: "BackingTrack.store — Cifras e Bases para Musicos",
   description: "Bases musicais profissionais com cifras interativas para musicos amadores e profissionais.",
+  other: {
+    "google-adsense-account": "ca-pub-2626036835425131",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
