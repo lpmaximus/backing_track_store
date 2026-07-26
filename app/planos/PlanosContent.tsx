@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import FaqSection, { type FaqItem } from "@/app/components/FaqSection";
+
+const PLANOS_FAQ: FaqItem[] = [
+  { q: "Preciso de cartão de crédito?", a: "Não. Você poderá pagar com PIX ou boleto." },
+  { q: "Como funciona o teste de 7 dias?", a: "Você acessa tudo do Pro. A primeira cobrança só ocorre depois de 7 dias." },
+  { q: "Posso cancelar quando quiser?", a: "Sim. Sem multa e sem fidelidade — cancele pelo painel a qualquer momento." },
+  { q: "O que acontece se eu cancelar?", a: "Você volta para o plano Free imediatamente, sem perder as suas cifras salvas." },
+];
 
 const FREE_FEATURES = [
   "Catalogo completo (todas as musicas)",
@@ -148,19 +156,10 @@ export default function PlanosContent() {
         </div>
       </div>
 
-      {/* FAQ */}
-      <div className="planos-faq-grid" style={{ marginTop: 48, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        {[
-          { q: "Preciso de cartao de credito?", a: "Nao! Voce pode pagar com PIX ou boleto." },
-          { q: "Como funciona o trial de 7 dias?", a: "Voce acessa tudo do Pro. A primeira cobranca so ocorre apos 7 dias." },
-          { q: "Posso cancelar quando quiser?", a: "Sim. Sem multa, sem fidelidade. Cancele pelo painel a qualquer momento." },
-          { q: "O que acontece se cancelar?", a: "Voce volta para o plano Free imediatamente, sem perder suas cifras salvas." },
-        ].map(({ q, a }) => (
-          <div key={q} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 20px" }}>
-            <p style={{ fontWeight: 700, color: "var(--text)", fontSize: 14, margin: "0 0 8px" }}>{q}</p>
-            <p style={{ color: "var(--muted)", fontSize: 13, margin: 0, lineHeight: 1.6 }}>{a}</p>
-          </div>
-        ))}
+      {/* FAQ — mesmo componente da home (app/components/FaqSection.tsx),
+          mas com as perguntas de cobrança. */}
+      <div style={{ marginTop: 48 }}>
+        <FaqSection items={PLANOS_FAQ} />
       </div>
 
     </main>

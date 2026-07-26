@@ -2,6 +2,36 @@ import Link from "next/link";
 import SiteHeader from "./components/SiteHeader";
 import SiteFooter from "./components/SiteFooter";
 import HeroCarousel from "./components/HeroCarousel";
+import FaqSection, { type FaqItem } from "./components/FaqSection";
+
+// FAQ da landing — perguntas de quem ainda NÃO conhece o produto.
+// (O FAQ de /planos é outro: trata de cobrança, trial e cancelamento.)
+const HOME_FAQ: FaqItem[] = [
+  {
+    q: "O que é uma backing track?",
+    a: "É a música sem o seu instrumento. Você escolhe uma faixa, silencia a guitarra (ou a bateria, o baixo, o vocal…) e toca por cima do restante da banda — como se ela estivesse ensaiando com você.",
+  },
+  {
+    q: "Preciso instalar alguma coisa?",
+    a: "Não. Tudo roda no navegador, no computador ou no celular. Basta abrir a música e apertar play.",
+  },
+  {
+    q: "Posso usar as minhas próprias músicas?",
+    a: "Sim. Você envia o arquivo e a plataforma separa os instrumentos automaticamente em faixas independentes — bateria, baixo, guitarra, teclas e vocal — para você montar a mix que quiser.",
+  },
+  {
+    q: "A cifra é confiável?",
+    a: "A cifra e a letra são geradas automaticamente e sincronizadas com o áudio, então servem como um ponto de partida muito bom — mas não são perfeitas. Qualquer pessoa pode corrigir, e a correção fica salva para os próximos.",
+  },
+  {
+    q: "Como funciona para a minha banda?",
+    a: "Você cria a banda, convida os integrantes e cada um marca o instrumento que toca. Ao abrir a mesma música, cada pessoa ouve tudo menos o próprio instrumento — e as setlists de ensaio e de show ficam compartilhadas entre todos.",
+  },
+  {
+    q: "Quanto custa?",
+    a: "Estamos em beta e ainda não vendemos planos: o catálogo está livre para explorar, sem cartão de crédito. Os valores acima são a nossa previsão para o lançamento e ainda podem mudar.",
+  },
+];
 
 export default function HomePage() {
   return (
@@ -244,6 +274,19 @@ export default function HomePage() {
             </div>
             <p style={{ color: "var(--muted2)", fontSize: 12, marginTop: 18 }}>
               Estamos em beta — os planos pagos ainda não estão à venda. Valores sujeitos a ajuste no lançamento.
+            </p>
+          </section>
+
+        {/* FAQ — dúvidas de quem chega pela primeira vez */}
+        <section style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px 96px" }}>
+            <FaqSection
+              id="faq"
+              kicker="DÚVIDAS FREQUENTES"
+              title="Perguntas de quem está chegando agora."
+              items={HOME_FAQ}
+            />
+            <p style={{ color: "var(--muted)", fontSize: 13.5, marginTop: 24 }}>
+              Ficou alguma dúvida? <Link href="/contato" style={{ color: "var(--accent)", fontWeight: 600 }}>Fale com a gente</Link>.
             </p>
           </section>
       </main>
