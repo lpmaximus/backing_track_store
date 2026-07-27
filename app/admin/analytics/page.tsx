@@ -31,6 +31,10 @@ type Analytics = {
   topPages: Slice[];
   channels: Slice[];
   devices: Slice[];
+  browsers: Slice[];
+  operatingSystems: Slice[];
+  countries: Slice[];
+  regions: Slice[];
   cities: Slice[];
   generatedAt: string;
 };
@@ -55,6 +59,15 @@ const DEVICE_LABELS: Record<string, string> = {
   desktop: "Computador",
   tablet: "Tablet",
   smarttv: "Smart TV",
+};
+
+const OS_LABELS: Record<string, string> = {
+  Windows: "Windows",
+  Android: "Android",
+  iOS: "iOS",
+  Macintosh: "macOS",
+  Linux: "Linux",
+  "Chrome OS": "ChromeOS",
 };
 
 function fmtDuration(seconds: number): string {
@@ -259,8 +272,37 @@ function AnalyticsContent() {
               <Ranking items={data.devices} translate={DEVICE_LABELS} />
             </Panel>
 
-            <Panel title="📍 Cidades" hint="Concentração geográfica do público">
-              <Ranking items={data.cities} />
+            <Panel title="🖥️ Navegador e sistema" hint="O que precisa ser testado antes de subir mudança de front">
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div>
+                  <p style={{ color: "var(--muted2)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 6px" }}>Navegador</p>
+                  <Ranking items={data.browsers} />
+                </div>
+                <div>
+                  <p style={{ color: "var(--muted2)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 6px" }}>Sistema operacional</p>
+                  <Ranking items={data.operatingSystems} translate={OS_LABELS} />
+                </div>
+              </div>
+            </Panel>
+
+            <Panel title="🌍 Localização" hint="Orienta anúncio geolocalizado e parceria com escolas de música">
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div>
+                  <p style={{ color: "var(--muted2)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 6px" }}>País</p>
+                  <Ranking items={data.countries} />
+                </div>
+                <div>
+                  <p style={{ color: "var(--muted2)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 6px" }}>Estado / região</p>
+                  <Ranking items={data.regions} />
+                </div>
+                <div>
+                  <p style={{ color: "var(--muted2)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 6px" }}>Cidade</p>
+                  <Ranking items={data.cities} />
+                </div>
+              </div>
+              <p style={{ color: "var(--muted2)", fontSize: 11, margin: "12px 0 0" }}>
+                Precisão até o nível de cidade — o Google infere pelo IP e não devolve o endereço.
+              </p>
             </Panel>
           </div>
 

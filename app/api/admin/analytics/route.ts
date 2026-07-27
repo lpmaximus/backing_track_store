@@ -23,6 +23,9 @@ function toSlices(report: GaReport | undefined): Slice[] {
   return (report?.rows ?? []).map((r) => ({ label: dim(r), value: num(r) }));
 }
 
+/** Descarta linhas sem valor de dimensão (GA devolve "(not set)" para sessões sem geo/tech). */
+const named = (s: Slice) => Boolean(s.label) && s.label !== "(not set)" && s.label !== "(other)";
+
 function pct(current: number, previous: number): number | null {
   if (!previous) return null;
   return Math.round(((current - previous) / previous) * 1000) / 10;
@@ -56,7 +59,7 @@ export async function GET(req: NextRequest) {
   const prevEnd = `${days + 1}daysAgo`;
 
   try {
-    const [batchA, batchB, realtime] = await Promise.all([
+    const [batchA, batchB, batchC, realtime] = await Promise.all([
       batchRunReports([
         {
           metrics: ["activeUsers", "newUsers", "sessions", "screenPageViews", "averageSessionDuration", "bounceRate"],
@@ -86,12 +89,26 @@ export async function GET(req: NextRequest) {
         { dimensions: ["deviceCategory"], metrics: ["activeUsers"], startDate, endDate, orderByMetric: "activeUsers" },
         { dimensions: ["city"], metrics: ["activeUsers"], startDate, endDate, orderByMetric: "activeUsers", limit: 8 },
         { metrics: ["activeUsers", "sessions"], startDate: prevStart, endDate: prevEnd },
+        { dimensions: ["country"], metrics: ["activeUsers"], startDate, endDate, orderByMetric: "activeUsers", limit: 8 },
+        { dimensions: ["region"], metrics: ["activeUsers"], startDate, endDate, orderByMetric: "activeUsers", limit: 8 },
+      ]),
+      batchRunReports([
+        { dimensions: ["browser"], metrics: ["activeUsers"], startDate, endDate, orderByMetric: "activeUsers", limit: 8 },
+        {
+          dimensions: ["operatingSystem"],
+          metrics: ["activeUsers"],
+          startDate,
+          endDate,
+          orderByMetric: "activeUsers",
+          limit: 8,
+        },
       ]),
       runRealtimeActiveUsers().catch(() => 0),
     ]);
 
     const [totalsR, dailyR, nvrR, pagesR, channelsR] = batchA;
-    const [devicesR, citiesR, prevR] = batchB;
+    const [devicesR, citiesR, prevR, countriesR, regionsR] = batchB;
+    const [browsersR, osR] = batchC;
 
     const t = totalsR?.rows?.[0];
     const p = prevR?.rows?.[0];
@@ -127,7 +144,11 @@ export async function GET(req: NextRequest) {
       topPages: toSlices(pagesR),
       channels: toSlices(channelsR),
       devices: toSlices(devicesR),
-      cities: toSlices(citiesR).filter((c) => c.label && c.label !== "(not set)"),
+      browsers: toSlices(browsersR).filter(named),
+      operatingSystems: toSlices(osR).filter(named),
+      countries: toSlices(countriesR).filter(named),
+      regions: toSlices(regionsR).filter(named),
+      cities: toSlices(citiesR).filter(named),
       generatedAt: new Date().toISOString(),
     };
 
