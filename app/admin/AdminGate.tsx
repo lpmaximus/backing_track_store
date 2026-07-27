@@ -12,6 +12,7 @@ const NAV = [
   { href: "/admin/audio", label: "🎵 Áudio" },
   { href: "/admin/moderacao", label: "📝 Cifras" },
   { href: "/admin/consumo", label: "📊 Consumo" },
+  { href: "/admin/analytics", label: "🌐 Audiência" },
   { href: "/admin/mensagens", label: "📣 Mensagens" },
 ];
 
