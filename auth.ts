@@ -5,6 +5,8 @@ import { db, users } from "@/src/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { authConfig } from "./auth.config";
+import { expireTrialIfDue } from "@/src/lib/trials";
+import { track } from "@/src/lib/activity";
 
 // Conta impedida de logar: suspensa, banida ou em processo de exclusão (R3).
 function isLoginBlocked(u: { status?: string | null; deletionScheduledAt?: Date | null }): boolean {
@@ -72,26 +74,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
 
     async jwt({ token, user, trigger }) {
-      if (user) {
-        // Primeiro login — carregar role do banco
+      if (user || trigger === "update") {
+        // Primeiro login (ou refresh explícito) — carregar role do banco.
         const [dbUser] = await db
           .select()
           .from(users)
           .where(eq(users.email, token.email!))
           .limit(1);
         if (dbUser) {
-          token.id   = String(dbUser.id);
-          token.role = dbUser.role;
+          token.id = String(dbUser.id);
+          // Analytics de produto: marca a entrada no sistema. Só no primeiro
+          // login/refresh do token, não em toda requisição. Best effort.
+          if (user) void track(dbUser.id, "login");
+          // Trial de convite vencido rebaixa aqui também, não só no cron:
+          // garante que ninguém siga Pro se /api/jobs/trials falhar.
+          if (dbUser.trialPlan && dbUser.trialEndsAt && dbUser.trialEndsAt.getTime() <= Date.now()) {
+            await expireTrialIfDue(dbUser.id);
+            token.role = dbUser.trialPreviousRole ?? "free";
+          } else {
+            token.role = dbUser.role;
+          }
         }
-      }
-      if (trigger === "update") {
-        // Atualizar role quando assinatura mudar
-        const [dbUser] = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, token.email!))
-          .limit(1);
-        if (dbUser) token.role = dbUser.role;
       }
       return token;
     },

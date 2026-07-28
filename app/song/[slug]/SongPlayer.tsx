@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ import AdBanner from "@/app/components/AdBanner";
 import type { Stem } from "./WavePlayer";
 import type { ResolvedStem } from "@/src/lib/mix";
 import { CifraView, CifraText, type ChordSection, type LyricsLine } from "./CifraView";
+import { track } from "@/app/track";
 
 // WavePlayer usa APIs de browser — importar só no client
 const WavePlayer = dynamic(() => import("./WavePlayer"), { ssr: false });
@@ -71,6 +72,16 @@ export default function SongPlayer({
   header, footer,
 }: Props) {
   const [currentTime, setCurrentTime]   = useState(0);
+  // Analytics de produto: o primeiro segundo de áudio que roda conta como "play".
+  // Evita marcar quem só abriu a página e saiu. Ver src/lib/activity.ts.
+  const playedRef = useRef(false);
+  const handleTimeUpdate = useCallback((t: number) => {
+    setCurrentTime(t);
+    if (!playedRef.current && t > 1) {
+      playedRef.current = true;
+      track("play", { songId: song.id });
+    }
+  }, [song.id]);
   const [autoScroll,  setAutoScroll]    = useState(false);
   const [autoFollow,  setAutoFollow]    = useState(false); // segue o andamento real da música
   const [scrollSpd,   setScrollSpd]     = useState(0.4);
@@ -106,6 +117,18 @@ export default function SongPlayer({
   const [speed, setSpeed]                       = useState(setlistSpeed);
   const [pitch, setPitch]                       = useState(setlistTranspose);
   const [metronome, setMetronome]               = useState(false);
+
+  // Analytics de produto: cifra/letra disponíveis na tela e modo palco (tela cheia).
+  useEffect(() => {
+    if (chords && chords.length > 0) track("cifra", { songId: song.id });
+  }, [chords, song.id]);
+  useEffect(() => {
+    if (lyrics && lyrics.length > 0) track("letra", { songId: song.id });
+  }, [lyrics, song.id]);
+  useEffect(() => {
+    if (fullscreen) track("stage_mode", { songId: song.id });
+  }, [fullscreen, song.id]);
+
   const [songKey, setSongKey]                   = useState(song.key ?? "");
   const [songBpm, setSongBpm]                   = useState(song.bpm ? String(song.bpm) : "");
 
@@ -381,7 +404,8 @@ export default function SongPlayer({
           soloInstrument={soloInstrument}
           songTitle={song.title}
           songArtist={song.artist}
-          onTimeUpdate={setCurrentTime}
+          onTimeUpdate={handleTimeUpdate}
+          onMixerTouch={() => track("mixer", { songId: song.id })}
           speed={speed}
           pitch={pitch}
           loopStart={loopStart}

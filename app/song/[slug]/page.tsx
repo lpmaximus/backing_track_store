@@ -13,6 +13,7 @@ import { auth } from "@/auth";
 import { hasProAccess } from "@/src/lib/access";
 import { resolveSetlistRole } from "@/src/lib/events";
 import { resolveMix, parseSpeed, clampTranspose, type ResolvedStem } from "@/src/lib/mix";
+import { markFirstUse } from "@/src/lib/invites";
 import SongPlayer from "./SongPlayer";
 import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
@@ -51,6 +52,11 @@ export default async function SongPage({
   const isPro = session?.user
     ? await hasProAccess(Number(session.user.id), session.user.role)
     : false;
+
+  // Funil do convite: abrir a página de uma música conta como "primeiro uso".
+  // UPDATE indexado por user_id que só acerta linha na primeira vez; nas demais
+  // é um no-op. Best-effort — markFirstUse engole o próprio erro.
+  if (session?.user?.id) await markFirstUse(Number(session.user.id));
 
   // Trilha-guia: quando aberto pela setlist da banda, ?solo=<instrumento> faz o
   // player vir com só a trilha do integrante no ar (pré-muta as outras).

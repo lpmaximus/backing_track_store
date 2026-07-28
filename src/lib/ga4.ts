@@ -75,6 +75,12 @@ type ReportSpec = {
   endDate: string;
   orderByMetric?: string;
   limit?: number;
+  /**
+   * Descarta linhas cuja dimensão começa com este prefixo — usado para tirar
+   * `/admin` dos rankings de página. Só afeta dados JÁ coletados; a coleta em
+   * si é bloqueada em components/Analytics.tsx.
+   */
+  excludePrefix?: { dimension: string; value: string };
 };
 
 function toRequest(s: ReportSpec) {
@@ -82,6 +88,18 @@ function toRequest(s: ReportSpec) {
     dateRanges: [{ startDate: s.startDate, endDate: s.endDate }],
     dimensions: (s.dimensions ?? []).map((name) => ({ name })),
     metrics: s.metrics.map((name) => ({ name })),
+    ...(s.excludePrefix
+      ? {
+          dimensionFilter: {
+            notExpression: {
+              filter: {
+                fieldName: s.excludePrefix.dimension,
+                stringFilter: { matchType: "BEGINS_WITH", value: s.excludePrefix.value },
+              },
+            },
+          },
+        }
+      : {}),
     ...(s.orderByMetric
       ? { orderBys: [{ metric: { metricName: s.orderByMetric }, desc: true }] }
       : s.dimensions?.[0] === "date"

@@ -54,3 +54,8 @@ replicate/btc-chords/BTC-ISMIR19/
 replicate/btc-chords/*.mp3
 replicate/btc-chords/.cog/
 **/__pycache__/
+
+# chaves de service account (Google Cloud) — nunca commitar
+backing-track-*.json
+*-serviceaccount*.json
+_COLAR_NA_VERCEL.txt

@@ -15,6 +15,7 @@ import { db, songs } from "@/src/db";
 import { eq } from "drizzle-orm";
 import { presignPut, sanitizeKey } from "@/src/lib/r2";
 import { checkUploadQuota } from "@/src/lib/quota";
+import { track } from "@/src/lib/activity";
 
 const HASH_RE = /^[a-f0-9]{64}$/i;
 
@@ -92,6 +93,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { uploadUrl, publicUrl } = await presignPut(key, contentType);
+    void track(userId, "upload");
     return NextResponse.json({ cached: false, uploadUrl, key, publicUrl });
   } catch (err) {
     console.error("[POST /api/upload]", err);

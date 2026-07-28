@@ -159,6 +159,106 @@ function Sparkline({ data }: { data: { date: string; users: number }[] }) {
   );
 }
 
+type Activity = {
+  days: number;
+  pendingMigration?: boolean;
+  error?: string;
+  registered: number;
+  active: number;
+  activationRate: number;
+  activeDelta: number | null;
+  newUsers: number;
+  dormant: number;
+  byRole: Slice[];
+  byEvent: (Slice & { people: number })[];
+  topSongs: (Slice & { slug: string })[];
+  topUsers: (Slice & { role: string; lastSeenAt: string | null })[];
+};
+
+function UsersPanel({ days }: { days: number }) {
+  const [data, setData] = useState<Activity | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    fetch(`/api/admin/atividade?days=${days}`, { headers: adminHeaders() })
+      .then((r) => r.json())
+      .then((j) => alive && setData(j))
+      .catch(() => alive && setData(null))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [days]);
+
+  if (loading) return <p style={{ color: "var(--muted)" }}>Carregando atividade dos cadastrados…</p>;
+
+  if (!data || data.pendingMigration) {
+    return (
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: 20 }}>
+        <p style={{ color: "var(--text)", fontWeight: 700, margin: 0 }}>Rastreamento ainda não instalado</p>
+        <p style={{ color: "var(--muted)", fontSize: 13, margin: "8px 0 0" }}>
+          Falta rodar a migração do banco (<code>npm run db:push</code>) para criar a tabela de atividade.
+          A partir daí os eventos começam a ser gravados.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 16 }}>
+        <Kpi label="Cadastrados" value={data.registered.toLocaleString("pt-BR")} sub={`+${data.newUsers} no período`} />
+        <Kpi
+          label="Ativos no período"
+          value={data.active.toLocaleString("pt-BR")}
+          sub={`${data.activationRate}% da base`}
+          delta={data.activeDelta}
+        />
+        <Kpi label="Dormentes" value={data.dormant.toLocaleString("pt-BR")} sub="sem sinal há 30+ dias" />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
+        <Panel title="🎛️ O que os cadastrados fazem" hint="Eventos no período — o número ao lado é o total de vezes">
+          <Ranking items={data.byEvent} />
+          {data.byEvent.length > 0 && (
+            <p style={{ color: "var(--muted2)", fontSize: 11, margin: "10px 0 0" }}>
+              {data.byEvent.map((e) => `${e.label}: ${e.people} pessoa(s)`).join(" · ")}
+            </p>
+          )}
+        </Panel>
+
+        <Panel title="💳 Ativos por plano" hint="Se o Pro não usa mais que o Free, o plano não está entregando valor">
+          <Ranking items={data.byRole} />
+        </Panel>
+
+        <Panel title="🎧 Mais tocadas por quem está logado" hint="Diferente do catálogo geral: é o que a base realmente ensaia">
+          <Ranking items={data.topSongs} />
+        </Panel>
+
+        <Panel title="⭐ Quem mais usa" hint="Candidatos naturais para pedir feedback e depoimento">
+          {data.topUsers.length === 0 ? (
+            <p style={{ color: "var(--muted2)", fontSize: 13, margin: 0 }}>Sem atividade no período.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {data.topUsers.map((u) => (
+                <div key={u.label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                  <span style={{ color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {u.label}
+                  </span>
+                  <span style={{ color: "var(--muted2)", fontSize: 11, fontWeight: 700 }}>{u.role}</span>
+                  <span style={{ color: "var(--text)", fontWeight: 700, width: 40, textAlign: "right" }}>{u.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+      </div>
+    </>
+  );
+}
+
 function AnalyticsContent() {
   const [days, setDays] = useState(30);
   const [data, setData] = useState<Analytics | null>(null);
@@ -311,6 +411,15 @@ function AnalyticsContent() {
           </p>
         </>
       )}
+
+      {/* ── Usuários cadastrados: o GA não sabe quem é quem; isto sabe ── */}
+      <div style={{ marginTop: 32 }}>
+        <h2 style={{ color: "var(--text)", fontSize: 18, fontWeight: 900, margin: "0 0 4px" }}>Usuários cadastrados</h2>
+        <p style={{ color: "var(--muted2)", fontSize: 13, margin: "0 0 16px" }}>
+          Quem criou conta, quem volta e o que faz dentro do sistema. Dado do próprio banco, não do Google.
+        </p>
+        <UsersPanel days={days} />
+      </div>
     </div>
   );
 }

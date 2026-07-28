@@ -75,6 +75,8 @@ export async function GET(req: NextRequest) {
           endDate,
           orderByMetric: "screenPageViews",
           limit: 12,
+          // O painel mede o público, não o dono: fora as páginas do admin.
+          excludePrefix: { dimension: "pagePath", value: "/admin" },
         },
         {
           dimensions: ["sessionDefaultChannelGroup"],

@@ -14,6 +14,7 @@ const NAV = [
   { href: "/admin/consumo", label: "📊 Consumo" },
   { href: "/admin/analytics", label: "🌐 Audiência" },
   { href: "/admin/mensagens", label: "📣 Mensagens" },
+  { href: "/admin/convites", label: "✉️ Convites" },
 ];
 
 // Valida a senha contra um endpoint admin (401 se errada).

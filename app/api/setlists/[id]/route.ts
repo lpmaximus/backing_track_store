@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db, setlists, setlistSongs, songs, bandMembers, bands } from "@/src/db";
 import { eq, asc, and } from "drizzle-orm";
 import { hasProAccess } from "@/src/lib/access";
+import { track } from "@/src/lib/activity";
 
 // Mutações (renomear/excluir) continuam só do dono/líder.
 async function loadOwnedSetlist(id: number, userId: number) {
@@ -40,6 +41,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const { id: idParam } = await params;
     const id = Number(idParam);
     if (!id) return NextResponse.json({ error: "ID invalido" }, { status: 400 });
+
+    // Analytics de produto: abrir a setlist é o sinal de uso do fluxo de ensaio.
+    void track(Number(session.user.id), "setlist_open", { meta: { setlistId: id } });
 
     const userId = Number(session.user.id);
     const setlist = await loadAccessibleSetlist(id, userId);

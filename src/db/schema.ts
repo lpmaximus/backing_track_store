@@ -8,6 +8,7 @@ import {
   varchar,
   jsonb,
   numeric,
+  index,
 } from "drizzle-orm/pg-core";
 
 // ─── Songs ────────────────────────────────────────────────────────────────────
@@ -93,9 +94,50 @@ export const users = pgTable("users", {
   // Hard delete LGPD com retenção: marcado aqui; purga definitiva após 30 dias
   // (rota /api/admin/users/purge, disparada por cron/manual).
   deletionScheduledAt: timestamp("deletion_scheduled_at"),
+  // ─── Trial por convite (aba /admin/convites) ────────────────────────────
+  // O trial NÃO cria um role novo: `role` é promovido para pro|proband e estes
+  // campos guardam a validade + o role de origem para o rebaixamento. Assim
+  // todo o código de permissão existente (permissions.ts, access.ts, quota.ts)
+  // continua valendo sem nenhuma alteração. Expiração: src/lib/trials.ts.
+  trialPlan: varchar("trial_plan", { length: 20 }),          // pro | proband (null = sem trial)
+  trialStartedAt: timestamp("trial_started_at"),
+  trialEndsAt: timestamp("trial_ends_at"),
+  trialPreviousRole: varchar("trial_previous_role", { length: 20 }), // role para voltar no fim
+  trialSource: varchar("trial_source", { length: 30 }),      // invite | manual
+  // ─── Analytics de produto ───────────────────────────────────────────────
+  // Última vez que o usuário deu qualquer sinal de vida (qualquer evento em
+  // user_activity atualiza aqui). Serve para separar ativo × dormente sem
+  // precisar varrer a tabela de eventos.
+  lastSeenAt: timestamp("last_seen_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// ─── Atividade do usuário logado (analytics de produto) ───────────────────────
+// O Google Analytics enxerga visitante anônimo; esta tabela enxerga QUEM fez o
+// quê. Só grava usuário autenticado e só eventos da whitelist em
+// src/lib/activity.ts — nunca dado livre vindo do client.
+export const userActivity = pgTable(
+  "user_activity",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // play | mixer | cifra | letra | setlist_open | setlist_create | stage_mode
+    // | upload | export | login
+    event: varchar("event", { length: 30 }).notNull(),
+    songId: integer("song_id").references(() => songs.id, { onDelete: "set null" }),
+    // Contexto extra do evento (ex.: { stem: "drums", muted: true }). Opcional.
+    meta: jsonb("meta"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byUserDate: index("user_activity_user_created_idx").on(t.userId, t.createdAt),
+    byDate: index("user_activity_created_idx").on(t.createdAt),
+    byEvent: index("user_activity_event_idx").on(t.event),
+  }),
+);
 
 // ─── Subscriptions ────────────────────────────────────────────────────────────
 export const subscriptions = pgTable("subscriptions", {
@@ -381,6 +423,75 @@ export const cifraReports = pgTable("cifra_reports", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ─── Waitlist ────────────────────────────────────────────────────────────────
+/**
+ * Cadastros da página "Em breve". A tabela é criada em runtime por
+ * /api/waitlist (CREATE TABLE IF NOT EXISTS) desde antes do drizzle cobrir tudo.
+ * Está declarada aqui SÓ para o `drizzle-kit push` reconhecê-la como parte do
+ * schema — sem isto ele a trata como tabela órfã e propõe DROP, o que apagaria
+ * os inscritos. Não mexer no formato das colunas: precisa espelhar o que a rota
+ * cria (created_at é timestamptz lá).
+ */
+export const waitlist = pgTable("waitlist", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Convites de teste (aba /admin/convites) ─────────────────────────────────
+/**
+ * Texto do convite, editável no admin. Fica em tabela (e não hardcoded) porque
+ * o e-mail é o principal vetor de "cheiro de phishing": cada ajuste de tom no
+ * assunto/corpo precisa ser feito sem deploy. `isDefault` marca o modelo que
+ * abre pré-preenchido no formulário.
+ */
+export const inviteTemplates = pgTable("invite_templates", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  subject: varchar("subject", { length: 200 }).notNull(),
+  // Corpo em texto puro com placeholders {{nome}}, {{plano}}, {{dias}},
+  // {{link}}, {{validade}}. O HTML é montado em src/lib/inviteEmail.ts a
+  // partir daqui — o admin nunca escreve HTML.
+  body: text("body").notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+/**
+ * Um convite = um e-mail para uma pessoa. O funil rastreado é
+ * enviado → clicado → cadastrado (aceito) → primeiro uso, sem pixel de
+ * abertura (decisão do produto: pixel é sinal clássico de spam e o Gmail/Apple
+ * falseiam o dado de qualquer jeito).
+ */
+export const invites = pgTable("invites", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  name: varchar("name", { length: 255 }),
+  plan: varchar("plan", { length: 20 }).notNull().default("pro"), // pro | proband
+  trialDays: integer("trial_days").notNull().default(20),
+  // Token de 48 hex chars — entra na URL /convite/<token>.
+  token: varchar("token", { length: 96 }).notNull().unique(),
+  // pending | sent | failed | clicked | accepted | expired | revoked
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  // Snapshot do que foi realmente enviado (o template pode mudar depois).
+  subject: varchar("subject", { length: 200 }).notNull(),
+  body: text("body").notNull(),
+  error: text("error"),
+  // Validade do CONVITE (link para de funcionar). Diferente de trialEndsAt,
+  // que é a validade do acesso depois de aceito.
+  expiresAt: timestamp("expires_at").notNull(),
+  sentAt: timestamp("sent_at"),
+  sendCount: integer("send_count").notNull().default(0),
+  clickedAt: timestamp("clicked_at"),
+  acceptedAt: timestamp("accepted_at"),
+  firstUseAt: timestamp("first_use_at"),
+  trialEndsAt: timestamp("trial_ends_at"),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type Song = typeof songs.$inferSelect;
 export type NewSong = typeof songs.$inferInsert;
@@ -421,6 +532,11 @@ export type CifraReport = typeof cifraReports.$inferSelect;
 export type NewCifraReport = typeof cifraReports.$inferInsert;
 export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
+export type Invite = typeof invites.$inferSelect;
+export type NewInvite = typeof invites.$inferInsert;
+export type InviteTemplate = typeof inviteTemplates.$inferSelect;
+export type NewInviteTemplate = typeof inviteTemplates.$inferInsert;
+export type Waitlist = typeof waitlist.$inferSelect;
 
 export interface ChordSection {
   section: string;    // "Verso" | "Refrão" | "Ponte" etc.

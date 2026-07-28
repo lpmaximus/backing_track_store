@@ -4,6 +4,7 @@ import { db, setlists, setlistSongs, bands, bandMembers } from "@/src/db";
 import { eq, sql, and, or, inArray } from "drizzle-orm";
 import { hasProAccess } from "@/src/lib/access";
 import { roleCan } from "@/src/lib/permissions";
+import { track } from "@/src/lib/activity";
 
 // GET /api/setlists — setlists pessoais do usuario + setlists das bandas em que
 // ele é membro ativo (Fase 1.5, Frente E).
@@ -86,6 +87,8 @@ export async function POST(req: NextRequest) {
       .insert(setlists)
       .values({ userId, bandId: finalBandId, name: name.trim(), notes: notes?.trim() || null })
       .returning();
+
+    void track(userId, "setlist_create", { meta: { bandId: finalBandId } });
 
     return NextResponse.json({ setlist: { ...created, songCount: 0 } }, { status: 201 });
   } catch (err) {

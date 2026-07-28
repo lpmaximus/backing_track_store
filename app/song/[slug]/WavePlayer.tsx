@@ -35,6 +35,9 @@ type Props = {
   // volume por stem. Aplicada uma vez, quando o motor fica pronto — é soft,
   // como o pré-mute do ?solo=: o usuário mexe na mesa depois se quiser.
   initialMix?: { stemKey: string; state: string; volume: number }[] | null;
+  // Analytics de produto: avisa o SongPlayer que o usuário mexeu na mesa
+  // (mute, solo ou volume de faixa). Só sinaliza — quem grava é o SongPlayer.
+  onMixerTouch?: () => void;
 };
 
 // ─── Aparência por instrumento ────────────────────────────────────────────────
@@ -152,7 +155,7 @@ type Engine = {
 
 export default function WavePlayer({
   audioUrl, stems, isPro = false, soloInstrument = null, songTitle, songArtist, onTimeUpdate, onDurationReady, speed = 1, pitch = 0,
-  loopStart = null, loopEnd = null, initialMix = null,
+  loopStart = null, loopEnd = null, initialMix = null, onMixerTouch,
 }: Props) {
   // Faixas de áudio a carregar. Com stems, cada stem é uma faixa; senão, o mix.
   const tracks: Track[] = useMemo(() => {
@@ -506,12 +509,14 @@ export default function WavePlayer({
   const toggleMute = (k: string) => {
     const t = tracks.find(tr => tr.key === k);
     if (t && !canControlTrack(t.instrument)) return;
+    onMixerTouch?.();
     setMuted(p => ({ ...p, [k]: !p[k] }));
     setSoloed(p => (p[k] ? { ...p, [k]: false } : p));
   };
   const toggleSolo = (k: string) => {
     const t = tracks.find(tr => tr.key === k);
     if (t && !canControlTrack(t.instrument)) return;
+    onMixerTouch?.();
     setSoloed(p => ({ ...p, [k]: !p[k] }));
     setMuted(p => (p[k] ? { ...p, [k]: false } : p));
   };
@@ -684,7 +689,7 @@ export default function WavePlayer({
                       </a>
                     ) : (
                       <input type="range" min={0} max={1} step={0.02} value={g}
-                        onChange={e => setTrackVol(p => ({ ...p, [t.key]: Number(e.target.value) }))}
+                        onChange={e => { onMixerTouch?.(); setTrackVol(p => ({ ...p, [t.key]: Number(e.target.value) })); }}
                         style={{ width: 64, flexShrink: 0 }} aria-label={`Volume ${t.label}`} />
                     )}
                     {/* onda (clique = seek) */}

@@ -7,6 +7,14 @@
     {
       "path": "/api/jobs/finalize",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/jobs/trials",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/jobs/report",
+      "schedule": "0 10 * * 3,6"
     }
   ]
 }
