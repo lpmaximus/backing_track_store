@@ -63,12 +63,14 @@ const STEM_COLORS: Record<string, string> = {
 };
 const DEFAULT_COLOR = "#8a8a8c";
 
-// ─── Amostra grátis (regra de divulgação) ────────────────────────────────────
-// Visitante sem cadastro NÃO tem isPro, mas ainda assim pode dar M/S nesses
-// instrumentos — é a "prévia" do recurso de stems, pensada pra conversão.
-// Os demais (hoje: baixo, vocal, harmony, melody) ficam travados até assinar.
-// Única fonte de verdade: mudar o que é liberado é só editar este Set.
-const GUEST_UNLOCKED_INSTRUMENTS = new Set(["drums", "guitar"]);
+// ─── Mixer no plano Free ─────────────────────────────────────────────────────
+// Decisão de 2026-07-28: a landing sempre prometeu "Player com stems" no Free,
+// e essa virou a promessa oficial (home, /planos e Termos alinhados). Portanto
+// TODO mundo controla M/S de todos os canais — o que o Pro acrescenta é o
+// EXPORT dos stems, pitch shift, loop A-B, PDF, setlists e Modo Performance.
+// Para voltar a restringir, preencha este Set (vazio = tudo liberado).
+const GUEST_UNLOCKED_INSTRUMENTS = new Set<string>();
+const FREE_MIXER_UNLOCKED = true;
 
 function colorFor(instrument: string) { return STEM_COLORS[instrument] ?? DEFAULT_COLOR; }
 function iconFor(instrument: string) { return STEM_ICONS[instrument] ?? "🎵"; }
@@ -507,10 +509,11 @@ export default function WavePlayer({
     return () => window.removeEventListener("keydown", handler);
   }, [togglePlay]);
 
-  // Visitante sem cadastro só controla M/S nos instrumentos de amostra
-  // (GUEST_UNLOCKED_INSTRUMENTS); usuário Pro controla todos.
+  // Mixer liberado para todos (ver FREE_MIXER_UNLOCKED no topo). O Set continua
+  // sendo consultado para o caso de voltarmos a liberar só alguns canais.
   const canControlTrack = useCallback(
-    (instrument: string) => isPro || GUEST_UNLOCKED_INSTRUMENTS.has(instrument),
+    (instrument: string) =>
+      isPro || FREE_MIXER_UNLOCKED || GUEST_UNLOCKED_INSTRUMENTS.has(instrument),
     [isPro]
   );
 
@@ -760,8 +763,7 @@ export default function WavePlayer({
 
       {/* Velocidade e Pitch foram movidos pra a coluna direita (SongPlayer). */}
 
-      {/* Gate parcial: bateria e guitarra já vêm liberadas (amostra grátis) —
-          o upsell abaixo é sobre o que ainda falta (baixo, vocal e mais). */}
+      {/* O mixer inteiro é do Free; o upsell abaixo é sobre o que só o Pro tem. */}
       {!isPro && stems.length > 0 && proGate(tx("gateStems"))}
 
     </div>

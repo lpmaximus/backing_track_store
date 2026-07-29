@@ -97,12 +97,13 @@ export default function TermsContentPt() {
         <tbody>
           <tr><td>Catálogo de backing tracks</td><td>Acesso livre</td><td>Acesso livre</td><td>Acesso livre</td></tr>
           <tr><td>Upload próprio + separação de stems</td><td>3 separações/mês, exportação completa</td><td>20 separações/mês</td><td>40 separações/mês</td></tr>
-          <tr><td>Stems por instrumento no player</td><td>Não (mix sem voz)</td><td>Sim</td><td>Sim</td></tr>
+          <tr><td>Stems por instrumento no player (mudo/solo)</td><td>Sim</td><td>Sim</td><td>Sim</td></tr>
+          <tr><td>Exportação (download) dos stems separados</td><td>Sim, nas 3 separações/mês</td><td>Sim</td><td>Sim</td></tr>
           <tr><td>Pitch shift e Loop A-B</td><td>Não</td><td>Sim</td><td>Sim</td></tr>
           <tr><td>Comentários da comunidade</td><td>Somente leitura</td><td>Leitura e escrita</td><td>Leitura e escrita</td></tr>
           <tr><td>Setlist e Modo Performance</td><td>Não</td><td>Sim</td><td>Sim</td></tr>
-          <tr><td>Banda (criar e convidar integrantes)</td><td>Não</td><td>Não</td><td>Sim, até 5 integrantes por banda</td></tr>
-          <tr><td>Download do áudio processado</td><td>Não</td><td>Não</td><td>Não</td></tr>
+          <tr><td>Banda (criar e convidar integrantes)</td><td>Não</td><td>Não</td><td>Sim, até 6 integrantes por banda (líder + 5)</td></tr>
+          <tr><td>Download das backing tracks do catálogo próprio</td><td>Não</td><td>Não</td><td>Não</td></tr>
         </tbody>
       </table>
       <p>

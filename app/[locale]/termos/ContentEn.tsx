@@ -116,12 +116,13 @@ export default function TermsContentEn() {
         <tbody>
           <tr><td>Backing track catalog</td><td>Open access</td><td>Open access</td><td>Open access</td></tr>
           <tr><td>Own upload + stem separation</td><td>3 separations/month, full export</td><td>20 separations/month</td><td>40 separations/month</td></tr>
-          <tr><td>Per-instrument stems in the player</td><td>No (mix without vocals)</td><td>Yes</td><td>Yes</td></tr>
+          <tr><td>Per-instrument stems in the player (mute/solo)</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><td>Export (download) of the separated stems</td><td>Yes, within the 3 separations/month</td><td>Yes</td><td>Yes</td></tr>
           <tr><td>Pitch shift and A-B loop</td><td>No</td><td>Yes</td><td>Yes</td></tr>
           <tr><td>Community comments</td><td>Read only</td><td>Read and write</td><td>Read and write</td></tr>
           <tr><td>Setlist and Performance Mode</td><td>No</td><td>Yes</td><td>Yes</td></tr>
-          <tr><td>Band (create and invite members)</td><td>No</td><td>No</td><td>Yes, up to 5 members per band</td></tr>
-          <tr><td>Download of processed audio</td><td>No</td><td>No</td><td>No</td></tr>
+          <tr><td>Band (create and invite members)</td><td>No</td><td>No</td><td>Yes, up to 6 members per band (leader + 5)</td></tr>
+          <tr><td>Download of the platform&apos;s own catalog backing tracks</td><td>No</td><td>No</td><td>No</td></tr>
         </tbody>
       </table>
       <p>

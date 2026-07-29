@@ -158,23 +158,21 @@
     "alreadyPro": "✓ You're already Pro",
     "notAvailable": "Coming soon — subscriptions not available yet",
     "freeFeatures": [
-      "Full catalog (every song)",
-      "Player with full mix, vocals removed",
-      "Real-time synced chord charts",
+      "3 songs per month",
+      "Full catalog",
+      "Player with stems (mute and solo per instrument)",
+      "Synced chords and lyrics",
       "Basic speed control",
-      "30-day history",
       "Read community comments"
     ],
     "proFeatures": [
       "Everything in Free, plus:",
-      "Individual stems (drums, bass, guitar, harmony)",
-      "Real-time pitch shift",
-      "A-B loop (repeat any section)",
-      "Named setlists for gigs",
-      "Performance mode (fullscreen, offline)",
-      "Post and reply to comments",
-      "Unlimited history",
-      "Offline (PWA)"
+      "20 songs per month",
+      "Stem export",
+      "Full practice mode (pitch shift and A-B loop)",
+      "Chord chart as PDF",
+      "Setlists and Performance mode",
+      "Post and reply to comments"
     ],
     "faq": {
       "q1": "Do I need a credit card?",
@@ -185,7 +183,16 @@
       "a3": "Yes. No penalty, no lock-in — cancel from your account at any time.",
       "q4": "What happens if I cancel?",
       "a4": "You go back to the Free plan right away, and you keep every chord chart you saved."
-    }
+    },
+    "bandFeatures": [
+      "Everything in Pro, plus:",
+      "40 songs per month",
+      "Up to 6 members",
+      "Setlists shared with the band",
+      "Auto-mute by instrument",
+      "Rehearsals with band readiness"
+    ],
+    "bandSoon": "Coming soon — subscriptions not available yet"
   },
   "howItWorks": {
     "metaTitle": "How it works",
@@ -384,7 +391,7 @@
     "soloAria": "Solo {label}",
     "unlockChannel": "Unlock the isolated channel on the Pro plan",
     "vol": "Vol",
-    "gateStems": "Isolating bass, vocals and more controls",
+    "gateStems": "Stem export, pitch shift, A-B loop and chord chart as PDF",
     "noSetlists": "You don't have any setlists yet.",
     "createFirstSetlist": "Create your first",
     "added": "✓ Added",

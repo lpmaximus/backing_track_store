@@ -158,23 +158,21 @@
     "alreadyPro": "✓ Você já é Pro",
     "notAvailable": "Em breve — assinaturas ainda não disponíveis",
     "freeFeatures": [
-      "Catálogo completo (todas as músicas)",
-      "Player com mix completa sem voz",
-      "Cifra sincronizada em tempo real",
+      "3 músicas por mês",
+      "Catálogo completo",
+      "Player com stems (mute e solo por instrumento)",
+      "Cifra e letra sincronizadas",
       "Controle de velocidade básico",
-      "Histórico de 30 dias",
       "Ler comentários da comunidade"
     ],
     "proFeatures": [
       "Tudo do Free, mais:",
-      "Stems individuais (bateria, baixo, guitarra, harmonia)",
-      "Pitch shift em tempo real",
-      "Loop A-B (trecho para repetir)",
-      "Setlist nomeada para shows",
-      "Modo Performance (tela cheia, offline)",
-      "Escrever e responder comentários",
-      "Histórico ilimitado",
-      "Offline (PWA)"
+      "20 músicas por mês",
+      "Export de stems",
+      "Practice mode completo (pitch shift e loop A-B)",
+      "Cifra em PDF",
+      "Setlists e Modo Performance",
+      "Escrever e responder comentários"
     ],
     "faq": {
       "q1": "Preciso de cartão de crédito?",
@@ -185,7 +183,16 @@
       "a3": "Sim. Sem multa e sem fidelidade — cancele pelo painel a qualquer momento.",
       "q4": "O que acontece se eu cancelar?",
       "a4": "Você volta para o plano Free imediatamente, sem perder as suas cifras salvas."
-    }
+    },
+    "bandFeatures": [
+      "Tudo do Pro, mais:",
+      "40 músicas por mês",
+      "Até 6 integrantes",
+      "Setlists compartilhadas com a banda",
+      "Auto-mute por instrumento",
+      "Ensaios com prontidão da banda"
+    ],
+    "bandSoon": "Em breve — assinaturas ainda não disponíveis"
   },
   "howItWorks": {
     "metaTitle": "Como funciona",
@@ -384,7 +391,7 @@
     "soloAria": "Solo {label}",
     "unlockChannel": "Ativar canal isolado no plano Pro",
     "vol": "Vol",
-    "gateStems": "Isolar baixo, vocal e mais controles",
+    "gateStems": "Export de stems, pitch shift, loop A-B e cifra em PDF",
     "noSetlists": "Você ainda não tem setlists.",
     "createFirstSetlist": "Criar a primeira",
     "added": "✓ Adicionada",
