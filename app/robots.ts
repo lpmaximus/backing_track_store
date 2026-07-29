@@ -14,24 +14,37 @@ export default function robots(): MetadataRoute.Robots {
     };
   }
 
+  // Rotas sem valor de busca ou que exigem sessão — nas duas línguas
+  // (os slugs em inglês são outros: ver src/i18n/routing.ts).
+  const privatePaths = [
+    "/api/",
+    "/admin/",
+    "/coming-soon",
+    "/en/coming-soon",
+    // pt
+    "/conta",
+    "/perfil",
+    "/upload",
+    "/setlists",
+    "/compartilhadas",
+    "/entrar",
+    "/bandas/entrar",
+    // en
+    "/en/account",
+    "/en/my-songs",
+    "/en/upload",
+    "/en/setlists",
+    "/en/shared",
+    "/en/sign-in",
+    "/en/bands/join",
+  ];
+
   return {
     rules: [
       {
         userAgent: "*",
         allow: "/",
-        // Rotas sem valor de busca ou que exigem sessão.
-        disallow: [
-          "/api/",
-          "/admin/",
-          "/conta",
-          "/perfil",
-          "/upload",
-          "/setlists",
-          "/compartilhadas",
-          "/entrar",
-          "/bandas/entrar",
-          "/coming-soon",
-        ],
+        disallow: privatePaths,
       },
     ],
     sitemap: `${base}/sitemap.xml`,

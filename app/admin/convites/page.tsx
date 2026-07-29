@@ -259,6 +259,12 @@ function ConvitesContent() {
           <p style={{ color: "var(--muted2)", fontSize: 12, margin: "6px 0 0" }}>
             {count} destinatário(s) · máx. 20 por envio — convite é conversa, não campanha.
           </p>
+          {count > 0 && parseRecipients().some((r) => !r.name) && (
+            <p style={{ color: "#f59e0b", fontSize: 12, margin: "6px 0 0" }}>
+              ⚠️ {parseRecipients().filter((r) => !r.name).length} sem nome. O e-mail funciona, mas
+              convite sem nome soa como mala direta — que é o que levanta suspeita de golpe.
+            </p>
+          )}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14, marginBottom: 16 }}>

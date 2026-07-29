@@ -59,3 +59,6 @@ replicate/btc-chords/.cog/
 backing-track-*.json
 *-serviceaccount*.json
 _COLAR_NA_VERCEL.txt
+
+# artefatos do mount FUSE (aparecem ao mover arquivos abertos)
+.fuse_hidden*

@@ -1,20 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { Link } from "@/src/i18n/navigation";
+import type { StaticPathname } from "@/src/i18n/routing";
 
-type NavItem = { label: string; href: string };
+/** href é validado contra o mapa de rotas do i18n (src/i18n/routing.ts). */
+export type NavItem = { label: string; href: StaticPathname };
 
 /** Menu hamburguer para telas estreitas (tablet/celular) — a nav completa
  *  (.desktop-nav) some abaixo de 880px e este botão assume no lugar dela. */
-export default function MobileNav({ nav }: { nav: NavItem[] }) {
+export default function MobileNav({
+  nav,
+  labels,
+}: {
+  nav: NavItem[];
+  labels: { open: string; close: string };
+}) {
   const [open, setOpen] = useState(false);
 
   return (
     <div className="mobile-nav" style={{ position: "relative" }}>
       <button
         onClick={() => setOpen(v => !v)}
-        aria-label={open ? "Fechar menu" : "Abrir menu"}
+        aria-label={open ? labels.close : labels.open}
         aria-expanded={open}
         className="mobile-nav-toggle"
         style={{ background: "none", border: "none", cursor: "pointer", padding: 6, alignItems: "center", justifyContent: "center", color: "var(--text)" }}

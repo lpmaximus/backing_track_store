@@ -1,7 +1,9 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useSession } from "next-auth/react";
-import Link from "next/link";
+import { Link } from "@/src/i18n/navigation";
 import { isProRole } from "@/src/lib/roles";
 
 /**
@@ -22,6 +24,7 @@ import { isProRole } from "@/src/lib/roles";
  * ...e carregar o script do AdSense via <Script> no layout (fora deste componente).
  */
 export default function AdBanner({ variant = "default" }: { variant?: "default" | "compact" }) {
+  const t = useTranslations("ads");
   const { data: session } = useSession();
   // Pro/ProBand/admin não veem anúncios (ProBand herda o acesso Pro).
   const isPro = isProRole(session?.user?.role);
@@ -48,13 +51,13 @@ export default function AdBanner({ variant = "default" }: { variant?: "default" 
         fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: "var(--muted2)",
         border: "1px solid var(--border2)", borderRadius: 4, padding: "2px 6px", flexShrink: 0,
       }}>
-        PUBLICIDADE
+        {t("label")}
       </span>
       <p style={{ flex: 1, minWidth: 200, color: "var(--muted)", fontSize: compact ? 13 : 14, margin: 0 }}>
-        Quer tocar sem anúncios e desbloquear stems, pitch shift e setlists ilimitadas?
+        {t("pitch")}
       </p>
       <Link href="/planos" className="btn-primary" style={{ padding: "8px 18px", fontSize: 12, flexShrink: 0, whiteSpace: "nowrap" }}>
-        Conheça o Pro
+        {t("cta")}
       </Link>
     </div>
   );

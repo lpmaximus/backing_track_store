@@ -1,57 +1,28 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/src/i18n/navigation";
+import type { StaticPathname } from "@/src/i18n/routing";
 
 /**
  * Carrossel do hero — padrão layout-6 (BRD-001).
  * Imagens em /public: carousel-1.jpg … carousel-5.jpg
  * (fallback: gradiente escuro enquanto a imagem não existir).
  */
-const SLIDES = [
-  {
-    title: "Separação de stems",
-    sub: "Separe qualquer faixa",
-    desc: "Transforme sua música em questão de segundos. Isole ou silencie vocais e instrumentos com a maior fidelidade possível.",
-    cta: "Isolar faixas",
-    href: "/upload",
-    img: "/carousel-1.jpg",
-  },
-  {
-    title: "Mixer por instrumento",
-    sub: "Sua mix, do seu jeito",
-    desc: "Volume, mute e solo em cada stem. Silencie o seu instrumento e assuma o lugar dele na banda.",
-    cta: "Testar o mixer",
-    href: "/catalogo",
-    img: "/carousel-2.jpg",
-  },
-  {
-    title: "Cifra sincronizada",
-    sub: "Toque junto, sem errar",
-    desc: "Cifras interativas rolando em sincronia com o áudio, com controle de velocidade e tom.",
-    cta: "Ver como funciona",
-    href: "/como-funciona",
-    img: "/carousel-3.jpg",
-  },
-  {
-    title: "Feito para bandas",
-    sub: "Uma mix para cada integrante",
-    desc: "Convide sua banda, compartilhe setlists e cada um ouve a música sem o próprio instrumento.",
-    cta: "Criar minha banda",
-    href: "/bandas",
-    img: "/carousel-4.jpg",
-  },
-  {
-    title: "Do ensaio ao palco",
-    sub: "Pronto para tocar ao vivo",
-    desc: "Monte setlists para o show e leve suas backing tracks para qualquer palco.",
-    cta: "Começar grátis",
-    href: "/entrar",
-    img: "/carousel-5.jpg",
-  },
-];
+const SLIDE_HREFS: StaticPathname[] = ["/upload", "/catalogo", "/como-funciona", "/bandas", "/entrar"];
+const SLIDE_IMGS = ["/carousel-1.jpg", "/carousel-2.jpg", "/carousel-3.jpg", "/carousel-4.jpg", "/carousel-5.jpg"];
 
 export default function HeroCarousel() {
+  const t = useTranslations("carousel");
+  const SLIDES = SLIDE_HREFS.map((href, i) => ({
+    title: t(`s${i + 1}Title`),
+    sub: t(`s${i + 1}Sub`),
+    desc: t(`s${i + 1}Desc`),
+    cta: t(`s${i + 1}Cta`),
+    href,
+    img: SLIDE_IMGS[i],
+  }));
   const [index, setIndex] = useState(0);
   const [visible, setVisible] = useState(true);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);

@@ -1,8 +1,10 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
-import Link from "next/link";
+import { Link } from "@/src/i18n/navigation";
 import Image from "next/image";
 import { isProRole, roleLabel } from "@/src/lib/roles";
 
@@ -11,6 +13,7 @@ type Props = {
 };
 
 export default function UserMenu({ user }: Props) {
+  const t = useTranslations("nav");
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const isPro = isProRole(user.role);
@@ -92,12 +95,12 @@ export default function UserMenu({ user }: Props) {
               {isPro && (
                 <Link href="/setlists" onClick={() => setOpen(false)}
                   style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 6, color: "var(--muted)", fontSize: 13 }}>
-                  Minhas Setlists
+                  {t("mySetlists")}
                 </Link>
               )}
               <Link href="/conta" onClick={() => setOpen(false)}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderRadius: 6, color: "var(--muted)", fontSize: 13 }}>
-                <span>Área Usuário</span>
+                <span>{t("account")}</span>
                 {unread > 0 && (
                   <span style={{
                     background: "var(--accent)", color: "#fff", fontSize: 10, fontWeight: 800,
@@ -107,7 +110,7 @@ export default function UserMenu({ user }: Props) {
               </Link>
               <button onClick={() => signOut({ callbackUrl: "/" })}
                 style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", borderRadius: 6, background: "none", border: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>
-                Sair
+                {t("signOut")}
               </button>
             </div>
           </div>

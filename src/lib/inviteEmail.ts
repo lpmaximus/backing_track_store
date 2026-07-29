@@ -57,10 +57,36 @@ Se não fizer sentido pra você, pode ignorar este e-mail — não vou insistir.
 Abraço,
 {{remetente}}`;
 
+/**
+ * Primeiro nome, ou string VAZIA quando não há nome. Vazio de propósito: quem
+ * limpa a frase depois é `tidy()`. Devolver um fallback aqui (era "Olá") gerava
+ * "Olá, Olá!" quando o template já trazia a saudação.
+ */
 export function firstName(name?: string | null): string {
   const n = (name ?? "").trim();
-  if (!n) return "Olá";
+  if (!n) return "";
   return n.split(/\s+/)[0];
+}
+
+/** Saudação pronta: "Olá, João" ou só "Olá". Para uso na UI. */
+export function greeting(name?: string | null): string {
+  const f = firstName(name);
+  return f ? `Olá, ${f}` : "Olá";
+}
+
+/**
+ * Conserta as sobras de pontuação quando {{nome}} vem vazio:
+ *   "Olá, !"                  → "Olá!"
+ *   ", seu acesso de teste…"  → "Seu acesso de teste…"
+ * Sem isto, um convite sem nome preenchido sai com cara de mala direta
+ * quebrada — que é exatamente a impressão que a gente está evitando.
+ */
+function tidy(s: string): string {
+  return s
+    .replace(/,\s*([!?.,])/g, "$1")   // "Olá, !" → "Olá!"
+    .replace(/^\s*,\s*/, "")          // ", seu acesso" → "seu acesso"
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/^(\p{Ll})/u, (c) => c.toUpperCase());
 }
 
 export function formatDate(d: Date): string {
@@ -78,7 +104,7 @@ export type InviteVars = {
 };
 
 export function renderTemplate(tpl: string, v: InviteVars): string {
-  return tpl
+  const raw = tpl
     .replaceAll("{{nome}}", firstName(v.name))
     .replaceAll("{{plano}}", PLAN_LABEL[v.plan])
     .replaceAll("{{dias}}", String(v.days))
@@ -86,6 +112,9 @@ export function renderTemplate(tpl: string, v: InviteVars): string {
     .replaceAll("{{validade}}", formatDate(v.expiresAt))
     .replaceAll("{{email}}", v.email)
     .replaceAll("{{remetente}}", v.sender);
+
+  // tidy por linha: preserva os parágrafos e conserta cada frase isolada.
+  return raw.split("\n").map(tidy).join("\n");
 }
 
 function escapeHtml(s: string): string {

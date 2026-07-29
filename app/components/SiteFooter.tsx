@@ -1,28 +1,33 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { Link } from "@/src/i18n/navigation";
+import type { StaticPathname } from "@/src/i18n/routing";
 import BrandLogo from "./BrandLogo";
+import LanguageSwitcher from "./LanguageSwitcher";
 
-const COLUMNS: { title: string; links: { label: string; href: string; disabled?: boolean }[] }[] = [
+type FooterLink = { key: string; href: StaticPathname; disabled?: boolean };
+
+const COLUMNS: { titleKey: "productTitle" | "aboutTitle"; links: FooterLink[] }[] = [
   {
-    title: "Produto",
+    titleKey: "productTitle",
     links: [
-      { label: "Separar Stems",          href: "/upload" },
-      { label: "Minhas Músicas",         href: "/perfil" },
-      { label: "Músicas Compartilhadas", href: "/compartilhadas" },
-      { label: "Setlists",               href: "/setlists" },
-      { label: "Bandas",                 href: "/bandas" },
+      { key: "separateStems", href: "/upload" },
+      { key: "mySongs", href: "/perfil" },
+      { key: "sharedSongs", href: "/compartilhadas" },
+      { key: "setlists", href: "/setlists" },
+      { key: "bands", href: "/bandas" },
       // Em beta não vendemos planos ainda — link fica desabilitado (sem navegação).
-      { label: "Planos",                 href: "/planos", disabled: true },
-      { label: "Como funciona",          href: "/como-funciona" },
+      { key: "pricing", href: "/planos", disabled: true },
+      { key: "howItWorks", href: "/como-funciona" },
     ],
   },
   {
-    title: "Sobre",
+    titleKey: "aboutTitle",
     links: [
-      { label: "Sobre nós",           href: "/sobre" },
-      { label: "Contato",             href: "/contato" },
-      { label: "Termos de Uso",       href: "/termos" },
-      { label: "Privacidade",         href: "/privacidade" },
-      { label: "Política de Cookies", href: "/cookies" },
+      { key: "about", href: "/sobre" },
+      { key: "contact", href: "/contato" },
+      { key: "terms", href: "/termos" },
+      { key: "privacy", href: "/privacidade" },
+      { key: "cookies", href: "/cookies" },
     ],
   },
 ];
@@ -30,7 +35,6 @@ const COLUMNS: { title: string; links: { label: string; href: string; disabled?:
 const SOCIAL = [
   {
     label: "Instagram",
-    href: "https://instagram.com",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
         <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" />
@@ -41,7 +45,6 @@ const SOCIAL = [
   },
   {
     label: "YouTube",
-    href: "https://youtube.com",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
         <rect x="2.5" y="5.5" width="19" height="13" rx="4" />
@@ -51,7 +54,6 @@ const SOCIAL = [
   },
   {
     label: "Facebook",
-    href: "https://facebook.com",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
         <circle cx="12" cy="12" r="9.5" />
@@ -61,13 +63,9 @@ const SOCIAL = [
   },
 ];
 
-const LANGUAGES = [
-  { code: "pt-BR", label: "Português (BR)" },
-  { code: "en",    label: "English" },
-  { code: "es",    label: "Español" },
-];
+export default async function SiteFooter() {
+  const t = await getTranslations("footer");
 
-export default function SiteFooter() {
   return (
     <footer style={{ borderTop: "1px solid var(--border)", marginTop: 48, background: "var(--surface)" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "44px 24px 28px" }}>
@@ -80,27 +78,16 @@ export default function SiteFooter() {
               <BrandLogo size={30} variant="dark" />
             </div>
             <p style={{ color: "var(--muted)", fontSize: 13.5, fontWeight: 400, lineHeight: 1.7, margin: "0 0 18px", maxWidth: 280 }}>
-              Backing tracks com cifra sincronizada para músicos amadores e profissionais. Toque, ensaie e suba ao palco.
+              {t("tagline")}
             </p>
 
-            {/* Seletor de idioma (placeholder visual — i18n ainda não implementado) */}
-            <label style={{ display: "block", marginBottom: 18 }}>
+            {/* Seletor de idioma — funcional (ADR-BTS-006) */}
+            <div style={{ marginBottom: 18 }}>
               <span style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "var(--muted2)", marginBottom: 6 }}>
-                IDIOMA
+                {t("language")}
               </span>
-              <select
-                defaultValue="pt-BR"
-                aria-label="Selecionar idioma"
-                title="Em breve: troca de idioma"
-                style={{
-                  background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border2)",
-                  borderRadius: 10, padding: "8px 12px", fontSize: 13, cursor: "not-allowed", maxWidth: 200,
-                }}
-                disabled
-              >
-                {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
-              </select>
-            </label>
+              <LanguageSwitcher />
+            </div>
 
             {/* Redes sociais — apenas ícones, sem link (ainda não temos perfis ativos) */}
             <div style={{ display: "flex", gap: 10 }}>
@@ -117,22 +104,22 @@ export default function SiteFooter() {
           </div>
 
           {/* Colunas de links */}
-          {COLUMNS.map(({ title, links }) => (
-            <div key={title}>
+          {COLUMNS.map(({ titleKey, links }) => (
+            <div key={titleKey}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "var(--muted2)", marginBottom: 14 }}>
-                {title.toUpperCase()}
+                {t(titleKey).toUpperCase()}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {links.map(({ label, href, disabled }) => (
-                  disabled ? (
-                    <span key={label} className="footer-link" title="Em breve"
-                      style={{ cursor: "default", opacity: 0.6 }}>
+                {links.map(({ key, href, disabled }) => {
+                  const label = t(`links.${key}`);
+                  return disabled ? (
+                    <span key={key} className="footer-link" style={{ cursor: "default", opacity: 0.6 }}>
                       {label}
                     </span>
                   ) : (
-                    <Link key={label} href={href} className="footer-link">{label}</Link>
-                  )
-                ))}
+                    <Link key={key} href={href} className="footer-link">{label}</Link>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -144,7 +131,11 @@ export default function SiteFooter() {
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           <p style={{ color: "var(--muted)", fontSize: 13, margin: 0, textAlign: "center" }}>
-            © 2026 <span style={{ color: "var(--text)", fontWeight: 600 }}>BackingTrack.store</span> — Conectando músicos através da música
+            {t.rich("copyright", {
+              // string, não number: senão o Intl formata como "2.026"
+              year: String(new Date().getFullYear()),
+              b: (chunks) => <span style={{ color: "var(--text)", fontWeight: 600 }}>{chunks}</span>,
+            })}
           </p>
         </div>
       </div>
