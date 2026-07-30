@@ -41,6 +41,8 @@ export async function GET(req: NextRequest) {
         blockReason: users.blockReason,
         deletionScheduledAt: users.deletionScheduledAt,
         createdAt: users.createdAt,
+        // Cota do pacote de teste, quando o convite definiu um número próprio.
+        trialSeparations: users.trialSeparations,
       })
       .from(users)
       .orderBy(desc(users.createdAt));
@@ -73,7 +75,9 @@ export async function GET(req: NextRequest) {
     const list = rows.map((u) => ({
       ...u,
       usedThisMonth: usageMap.get(u.id) ?? 0,
-      monthlyLimit: monthlyLimitForRole(u.role),
+      // Trial com cota própria: o limite exibido é o pacote do convite (total
+      // do período), não o do plano — senão o painel mente sobre o teto real.
+      monthlyLimit: u.trialSeparations ?? monthlyLimitForRole(u.role),
       subscriptionStatus: subMap.get(u.id) ?? null,
       activeBands: bandCount.get(u.id) ?? 0,
     }));

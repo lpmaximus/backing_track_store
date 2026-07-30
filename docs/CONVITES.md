@@ -1,7 +1,8 @@
 # Convites de teste — aba `/admin/convites`
 
-Libera **Pro (individual)** ou **Pro Band (banda)** por um período (padrão 20 dias),
-por e-mail, a partir de `contato@l2techs.com`, com acompanhamento do funil.
+Libera **Pro (individual)** ou **Pro Band (banda)** por um período (padrão 20 dias)
+e com uma cota própria de separações, por e-mail, a partir de
+`contato@l2techs.com`, com acompanhamento do funil.
 
 ---
 
@@ -17,12 +18,14 @@ npm install          # instala nodemailer + @types/nodemailer (já em package.js
 
 ```bash
 npm run db:push
-# ou, direto no SQL Editor do Neon (idempotente):
+# ou, direto no SQL Editor do Neon (idempotente, nesta ordem):
 #   drizzle/0009_invites.sql
+#   drizzle/0010_invite_separations.sql
 ```
 
 Cria `invites`, `invite_templates` e as colunas de trial em `users`
-(`trial_plan`, `trial_started_at`, `trial_ends_at`, `trial_previous_role`, `trial_source`).
+(`trial_plan`, `trial_started_at`, `trial_ends_at`, `trial_previous_role`,
+`trial_source`, `trial_separations`).
 
 ### 1.3 Variáveis de ambiente (Vercel → Settings → Environment Variables)
 
@@ -170,6 +173,29 @@ O preço é precisar rebaixar de volta — feito em dois lugares redundantes:
 Assinante pagante nunca é tocado: `startTrial` devolve `null` e não altera nada
 se a pessoa já é `pro`/`proband`/`admin` sem `trial_plan`.
 
+### 5.1 Cota de separações do convite
+
+O campo **Separações liberadas** define quantas separações o convite dá no
+**total do período de teste** — não por mês. Deixar em branco = limite normal do
+plano (Pro 20 / Pro Band 40 por ciclo).
+
+Como funciona:
+
+* o número escolhido vai para `invites.trial_separations` e é copiado para
+  `users.trial_separations` no aceite;
+* enquanto `users.trial_separations` não é nulo **e** o trial está de pé,
+  `quota.ts` troca a janela de contagem: em vez do ciclo mensal, conta tudo
+  desde `trial_started_at` e usa esse número como teto. Sem reset no meio;
+* no rebaixamento (`downgrade`) a coluna é zerada, então o ex-convidado volta
+  ao limite normal do plano;
+* um trial novo reinicia `trial_started_at`; estender um trial em curso
+  preserva a data original (senão o consumo antigo comeria a cota nova);
+* teto de segurança contra erro de digitação: `MAX_TRIAL_SEPARATIONS = 500`.
+
+Na tela de envio a pessoa vê "Separações do seu teste · restam N até o fim do
+período de teste" em vez do texto mensal — a API `/api/upload/quota` devolve
+`trialPack: true` para isso.
+
 ---
 
 ## 6. Arquivos
@@ -187,5 +213,7 @@ app/api/jobs/trials/route.ts         cron de expiração
 app/admin/convites/page.tsx          a aba
 app/convite/[token]/page.tsx         landing do convite
 app/convite/[token]/sair/page.tsx    descadastro em 1 clique
+src/lib/quota.ts                     janela + limite (inclui o pacote do trial)
 drizzle/0009_invites.sql             migração
+drizzle/0010_invite_separations.sql  migração da cota de separações
 ```

@@ -33,6 +33,7 @@ export const PLACEHOLDERS = [
   { key: "{{nome}}", desc: "primeiro nome do convidado (ou 'Olá' se vazio)" },
   { key: "{{plano}}", desc: "Pro (individual) ou Pro Band (banda)" },
   { key: "{{dias}}", desc: "duração do teste em dias" },
+  { key: "{{separacoes}}", desc: "quantas separações o teste libera no total" },
   { key: "{{link}}", desc: "link único do convite" },
   { key: "{{validade}}", desc: "data limite para aceitar o convite" },
   { key: "{{email}}", desc: "e-mail do convidado" },
@@ -48,7 +49,7 @@ Aqui é o {{remetente}}, da L2techs. Estamos abrindo o Backing Track Store para 
 
 O que é: uma plataforma para ensaiar e tocar com backing tracks de verdade. Você separa a música em faixas (bateria, baixo, guitarra, teclado, voz), tira o instrumento que você toca, ajusta o volume de cada faixa, vê a cifra sincronizada com o áudio e ainda monta o repertório da banda.
 
-O que estou te oferecendo: acesso {{plano}} liberado por {{dias}} dias, sem cobrança e sem cadastrar cartão. No fim do período a conta volta sozinha para o plano gratuito — nada é cobrado, nada renova automaticamente.
+O que estou te oferecendo: acesso {{plano}} liberado por {{dias}} dias, com {{separacoes}} separações de música incluídas, sem cobrança e sem cadastrar cartão. No fim do período a conta volta sozinha para o plano gratuito — nada é cobrado, nada renova automaticamente.
 
 Para ativar, é só abrir o link abaixo e entrar com seu e-mail ou com sua conta Google. O convite vale até {{validade}}.
 
@@ -98,6 +99,8 @@ export type InviteVars = {
   email: string;
   plan: InvitePlan;
   days: number;
+  /** Cota de separações do teste (total do período). */
+  separations: number;
   link: string;
   expiresAt: Date;
   sender: string;
@@ -108,6 +111,7 @@ export function renderTemplate(tpl: string, v: InviteVars): string {
     .replaceAll("{{nome}}", firstName(v.name))
     .replaceAll("{{plano}}", PLAN_LABEL[v.plan])
     .replaceAll("{{dias}}", String(v.days))
+    .replaceAll("{{separacoes}}", String(v.separations))
     .replaceAll("{{link}}", v.link)
     .replaceAll("{{validade}}", formatDate(v.expiresAt))
     .replaceAll("{{email}}", v.email)

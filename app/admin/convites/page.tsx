@@ -22,6 +22,7 @@ type Invite = {
   name: string | null;
   plan: string;
   trialDays: number;
+  trialSeparations: number | null;
   status: string;
   error: string | null;
   token: string;
@@ -50,6 +51,13 @@ const STATUS: Record<string, { label: string; color: string }> = {
   expired:  { label: "Expirado",   color: "#64748b" },
   revoked:  { label: "Cancelado",  color: "#64748b" },
 };
+
+/**
+ * Limite padrão por plano — espelho de src/lib/quota.ts. Duplicado de propósito:
+ * quota.ts toca o banco e não pode ser importado em "use client". Serve só para
+ * exibir o número no formulário; a verdade continua no servidor.
+ */
+const PLAN_DEFAULT: Record<"pro" | "proband", number> = { pro: 20, proband: 40 };
 
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
@@ -141,6 +149,8 @@ function ConvitesContent() {
   const [emails, setEmails] = useState("");
   const [plan, setPlan] = useState<"pro" | "proband">("pro");
   const [days, setDays] = useState(20);
+  // "" = usa o limite normal do plano (Pro 20 / Band 40).
+  const [separations, setSeparations] = useState<string>("");
   const [sender, setSender] = useState("Luiz Paulo");
   const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState("");
@@ -187,7 +197,10 @@ function ConvitesContent() {
       const res = await fetch("/api/admin/invites", {
         method: "POST",
         headers: adminHeaders(),
-        body: JSON.stringify({ recipients, plan, days, subject, body, sender }),
+        body: JSON.stringify({
+          recipients, plan, days, subject, body, sender,
+          separations: separations.trim() === "" ? null : Number(separations),
+        }),
       });
       const d = await res.json();
       if (!res.ok) { setMsg(`❌ ${d.error}`); return; }
@@ -225,6 +238,7 @@ function ConvitesContent() {
   }
 
   const count = parseRecipients().length;
+  const planDefault = PLAN_DEFAULT[plan];
 
   return (
     <div>
@@ -280,10 +294,22 @@ function ConvitesContent() {
             <input type="number" min={1} max={90} value={days} onChange={(e) => setDays(Number(e.target.value))} style={input} />
           </div>
           <div>
+            <label style={label}>Separações liberadas</label>
+            <input type="number" min={1} max={500} value={separations}
+              onChange={(e) => setSeparations(e.target.value)}
+              placeholder={`padrão do plano (${planDefault})`} style={input} />
+          </div>
+          <div>
             <label style={label}>Assinado por</label>
             <input value={sender} onChange={(e) => setSender(e.target.value)} style={input} />
           </div>
         </div>
+
+        <p style={{ color: "var(--muted2)", fontSize: 12, lineHeight: 1.6, margin: "-4px 0 16px" }}>
+          As separações são o <strong>total do período de teste</strong>, não por mês: {separations.trim() === "" ? planDefault : separations} separação(ões)
+          para usar ao longo dos {days} dias, sem reset. Em branco = limite normal do plano
+          (Pro {PLAN_DEFAULT.pro} / Pro Band {PLAN_DEFAULT.proband}).
+        </p>
 
         <button onClick={send} disabled={sending || count === 0}
           style={{ background: "#f59e0b", color: "#000", border: "none", padding: "11px 24px", borderRadius: 8, fontWeight: 800, fontSize: 14, cursor: sending || count === 0 ? "not-allowed" : "pointer", opacity: sending || count === 0 ? 0.5 : 1 }}>
@@ -313,6 +339,7 @@ function ConvitesContent() {
             </div>
             <p style={{ color: "var(--muted2)", fontSize: 12, lineHeight: 1.7, margin: "0 0 14px" }}>
               Variáveis: <code>{"{{nome}}"}</code> <code>{"{{plano}}"}</code> <code>{"{{dias}}"}</code>{" "}
+              <code>{"{{separacoes}}"}</code>{" "}
               <code>{"{{link}}"}</code> <code>{"{{validade}}"}</code> <code>{"{{email}}"}</code>{" "}
               <code>{"{{remetente}}"}</code>.<br />
               O bloco de segurança, o botão, a URL por extenso e o rodapé com descadastro são adicionados
@@ -361,7 +388,10 @@ function ConvitesContent() {
                         {it.error && <div style={{ color: "#ef4444", fontSize: 11, marginTop: 2 }}>{it.error}</div>}
                       </td>
                       <td style={{ padding: "10px", color: "var(--muted)" }}>
-                        {it.plan === "proband" ? "Band" : "Pro"} · {it.trialDays}d
+                        {it.plan === "proband" ? "Band" : "Pro"} · {it.trialDays}d ·{" "}
+                        <span title={it.trialSeparations == null ? "limite padrão do plano" : "cota total do teste"}>
+                          {it.trialSeparations ?? PLAN_DEFAULT[it.plan === "proband" ? "proband" : "pro"]} sep
+                        </span>
                       </td>
                       <td style={{ padding: "10px" }}>
                         <span style={{ background: `${st.color}22`, color: st.color, borderRadius: 999, padding: "3px 10px", fontSize: 11, fontWeight: 800 }}>

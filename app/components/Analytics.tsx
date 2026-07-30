@@ -8,6 +8,11 @@
  *
  *  1. Área /admin nunca é medida (nem o script carrega, se a entrada foi direta).
  *  2. Usuário com role "admin" nunca é medido, em página nenhuma.
+ *  3. Só mede em produção de verdade — nem `npm run dev`, nem deploy de preview.
+ *     Sem esta trava, testar o site no localhost deslogado (ou em janela anônima,
+ *     onde não há role de admin) polui o painel com o próprio desenvolvimento:
+ *     foi o que aconteceu em 28/07/2026, com /en/bands e /en/setlists aparecendo
+ *     entre as páginas mais vistas logo depois de um dia de testes.
  *
  * Para o caso de o script já ter carregado antes (navegou de / para /admin na
  * mesma sessão), usamos a flag oficial de opt-out `ga-disable-<ID>`, que
@@ -23,13 +28,23 @@ import { useEffect } from "react";
 
 const GA_ID = "G-K9WC5H9H38";
 
+/**
+ * Mede apenas no ambiente de produção. NEXT_PUBLIC_VERCEL_ENV vale "production",
+ * "preview" ou "development" na Vercel; no localhost ela não existe, e o
+ * NODE_ENV resolve o caso. As duas condições juntas cobrem dev local, preview
+ * de branch e produção.
+ */
+const IS_LIVE =
+  process.env.NODE_ENV === "production" &&
+  (process.env.NEXT_PUBLIC_VERCEL_ENV ?? "production") === "production";
+
 export default function Analytics() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
 
   const isAdminArea = pathname?.startsWith("/admin") ?? false;
   const isAdminUser = session?.user?.role === "admin";
-  const excluded = isAdminArea || isAdminUser;
+  const excluded = !IS_LIVE || isAdminArea || isAdminUser;
 
   useEffect(() => {
     if (typeof window === "undefined") return;

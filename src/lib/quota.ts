@@ -5,6 +5,10 @@
  * transparência de 18/07/2026): Free 3, Pro 20, ProBand 40 por ciclo.
  *
  * Janela de contagem:
+ *  - Trial por convite com cota própria (users.trialSeparations != null):
+ *    a janela é o TRIAL INTEIRO (desde trialStartedAt) e o limite é o valor
+ *    do convite. É um pacote fechado de créditos: não reseta no aniversário
+ *    da conta enquanto o trial durar. Ver src/lib/trials.ts.
  *  - Pro/ProBand (assinatura ativa): o ciclo da assinatura
  *    (subscriptions.currentPeriodStart).
  *  - Free/FreeBand (sem assinatura): aniversário mensal da conta
@@ -64,10 +68,49 @@ export function monthlyAnniversaryStart(createdAt: Date, now: Date = new Date())
 }
 
 /**
- * Início da janela de cota do usuário: ciclo da assinatura ativa, ou o
- * aniversário mensal da conta como fallback (free/freeband/sem ciclo).
+ * Janela + limite de cota do usuário, em ordem de precedência:
+ *   1. trial com cota própria → desde trialStartedAt, limite do convite
+ *   2. assinatura ativa       → ciclo da assinatura
+ *   3. resto                  → aniversário mensal da conta
+ *
+ * `trialPack` avisa quem chama que o número não reseta no mês (a UI diz
+ * "restantes no teste" em vez de "neste mês").
  */
-async function quotaWindowStart(userId: number): Promise<Date> {
+async function quotaWindow(
+  userId: number,
+  role?: string,
+): Promise<{ windowStart: Date; limit: number; trialPack: boolean }> {
+  const [u] = await db
+    .select({
+      createdAt: users.createdAt,
+      trialPlan: users.trialPlan,
+      trialStartedAt: users.trialStartedAt,
+      trialEndsAt: users.trialEndsAt,
+      trialSeparations: users.trialSeparations,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  // 1. Pacote fechado do trial. Vale só enquanto o trial está de pé: se já
+  //    venceu, cai no fluxo normal (o cron/expireTrialIfDue limpa o resto).
+  const trialLive =
+    u?.trialPlan &&
+    u.trialSeparations != null &&
+    u.trialSeparations > 0 &&
+    (!u.trialEndsAt || u.trialEndsAt.getTime() > Date.now());
+
+  if (trialLive && role !== "admin") {
+    return {
+      windowStart: u!.trialStartedAt ?? u!.createdAt ?? new Date(0),
+      limit: u!.trialSeparations!,
+      trialPack: true,
+    };
+  }
+
+  const limit = monthlyLimitForRole(role);
+
+  // 2. Ciclo da assinatura paga.
   const [sub] = await db
     .select({
       status: subscriptions.status,
@@ -79,22 +122,17 @@ async function quotaWindowStart(userId: number): Promise<Date> {
     .limit(1);
 
   if (sub && ACTIVE_SUB_STATUSES.has(sub.status) && sub.currentPeriodStart) {
-    return sub.currentPeriodStart;
+    return { windowStart: sub.currentPeriodStart, limit, trialPack: false };
   }
 
-  const [u] = await db
-    .select({ createdAt: users.createdAt })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-
+  // 3. Aniversário mensal da conta.
   const created = u?.createdAt ?? new Date();
-  return monthlyAnniversaryStart(created);
+  return { windowStart: monthlyAnniversaryStart(created), limit, trialPack: false };
 }
 
 /** Quantas separações o usuário já disparou na janela atual (exclui failed). */
 export async function uploadsThisMonth(userId: number): Promise<number> {
-  const windowStart = await quotaWindowStart(userId);
+  const { windowStart } = await quotaWindow(userId);
   return uploadsSince(userId, windowStart);
 }
 
@@ -114,10 +152,12 @@ async function uploadsSince(userId: number, windowStart: Date): Promise<number> 
   return row?.n ?? 0;
 }
 
-/** Retorna { allowed, used, limit } para o usuário. */
+/**
+ * Retorna { allowed, used, limit, trialPack } para o usuário.
+ * `trialPack: true` = o limite é o pacote total do teste, sem reset mensal.
+ */
 export async function checkUploadQuota(userId: number, role?: string) {
-  const limit = monthlyLimitForRole(role);
-  const windowStart = await quotaWindowStart(userId);
+  const { windowStart, limit, trialPack } = await quotaWindow(userId, role);
   const used = await uploadsSince(userId, windowStart);
-  return { allowed: used < limit, used, limit };
+  return { allowed: used < limit, used, limit, trialPack };
 }

@@ -30,6 +30,11 @@ export async function startTrial(input: {
   userId: number;
   plan: TrialPlan;
   days: number;
+  /**
+   * Cota de separações do TOTAL do período (não por mês). null/undefined =
+   * usa o limite normal do plano. Ver quota.ts → quotaWindow().
+   */
+  separations?: number | null;
   source?: string;
 }): Promise<{ trialEndsAt: Date } | null> {
   const [user] = await db.select().from(users).where(eq(users.id, input.userId)).limit(1);
@@ -48,12 +53,18 @@ export async function startTrial(input: {
     .set({
       role: input.plan,
       trialPlan: input.plan,
-      trialStartedAt: user.trialStartedAt ?? now,
+      // Trial NOVO reinicia a data; extensão de um trial em curso preserva a
+      // original. Importa porque quota.ts conta o pacote de separações a partir
+      // daqui: manter a data de um trial antigo faria o consumo passado
+      // "comer" a cota do convite novo.
+      trialStartedAt: user.trialPlan ? (user.trialStartedAt ?? now) : now,
       trialEndsAt,
       // Só grava o role de origem na primeira vez, para não "salvar" o role
       // do próprio trial como destino do rebaixamento.
       trialPreviousRole: user.trialPreviousRole ?? (user.trialPlan ? "free" : user.role),
       trialSource: input.source ?? "invite",
+      trialSeparations:
+        input.separations != null && input.separations > 0 ? input.separations : null,
       updatedAt: now,
     })
     .where(eq(users.id, input.userId));
@@ -78,6 +89,9 @@ async function downgrade(userId: number, toRole: string) {
       trialPlan: null,
       trialEndsAt: null,
       trialPreviousRole: null,
+      // Zera a cota do pacote: sem isso o ex-trial levaria o limite do convite
+      // para a vida de free/assinante.
+      trialSeparations: null,
       updatedAt: new Date(),
     })
     .where(eq(users.id, userId));

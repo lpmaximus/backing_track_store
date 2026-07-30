@@ -13,7 +13,7 @@ import { getTranslations } from "next-intl/server";
 import { Link, getPathname } from "@/src/i18n/navigation";
 import type { Locale } from "@/src/i18n/routing";
 import { auth } from "@/auth";
-import { loadInvite, markClicked } from "@/src/lib/invites";
+import { loadInvite, markClicked, resolveSeparations } from "@/src/lib/invites";
 import { PLAN_LABEL, firstName, formatDate, type InvitePlan } from "@/src/lib/inviteEmail";
 
 import AceitarConvite from "./AceitarConvite";
@@ -85,6 +85,7 @@ export default async function ConvitePage({
           accent: (c) => <strong style={{ color: "var(--accent)" }}>{c}</strong>,
           b: (c) => <strong style={{ color: "var(--text)" }}>{c}</strong>,
           days: invite.trialDays,
+          separations: resolveSeparations(invite.plan as InvitePlan, invite.trialSeparations),
           planName: planLabel,
         })}
       </p>

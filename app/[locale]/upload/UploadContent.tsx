@@ -52,8 +52,9 @@ export default function UploadContent() {
   const [fileName, setFileName] = useState("");
   const [elapsed, setElapsed] = useState(0);
 
-  // Quota mensal de separações (quantas usadas / quantas restam no pacote).
-  const [quota, setQuota] = useState<{ used: number; limit: number; remaining: number; unlimited: boolean } | null>(null);
+  // Quota de separações (quantas usadas / quantas restam no pacote).
+  // trialPack = o limite é o total de um teste por convite, sem reset mensal.
+  const [quota, setQuota] = useState<{ used: number; limit: number; remaining: number; unlimited: boolean; trialPack?: boolean } | null>(null);
 
   async function loadQuota() {
     try {
@@ -203,12 +204,14 @@ export default function UploadContent() {
             }}>
               <div style={{ minWidth: 0 }}>
                 <p style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", margin: "0 0 2px" }}>
-                  {t("quotaTitle")}
+                  {quota.trialPack ? t("quotaTitleTrial") : t("quotaTitle")}
                 </p>
                 <p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>
                   {quota.unlimited
                     ? t("quotaUnlimited", { used: quota.used })
-                    : t("quotaUsed", { used: quota.used, limit: quota.limit ?? 0, remaining: quota.remaining })}
+                    : quota.trialPack
+                      ? t("quotaUsedTrial", { used: quota.used, limit: quota.limit ?? 0, remaining: quota.remaining })
+                      : t("quotaUsed", { used: quota.used, limit: quota.limit ?? 0, remaining: quota.remaining })}
                 </p>
               </div>
               {!quota.unlimited && (

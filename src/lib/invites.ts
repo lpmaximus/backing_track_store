@@ -28,10 +28,22 @@ import {
 } from "@/src/lib/inviteEmail";
 import { startTrial } from "@/src/lib/trials";
 import { createNotification } from "@/src/lib/notifications";
+import { monthlyLimitForRole } from "@/src/lib/quota";
 
 export const DEFAULT_TRIAL_DAYS = 20;
 /** Quantos dias o LINK do convite continua válido (diferente do trial). */
 export const INVITE_VALID_DAYS = 30;
+/** Teto anti-erro de digitação no campo de separações do admin. */
+export const MAX_TRIAL_SEPARATIONS = 500;
+
+/**
+ * Quantas separações o convite libera de fato: o valor escolhido no admin ou,
+ * se em branco, o limite normal do plano (Pro 20 / Pro Band 40).
+ */
+export function resolveSeparations(plan: InvitePlan, chosen?: number | null): number {
+  if (chosen != null && chosen > 0) return Math.min(Math.floor(chosen), MAX_TRIAL_SEPARATIONS);
+  return monthlyLimitForRole(plan);
+}
 
 export function newToken(): string {
   return randomBytes(24).toString("hex"); // 48 chars
@@ -85,6 +97,8 @@ export type CreateInviteInput = {
   name?: string | null;
   plan: InvitePlan;
   days?: number;
+  /** Cota total de separações do teste. Em branco = limite normal do plano. */
+  separations?: number | null;
   subject?: string;
   body?: string;
   sender?: string;
@@ -98,6 +112,12 @@ export type CreateInviteInput = {
 export async function createAndSendInvite(input: CreateInviteInput) {
   const email = input.email.trim().toLowerCase();
   const days = input.days && input.days > 0 ? Math.min(input.days, 90) : DEFAULT_TRIAL_DAYS;
+  // null quando o admin deixou em branco: aí o convite herda o limite do plano
+  // e, se amanhã esse limite mudar, o convite antigo acompanha.
+  const separations =
+    input.separations != null && input.separations > 0
+      ? Math.min(Math.floor(input.separations), MAX_TRIAL_SEPARATIONS)
+      : null;
   const sender = input.sender?.trim() || process.env.INVITE_SENDER_NAME || "Luiz Paulo";
 
   const tpl = await getDefaultTemplate();
@@ -112,6 +132,7 @@ export async function createAndSendInvite(input: CreateInviteInput) {
     email,
     plan: input.plan,
     days,
+    separations: resolveSeparations(input.plan, separations),
     link: inviteUrl(token),
     expiresAt,
     sender,
@@ -127,6 +148,7 @@ export async function createAndSendInvite(input: CreateInviteInput) {
       name: input.name?.trim() || null,
       plan: input.plan,
       trialDays: days,
+      trialSeparations: separations,
       token,
       status: "pending",
       subject,
@@ -183,6 +205,7 @@ export async function resendInvite(id: number) {
     email: invite.email,
     plan: invite.plan as InvitePlan,
     days: invite.trialDays,
+    separations: resolveSeparations(invite.plan as InvitePlan, invite.trialSeparations),
     link: inviteUrl(invite.token),
     expiresAt,
     sender: process.env.INVITE_SENDER_NAME || "Luiz Paulo",
@@ -279,6 +302,7 @@ export async function acceptInvite(token: string, userId: number) {
     userId,
     plan: invite.plan as InvitePlan,
     days: invite.trialDays,
+    separations: invite.trialSeparations,
     source: "invite",
   });
 
@@ -298,7 +322,7 @@ export async function acceptInvite(token: string, userId: number) {
       userId,
       type: "system",
       title: `Seu teste ${invite.plan === "proband" ? "Pro Band" : "Pro"} está ativo`,
-      body: `Você tem ${invite.trialDays} dias de acesso completo. No fim do período a conta volta sozinha para o gratuito — nada é cobrado e nada renova automaticamente.`,
+      body: `Você tem ${invite.trialDays} dias de acesso completo, com ${resolveSeparations(invite.plan as InvitePlan, invite.trialSeparations)} separações de música incluídas. No fim do período a conta volta sozinha para o gratuito — nada é cobrado e nada renova automaticamente.`,
       link: "/conta",
     });
   }
@@ -340,6 +364,7 @@ export async function listInvites(limit = 200) {
       name: invites.name,
       plan: invites.plan,
       trialDays: invites.trialDays,
+      trialSeparations: invites.trialSeparations,
       status: invites.status,
       subject: invites.subject,
       error: invites.error,

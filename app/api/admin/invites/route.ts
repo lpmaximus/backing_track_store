@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
       name?: string;
       plan?: string;
       days?: number;
+      separations?: number | null;
       subject?: string;
       body?: string;
       sender?: string;
@@ -92,6 +93,7 @@ export async function POST(req: NextRequest) {
         name: r.name || null,
         plan,
         days: data.days,
+        separations: data.separations,
         subject: data.subject,
         body: data.body,
         sender: data.sender,

@@ -104,6 +104,10 @@ export const users = pgTable("users", {
   trialEndsAt: timestamp("trial_ends_at"),
   trialPreviousRole: varchar("trial_previous_role", { length: 20 }), // role para voltar no fim
   trialSource: varchar("trial_source", { length: 30 }),      // invite | manual
+  // Cota de separações do trial: TOTAL do período, não por mês. null = usa o
+  // limite normal do plano (quota.ts). A contagem corre desde trialStartedAt e
+  // não reseta enquanto o trial durar — é um "pacote" fechado de créditos.
+  trialSeparations: integer("trial_separations"),
   // ─── Analytics de produto ───────────────────────────────────────────────
   // Última vez que o usuário deu qualquer sinal de vida (qualquer evento em
   // user_activity atualiza aqui). Serve para separar ativo × dormente sem
@@ -470,6 +474,9 @@ export const invites = pgTable("invites", {
   name: varchar("name", { length: 255 }),
   plan: varchar("plan", { length: 20 }).notNull().default("pro"), // pro | proband
   trialDays: integer("trial_days").notNull().default(20),
+  // Quantas separações o convite libera no TOTAL do período de teste.
+  // null = usa o limite padrão do plano (Pro 20 / Pro Band 40 por ciclo).
+  trialSeparations: integer("trial_separations"),
   // Token de 48 hex chars — entra na URL /convite/<token>.
   token: varchar("token", { length: 96 }).notNull().unique(),
   // pending | sent | failed | clicked | accepted | expired | revoked
