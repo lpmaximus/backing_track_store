@@ -85,7 +85,7 @@ export default auth((req: NextRequest & { auth: Session | null }) => {
     "/account",
     "/upload",
   ];
-  const isProtected = protectedPaths.some((p) => bare.startsWith(p));
+  const isProtected = protectedPaths.some((p) => bare === p || bare.startsWith(`${p}/`));
 
   if (isProtected && !req.auth) {
     const loginUrl = new URL(getPathname({ href: "/entrar", locale }), req.url);

@@ -3,6 +3,7 @@
 import type * as React from "react";
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import { useTranslations } from "next-intl";
+import DownloadPanel from "./DownloadPanel";
 
 export type Stem = {
   id: number;
@@ -39,6 +40,9 @@ type Props = {
   // Analytics de produto: avisa o SongPlayer que o usuário mexeu na mesa
   // (mute, solo ou volume de faixa). Só sinaliza — quem grava é o SongPlayer.
   onMixerTouch?: () => void;
+  // Analytics de produto: o usuário baixou áudio (mixagem ou faixas separadas).
+  // Alimenta o evento "export" do log de atividade.
+  onExport?: (kind: "mix" | "stems", count: number) => void;
 };
 
 // ─── Aparência por instrumento ────────────────────────────────────────────────
@@ -162,7 +166,7 @@ type Engine = {
 
 export default function WavePlayer({
   audioUrl, stems, isPro = false, soloInstrument = null, songTitle, songArtist, onTimeUpdate, onDurationReady, speed = 1, pitch = 0,
-  loopStart = null, loopEnd = null, initialMix = null, onMixerTouch,
+  loopStart = null, loopEnd = null, initialMix = null, onMixerTouch, onExport,
 }: Props) {
   // `tx` e não `t`: dentro do mixer `t` já é a faixa sendo mapeada.
   const tx = useTranslations("song");
@@ -537,6 +541,25 @@ export default function WavePlayer({
   const pct = duration > 0 ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
   const anySolo = Object.values(soloed).some(Boolean);
 
+  // ── Download (Pro) ────────────────────────────────────────────────────────
+  // O painel reaproveita os buffers que o motor já decodificou pra tocar: nada
+  // é baixado de novo pra gerar a mixagem. Ver DownloadPanel/exportAudio.
+  const getBuffer = useCallback((key: string): AudioBuffer | null => {
+    const e = engineRef.current;
+    if (!e) return null;
+    return (e.players[key]?.buffer.get() as AudioBuffer | undefined) ?? null;
+  }, []);
+
+  // Espelha a regra de audibilidade da mesa (mesma linha da UI das faixas):
+  // com algum solo ligado vale o solo; sem solo, vale o mudo. Canal travado
+  // toca sempre — mas quem não é Pro nem vê o painel, então não muda nada aqui.
+  const audible = useMemo(() => {
+    const solos = Object.values(soloed).some(Boolean);
+    return Object.fromEntries(
+      tracks.map((t) => [t.key, solos ? !!soloed[t.key] : !muted[t.key]]),
+    );
+  }, [tracks, soloed, muted]);
+
   // Pula `delta` segundos a partir da posição atual (avançar/voltar).
   const skip = (delta: number) => seek(posNow() + delta);
 
@@ -717,6 +740,19 @@ export default function WavePlayer({
                   o percurso vai de 284px até (100% - 16px de pad direito). */}
               <div style={{ position: "absolute", top: 0, bottom: 0, left: `calc(284px + (100% - 300px) * ${pct} / 100)`, width: 2, background: "var(--accent)", pointerEvents: "none", opacity: ready ? 1 : 0 }} />
             </div>
+
+            {/* Download da seleção (Pro/ProBand) — mixagem e/ou faixas separadas */}
+            <DownloadPanel
+              tracks={tracks}
+              audible={audible}
+              trackVol={trackVol}
+              getBuffer={getBuffer}
+              songTitle={songTitle}
+              songArtist={songArtist}
+              isPro={isPro}
+              ready={ready}
+              onExport={onExport}
+            />
           </>
         ) : (
           /* ─── Modo single (mix) ─── */

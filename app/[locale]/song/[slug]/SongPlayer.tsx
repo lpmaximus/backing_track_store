@@ -410,6 +410,9 @@ export default function SongPlayer({
           songArtist={song.artist}
           onTimeUpdate={handleTimeUpdate}
           onMixerTouch={() => track("mixer", { songId: song.id })}
+          // `once: false`: cada download é um evento — diferente do play/mixer,
+          // baixar de novo (outra combinação de faixas) é uso novo, não ruído.
+          onExport={(kind, count) => track("export", { songId: song.id, meta: { kind, count }, once: false })}
           speed={speed}
           pitch={pitch}
           loopStart={loopStart}
