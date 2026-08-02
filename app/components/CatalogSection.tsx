@@ -4,23 +4,38 @@ import Image from "next/image";
 import type { songs as songsTable } from "@/src/db";
 import AdBanner from "./AdBanner";
 
-export const GENRES = [
-  "Todos","Rock","Pop","MPB","Bossa Nova","Samba",
-  "Jazz","Funk","Forró","Gospel","Reggae","Blues",
-];
-
+// Emoji por gênero — cobre os valores de `Família` usados na carga em lote
+// (ver 3-SUNO/Levantamento-BackingTracks-Suno.xlsx) e os nomes legados do
+// formulário do admin, que podem divergir (ex.: "Funk" vs "Funk/Soul").
+// Um gênero sem entrada aqui não quebra nada — cai no fallback "🎵" do card.
 export const GENRE_EMOJI: Record<string, string> = {
-  Rock: "🎸", Pop: "🎤", MPB: "🇧🇷", "Bossa Nova": "🎷",
-  Samba: "🥁", Jazz: "🎺", Funk: "🕺", Forró: "🪗",
-  Gospel: "✝️", Reggae: "🌿", Blues: "😢",
+  Rock: "🎸", Pop: "🎤", MPB: "🇧🇷", Jazz: "🎺", Forró: "🪗", Blues: "😢",
+  "Funk/Soul": "🕺", Funk: "🕺",
+  "Gospel/Louvor": "✝️", Gospel: "✝️",
+  "Pagode/Samba": "🥁", Samba: "🥁", "Bossa Nova": "🎷",
+  Sertanejo: "🤠", Country: "🤠",
+  Regional: "🎶", "World Groove": "🌍",
+  Fusion: "🎷", Metal: "🤘", Disco: "🪩", "Lo-fi/Chill": "☕",
+  Balada: "💫", Latin: "💃", Reggae: "🌿",
 };
 
 type SongRow = typeof songsTable.$inferSelect;
 
 /** Catálogo completo — busca + filtro de gênero + grid de músicas.
- *  Vive na rota /catalogo (BUY-002: retirado da landing page). */
-export default async function CatalogSection({ songs, q, genre }: { songs: SongRow[]; q: string; genre: string }) {
+ *  Vive na rota /catalogo (BUY-002: retirado da landing page).
+ *
+ *  As pills de gênero refletem `availableGenres` (gêneros com pelo menos
+ *  uma música publicada, calculado pelo caller via SELECT DISTINCT) — nunca
+ *  uma lista fixa. Um gênero sem música publicada simplesmente não aparece;
+ *  quando a primeira música daquele gênero é publicada, a pill surge sozinha. */
+export default async function CatalogSection({
+  songs, q, genre, availableGenres,
+}: { songs: SongRow[]; q: string; genre: string; availableGenres: string[] }) {
   const t = await getTranslations("catalog");
+
+  // "Todos" sempre aparece primeiro; os demais, na ordem em que vieram do
+  // banco (já ordenados alfabeticamente pelo caller).
+  const pills = ["Todos", ...availableGenres];
 
   // O valor do gênero é dado (vai na URL e no banco) — só o rótulo de "Todos"
   // muda de idioma. Os demais são nomes próprios e ficam como estão.
@@ -46,9 +61,9 @@ export default async function CatalogSection({ songs, q, genre }: { songs: SongR
         </div>
       </form>
 
-      {/* Genre pills */}
+      {/* Genre pills — só gêneros com música publicada (ver availableGenres) */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 28 }}>
-        {GENRES.map(g => (
+        {pills.map(g => (
           <Link key={g}
             href={{ pathname: "/catalogo", query: q ? { genre: g, q } : { genre: g } }}
             style={{

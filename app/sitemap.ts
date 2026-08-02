@@ -2,7 +2,6 @@ import type { MetadataRoute } from "next";
 import { db, songs as songsTable } from "@/src/db";
 import { and, eq } from "drizzle-orm";
 import { siteUrl } from "@/src/lib/siteUrl";
-import { GENRES } from "@/app/components/CatalogSection";
 import { routing, htmlLang, type Locale } from "@/src/i18n/routing";
 import { getPathname } from "@/src/i18n/navigation";
 
@@ -58,9 +57,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Filtros de gênero do catálogo — cada um é uma página de conteúdo
   // distinta e uma porta de entrada orgânica ("backing track de samba").
-  const genreEntries: MetadataRoute.Sitemap = GENRES
-    .filter(g => g !== "Todos")
-    .flatMap(g =>
+  // Vem do banco (só gêneros com música publicada), não de uma lista fixa
+  // — mesma fonte de verdade das pills em CatalogSection, senão o sitemap
+  // indexa páginas vazias ou perde gêneros novos do catálogo.
+  let genreEntries: MetadataRoute.Sitemap = [];
+  try {
+    const genreRows = await db
+      .selectDistinct({ genre: songsTable.genre })
+      .from(songsTable)
+      .where(eq(songsTable.published, true));
+    const genreList = genreRows.map(r => r.genre).filter((g): g is string => !!g);
+
+    genreEntries = genreList.flatMap(g =>
       routing.locales.map((locale: Locale) => ({
         url: `${base}${getPathname({ href: "/catalogo", locale })}?genre=${encodeURIComponent(g)}`,
         lastModified: now,
@@ -68,6 +76,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.5,
       })),
     );
+  } catch {
+    genreEntries = [];
+  }
 
   // Páginas de música publicadas. Se o banco estiver indisponível no
   // momento do build/revalidate, devolvemos só as estáticas em vez de
