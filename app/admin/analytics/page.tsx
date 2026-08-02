@@ -30,6 +30,7 @@ type Analytics = {
   newVsReturning: { new: number; returning: number };
   topPages: Slice[];
   channels: Slice[];
+  sources: Slice[];
   devices: Slice[];
   browsers: Slice[];
   operatingSystems: Slice[];
@@ -59,6 +60,37 @@ const DEVICE_LABELS: Record<string, string> = {
   desktop: "Computador",
   tablet: "Tablet",
   smarttv: "Smart TV",
+};
+
+// O GA reporta o host cru que originou a sessão. Instagram e Facebook aparecem
+// em várias formas (o app usa domínios de redirecionamento), então normalizamos
+// para o nome da rede — senão "l.instagram.com" e "instagram.com" viram duas
+// linhas diferentes na mesma lista.
+const SOURCE_LABELS: Record<string, string> = {
+  "instagram.com": "Instagram",
+  "l.instagram.com": "Instagram",
+  "ig": "Instagram",
+  "facebook.com": "Facebook",
+  "l.facebook.com": "Facebook",
+  "m.facebook.com": "Facebook",
+  "lm.facebook.com": "Facebook",
+  "fb": "Facebook",
+  "whatsapp.com": "WhatsApp",
+  "l.wl.co": "WhatsApp",
+  "youtube.com": "YouTube",
+  "m.youtube.com": "YouTube",
+  "tiktok.com": "TikTok",
+  "linkedin.com": "LinkedIn",
+  "lnkd.in": "LinkedIn",
+  "t.co": "X / Twitter",
+  "x.com": "X / Twitter",
+  "twitter.com": "X / Twitter",
+  "reddit.com": "Reddit",
+  "t.me": "Telegram",
+  "google": "Google (busca)",
+  "bing": "Bing",
+  "duckduckgo": "DuckDuckGo",
+  "(direct)": "Direto / app sem referência",
 };
 
 const OS_LABELS: Record<string, string> = {
@@ -112,6 +144,16 @@ function Panel({ title, hint, children }: { title: string; hint?: string; childr
       {children}
     </div>
   );
+}
+
+/** Soma linhas que caem no mesmo rótulo depois da tradução (ex.: os vários domínios do Instagram). */
+function mergeByLabel(items: Slice[], translate: Record<string, string>): Slice[] {
+  const acc = new Map<string, number>();
+  for (const i of items) {
+    const label = translate[i.label] ?? i.label;
+    acc.set(label, (acc.get(label) ?? 0) + i.value);
+  }
+  return [...acc.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
 }
 
 function Ranking({ items, translate }: { items: Slice[]; translate?: Record<string, string> }) {
@@ -362,6 +404,14 @@ function AnalyticsContent() {
 
             <Panel title="🚪 Origem do tráfego" hint="Onde investir esforço de aquisição">
               <Ranking items={data.channels} translate={CHANNEL_LABELS} />
+            </Panel>
+
+            <Panel title="🔗 Rede / site de origem" hint="Qual rede social ou site mandou a visita — detalha o painel de canais">
+              <Ranking items={mergeByLabel(data.sources, SOURCE_LABELS)} />
+              <p style={{ color: "var(--muted2)", fontSize: 11, margin: "10px 0 0" }}>
+                Apps de mensagem costumam esconder a origem: parte do que vem de WhatsApp e Instagram
+                cai em &ldquo;Direto&rdquo;. Para medir com precisão, use links com <code>?utm_source=instagram</code>.
+              </p>
             </Panel>
 
             <Panel title="📄 Páginas mais vistas" hint="O que atrai — e o que ninguém abre">

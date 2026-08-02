@@ -21,11 +21,13 @@ npm run db:push
 # ou, direto no SQL Editor do Neon (idempotente, nesta ordem):
 #   drizzle/0009_invites.sql
 #   drizzle/0010_invite_separations.sql
+#   drizzle/0011_invite_link.sql
 ```
 
 Cria `invites`, `invite_templates` e as colunas de trial em `users`
 (`trial_plan`, `trial_started_at`, `trial_ends_at`, `trial_previous_role`,
-`trial_source`, `trial_separations`).
+`trial_source`, `trial_separations`). A 0011 torna `invites.email` opcional e
+adiciona `invites.channel` + `invite_templates.share_body`.
 
 ### 1.3 Variáveis de ambiente (Vercel → Settings → Environment Variables)
 
@@ -138,11 +140,43 @@ não recebe mais nada. **Não** use esta ferramenta com lista comprada ou raspad
 
 ---
 
+## 3.1 Convite por link (envio manual)
+
+Segundo canal na mesma aba: em vez de disparar o e-mail, o admin **gera o texto
+com o link** e manda ele mesmo por WhatsApp/DM.
+
+Quando usar cada um:
+
+| | E-mail | Link |
+|---|---|---|
+| Você tem o e-mail da pessoa | ✅ | opcional (só registro) |
+| A pessoa já te conhece / já conversa com você | funciona | **melhor** |
+| Contato só por WhatsApp ou Instagram | ✗ | ✅ |
+| Rastreio do funil | igual | igual |
+| Risco de cair no spam | existe | **zero** |
+
+O texto do link é **curto de propósito** e não repete a estrutura do e-mail: sem
+rodapé institucional, sem bloco antiphishing, sem descadastro. Isso não é
+descuido — num canal onde a pessoa já sabe quem você é e pode te responder na
+hora, esses elementos não acrescentam confiança, só fazem a mensagem parecer
+disparo automático. O que permanece é o essencial: quem fala, o que é, o que ela
+ganha, o link inteiro e visível, e "sem cobrança, sem cartão" dito com todas as
+letras.
+
+Detalhe de implementação que importa: o `{{link}}` fica **sozinho numa linha**.
+Apps de mensagem quebram a detecção do link quando há pontuação colada no fim.
+
+O status nasce como `link` (e não `sent`): sabemos que o convite existe, não que
+chegou em alguém. Marcar como enviado ali falsearia a taxa de clique.
+
+---
+
 ## 4. Funil rastreado
 
 | Estado | O que significa | Onde é marcado |
 |---|---|---|
 | `sent` | saiu do SMTP do Zoho sem erro | `createAndSendInvite` |
+| `link` | texto gerado, aguardando você mandar pela mão | `createInviteLink` |
 | `failed` | SMTP rejeitou — motivo visível na tabela | idem |
 | `clicked` | abriu `/convite/<token>` | `markClicked`, na própria página |
 | `accepted` | autenticou e clicou em "ativar" | `POST /api/invites/accept` |

@@ -2,7 +2,10 @@
  * /api/admin/invites — convites de teste (aba /admin/convites)
  *
  * GET:  lista + funil (enviado → clicado → cadastrado → 1º uso) + estado do SMTP.
- * POST: cria e envia um ou mais convites (um e-mail por destinatário).
+ * POST: cria convites. Dois modos, pelo campo `channel`:
+ *         "email" (padrão) — envia por SMTP, um e-mail por destinatário;
+ *         "link"           — não envia nada, devolve o texto pronto para o
+ *                            admin colar no WhatsApp/DM.
  *
  * Auth: header x-admin-password (src/lib/adminAuth.ts), igual aos demais
  * módulos do admin.
@@ -13,6 +16,7 @@ import { mailerConfigured } from "@/src/lib/mailer";
 import {
   DEFAULT_TRIAL_DAYS,
   createAndSendInvite,
+  createInviteLink,
   getDefaultTemplate,
   inviteStats,
   listInvites,
@@ -36,7 +40,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       items,
       stats,
-      template: { subject: template.subject, body: template.body },
+      template: {
+        subject: template.subject,
+        body: template.body,
+        shareBody: template.shareBody ?? "",
+      },
       smtpReady: mailerConfigured(),
       defaultDays: DEFAULT_TRIAL_DAYS,
     });
@@ -60,9 +68,35 @@ export async function POST(req: NextRequest) {
       subject?: string;
       body?: string;
       sender?: string;
+      channel?: string;
+      message?: string;
     };
 
     const plan: InvitePlan = data.plan === "proband" ? "proband" : "pro";
+
+    // ─── Modo LINK: não envia nada, devolve o texto pronto ──────────────────
+    if (data.channel === "link") {
+      const email = (data.email ?? "").trim().toLowerCase();
+      if (email && !EMAIL_RE.test(email)) {
+        return NextResponse.json({ error: `E-mail inválido: ${email}` }, { status: 400 });
+      }
+      const res = await createInviteLink({
+        name: data.name?.trim() || null,
+        email: email || null,
+        plan,
+        days: data.days,
+        separations: data.separations,
+        message: data.message,
+        sender: data.sender,
+      });
+      return NextResponse.json({
+        ok: true,
+        channel: "link",
+        message: res.message,
+        url: res.url,
+        id: res.invite.id,
+      });
+    }
 
     const raw = data.recipients?.length
       ? data.recipients

@@ -8,9 +8,21 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/src/lib/adminAuth";
-import { resendInvite, revokeInvite } from "@/src/lib/invites";
+import { getInviteMessage, resendInvite, revokeInvite } from "@/src/lib/invites";
 
 export const runtime = "nodejs";
+
+/** GET — devolve o texto e o link do convite, para o botão "copiar" da tabela. */
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!isAdminRequest(req)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const { id: idParam } = await params;
+  const id = Number(idParam);
+  if (!id) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+
+  const data = await getInviteMessage(id);
+  if (!data) return NextResponse.json({ error: "Convite não encontrado" }, { status: 404 });
+  return NextResponse.json(data);
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAdminRequest(req)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });

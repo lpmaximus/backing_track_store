@@ -457,6 +457,11 @@ export const inviteTemplates = pgTable("invite_templates", {
   // {{link}}, {{validade}}. O HTML é montado em src/lib/inviteEmail.ts a
   // partir daqui — o admin nunca escreve HTML.
   body: text("body").notNull(),
+  // Versão curta para envio manual (WhatsApp/DM). Texto puro, mesmos
+  // placeholders. Separada do corpo do e-mail de propósito: mensagem de
+  // WhatsApp longa não é lida, e o rodapé/descadastro do e-mail não faz
+  // sentido numa conversa em que a pessoa já sabe quem é você.
+  shareBody: text("share_body"),
   isDefault: boolean("is_default").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -470,8 +475,12 @@ export const inviteTemplates = pgTable("invite_templates", {
  */
 export const invites = pgTable("invites", {
   id: serial("id").primaryKey(),
-  email: varchar("email", { length: 255 }).notNull(),
+  // Nulo quando o convite é do tipo "link": nesse caso o admin manda por
+  // WhatsApp/mensagem e pode nem saber o e-mail da pessoa.
+  email: varchar("email", { length: 255 }),
   name: varchar("name", { length: 255 }),
+  // email = enviado por SMTP · link = texto gerado para envio manual
+  channel: varchar("channel", { length: 10 }).notNull().default("email"),
   plan: varchar("plan", { length: 20 }).notNull().default("pro"), // pro | proband
   trialDays: integer("trial_days").notNull().default(20),
   // Quantas separações o convite libera no TOTAL do período de teste.
@@ -479,7 +488,8 @@ export const invites = pgTable("invites", {
   trialSeparations: integer("trial_separations"),
   // Token de 48 hex chars — entra na URL /convite/<token>.
   token: varchar("token", { length: 96 }).notNull().unique(),
-  // pending | sent | failed | clicked | accepted | expired | revoked
+  // pending | sent | link | failed | clicked | accepted | expired | revoked
+  // ("link" = texto gerado, aguardando o admin mandar pela mão)
   status: varchar("status", { length: 20 }).notNull().default("pending"),
   // Snapshot do que foi realmente enviado (o template pode mudar depois).
   subject: varchar("subject", { length: 200 }).notNull(),

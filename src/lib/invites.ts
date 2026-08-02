@@ -19,6 +19,7 @@ import { siteUrl } from "@/src/lib/siteUrl";
 import { sendMail } from "@/src/lib/mailer";
 import {
   DEFAULT_BODY,
+  DEFAULT_SHARE_BODY,
   DEFAULT_SUBJECT,
   buildHtml,
   buildText,
@@ -66,7 +67,20 @@ export async function getDefaultTemplate() {
     .from(inviteTemplates)
     .where(eq(inviteTemplates.isDefault, true))
     .limit(1);
-  if (existing) return existing;
+
+  if (existing) {
+    // Backfill: templates criados antes do convite por link não têm shareBody.
+    // Preenche uma vez, em vez de espalhar `?? DEFAULT_SHARE_BODY` pelo código.
+    if (!existing.shareBody) {
+      const [filled] = await db
+        .update(inviteTemplates)
+        .set({ shareBody: DEFAULT_SHARE_BODY })
+        .where(eq(inviteTemplates.id, existing.id))
+        .returning();
+      return filled;
+    }
+    return existing;
+  }
 
   const [created] = await db
     .insert(inviteTemplates)
@@ -74,17 +88,23 @@ export async function getDefaultTemplate() {
       name: "Convite padrão",
       subject: DEFAULT_SUBJECT,
       body: DEFAULT_BODY,
+      shareBody: DEFAULT_SHARE_BODY,
       isDefault: true,
     })
     .returning();
   return created;
 }
 
-export async function saveDefaultTemplate(subject: string, body: string) {
+export async function saveDefaultTemplate(subject: string, body: string, shareBody?: string) {
   const tpl = await getDefaultTemplate();
   const [updated] = await db
     .update(inviteTemplates)
-    .set({ subject, body, updatedAt: new Date() })
+    .set({
+      subject,
+      body,
+      ...(shareBody != null ? { shareBody } : {}),
+      updatedAt: new Date(),
+    })
     .where(eq(inviteTemplates.id, tpl.id))
     .returning();
   return updated;
@@ -191,12 +211,93 @@ export async function createAndSendInvite(input: CreateInviteInput) {
   }
 }
 
+// ─── Convite por link (envio manual) ─────────────────────────────────────────
+
+export type CreateLinkInviteInput = {
+  name?: string | null;
+  /** Opcional: no WhatsApp você costuma não saber o e-mail da pessoa. */
+  email?: string | null;
+  plan: InvitePlan;
+  days?: number;
+  separations?: number | null;
+  /** Sobrescreve o texto padrão só neste convite. */
+  message?: string;
+  sender?: string;
+};
+
+/**
+ * Cria o convite SEM enviar nada e devolve o texto pronto para colar numa
+ * mensagem. O token e o funil são os mesmos do convite por e-mail — a única
+ * diferença é quem faz a entrega.
+ *
+ * O status nasce como `link` (e não `sent`): a gente sabe que o convite existe,
+ * mas não que ele chegou em alguém. Fingir "enviado" aqui estragaria a taxa de
+ * clique do funil.
+ */
+export async function createInviteLink(input: CreateLinkInviteInput) {
+  const email = input.email?.trim().toLowerCase() || null;
+  const days = input.days && input.days > 0 ? Math.min(input.days, 90) : DEFAULT_TRIAL_DAYS;
+  const separations =
+    input.separations != null && input.separations > 0
+      ? Math.min(Math.floor(input.separations), MAX_TRIAL_SEPARATIONS)
+      : null;
+  const sender = input.sender?.trim() || process.env.INVITE_SENDER_NAME || "Luiz Paulo";
+
+  const tpl = await getDefaultTemplate();
+  const rawMessage = input.message?.trim() || tpl.shareBody || DEFAULT_SHARE_BODY;
+
+  const token = newToken();
+  const expiresAt = new Date(Date.now() + INVITE_VALID_DAYS * 24 * 60 * 60 * 1000);
+
+  const vars: InviteVars = {
+    name: input.name ?? null,
+    email: email ?? "",
+    plan: input.plan,
+    days,
+    separations: resolveSeparations(input.plan, separations),
+    link: inviteUrl(token),
+    expiresAt,
+    sender,
+  };
+
+  const message = renderTemplate(rawMessage, vars);
+
+  const [invite] = await db
+    .insert(invites)
+    .values({
+      email,
+      name: input.name?.trim() || null,
+      channel: "link",
+      plan: input.plan,
+      trialDays: days,
+      trialSeparations: separations,
+      token,
+      status: "link",
+      subject: `Convite por link · ${input.name?.trim() || email || "sem identificação"}`,
+      body: message,
+      expiresAt,
+    })
+    .returning();
+
+  return { invite, message, url: inviteUrl(token) };
+}
+
+/** Recupera o texto de um convite por link, para o botão "copiar" da tabela. */
+export async function getInviteMessage(id: number) {
+  const [invite] = await db.select().from(invites).where(eq(invites.id, id)).limit(1);
+  if (!invite) return null;
+  return { message: invite.body, url: inviteUrl(invite.token), channel: invite.channel };
+}
+
 /** Reenvia um convite existente (mesmo token, para não invalidar o 1º e-mail). */
 export async function resendInvite(id: number) {
   const [invite] = await db.select().from(invites).where(eq(invites.id, id)).limit(1);
   if (!invite) return { ok: false as const, error: "Convite não encontrado" };
   if (invite.status === "accepted") return { ok: false as const, error: "Convite já foi aceito" };
   if (invite.status === "revoked") return { ok: false as const, error: "Convite revogado" };
+  if (!invite.email) {
+    return { ok: false as const, error: "Convite por link não tem e-mail — copie a mensagem e reenvie pela mão" };
+  }
 
   // Estende a validade para o reenvio fazer sentido.
   const expiresAt = new Date(Date.now() + INVITE_VALID_DAYS * 24 * 60 * 60 * 1000);
@@ -279,7 +380,7 @@ export async function markClicked(token: string) {
     .update(invites)
     .set({
       clickedAt: sql`coalesce(${invites.clickedAt}, now())`,
-      status: sql`case when ${invites.status} in ('pending','sent','failed') then 'clicked' else ${invites.status} end`,
+      status: sql`case when ${invites.status} in ('pending','sent','link','failed') then 'clicked' else ${invites.status} end`,
       updatedAt: new Date(),
     })
     .where(eq(invites.token, token));
@@ -362,6 +463,7 @@ export async function listInvites(limit = 200) {
       id: invites.id,
       email: invites.email,
       name: invites.name,
+      channel: invites.channel,
       plan: invites.plan,
       trialDays: invites.trialDays,
       trialSeparations: invites.trialSeparations,
@@ -389,7 +491,10 @@ export async function inviteStats() {
   const rows = await db
     .select({
       total: sql<number>`count(*)`.mapWith(Number),
-      sent: sql<number>`count(*) filter (where ${invites.sentAt} is not null)`.mapWith(Number),
+      // "Enviados" = e-mails que saíram + links gerados. Os dois são entrega
+      // tentada; separar aqui só bagunçaria a leitura do funil.
+      sent: sql<number>`count(*) filter (where ${invites.sentAt} is not null or ${invites.channel} = 'link')`.mapWith(Number),
+      links: sql<number>`count(*) filter (where ${invites.channel} = 'link')`.mapWith(Number),
       failed: sql<number>`count(*) filter (where ${invites.status} = 'failed')`.mapWith(Number),
       clicked: sql<number>`count(*) filter (where ${invites.clickedAt} is not null)`.mapWith(Number),
       accepted: sql<number>`count(*) filter (where ${invites.acceptedAt} is not null)`.mapWith(Number),

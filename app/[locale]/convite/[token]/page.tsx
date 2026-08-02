@@ -120,14 +120,20 @@ export default async function ConvitePage({
         </div>
       )}
 
-      <div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid var(--border)", color: "var(--muted2)", fontSize: 12, lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--muted)" }}>{t("securityLabel")}</strong>{t("securityText")}
-        <strong style={{ color: "var(--muted)" }}>{invite.email}</strong>{t("securityText2")}
-        <Link href={{ pathname: "/convite/[token]/sair", params: { token } }} style={{ color: "var(--muted2)", textDecoration: "underline" }}>
-          {t("unsubscribe")}
-        </Link>
-        .
-      </div>
+      {/* Bloco de segurança: só faz sentido no convite enviado por e-mail. No
+          convite por link (WhatsApp) a pessoa não tem "o e-mail que recebeu"
+          para conferir, e o descadastro não se aplica — quem mandou foi você,
+          por um canal onde ela já pode te responder. */}
+      {invite.email && (
+        <div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid var(--border)", color: "var(--muted2)", fontSize: 12, lineHeight: 1.7 }}>
+          <strong style={{ color: "var(--muted)" }}>{t("securityLabel")}</strong>{t("securityText")}
+          <strong style={{ color: "var(--muted)" }}>{invite.email}</strong>{t("securityText2")}
+          <Link href={{ pathname: "/convite/[token]/sair", params: { token } }} style={{ color: "var(--muted2)", textDecoration: "underline" }}>
+            {t("unsubscribe")}
+          </Link>
+          .
+        </div>
+      )}
     </Shell>
   );
 }

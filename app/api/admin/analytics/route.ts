@@ -96,6 +96,16 @@ export async function GET(req: NextRequest) {
       ]),
       batchRunReports([
         { dimensions: ["browser"], metrics: ["activeUsers"], startDate, endDate, orderByMetric: "activeUsers", limit: 8 },
+        // Site/app exato que originou a sessão — é aqui que Instagram, WhatsApp
+        // e YouTube aparecem separados, coisa que o grupo de canais não mostra.
+        {
+          dimensions: ["sessionSource"],
+          metrics: ["sessions"],
+          startDate,
+          endDate,
+          orderByMetric: "sessions",
+          limit: 12,
+        },
         {
           dimensions: ["operatingSystem"],
           metrics: ["activeUsers"],
@@ -110,7 +120,7 @@ export async function GET(req: NextRequest) {
 
     const [totalsR, dailyR, nvrR, pagesR, channelsR] = batchA;
     const [devicesR, citiesR, prevR, countriesR, regionsR] = batchB;
-    const [browsersR, osR] = batchC;
+    const [browsersR, sourcesR, osR] = batchC;
 
     const t = totalsR?.rows?.[0];
     const p = prevR?.rows?.[0];
@@ -145,6 +155,7 @@ export async function GET(req: NextRequest) {
       newVsReturning: { new: newVisitors, returning: returningVisitors },
       topPages: toSlices(pagesR),
       channels: toSlices(channelsR),
+      sources: toSlices(sourcesR).filter(named),
       devices: toSlices(devicesR),
       browsers: toSlices(browsersR).filter(named),
       operatingSystems: toSlices(osR).filter(named),

@@ -4,8 +4,11 @@
  * /admin/convites — convites de teste (Pro / Pro Band por N dias).
  *
  * Três blocos:
- *   1. Novo convite  — destinatários + plano + duração, com preview do texto.
- *   2. Texto padrão  — template editável (assunto + corpo em texto puro).
+ *   1. Novo convite  — dois canais: enviar por e-mail (SMTP) ou gerar o texto
+ *      com o link para o admin mandar pela mão (WhatsApp/DM). O funil e o
+ *      token são os mesmos nos dois; muda só quem faz a entrega.
+ *   2. Texto padrão  — template editável (assunto + corpo do e-mail + a versão
+ *      curta usada no envio manual).
  *   3. Acompanhamento — funil enviado → clicado → cadastrado → 1º uso.
  *
  * O painel "por que isto não é phishing" fica visível de propósito: as regras
@@ -18,8 +21,9 @@ import { adminHeaders } from "../adminClient";
 
 type Invite = {
   id: number;
-  email: string;
+  email: string | null;
   name: string | null;
+  channel: string;
   plan: string;
   trialDays: number;
   trialSeparations: number | null;
@@ -38,13 +42,14 @@ type Invite = {
 };
 
 type Stats = {
-  total: number; sent: number; failed: number;
+  total: number; sent: number; failed: number; links: number;
   clicked: number; accepted: number; used: number; active: number;
 };
 
 const STATUS: Record<string, { label: string; color: string }> = {
   pending:  { label: "Na fila",    color: "#64748b" },
   sent:     { label: "Enviado",    color: "#3b82f6" },
+  link:     { label: "Link gerado", color: "#8b5cf6" },
   failed:   { label: "Falhou",     color: "#ef4444" },
   clicked:  { label: "Clicou",     color: "#f59e0b" },
   accepted: { label: "Ativou",     color: "#22c55e" },
@@ -146,7 +151,14 @@ function ConvitesContent() {
   const [loading, setLoading] = useState(true);
 
   // formulário
+  // "email" = dispara pelo SMTP · "link" = gera o texto e você manda pela mão
+  const [mode, setMode] = useState<"email" | "link">("email");
   const [emails, setEmails] = useState("");
+  const [linkName, setLinkName] = useState("");
+  const [linkEmail, setLinkEmail] = useState("");
+  const [linkPhone, setLinkPhone] = useState("");
+  const [generated, setGenerated] = useState<{ message: string; url: string } | null>(null);
+  const [copied, setCopied] = useState("");
   const [plan, setPlan] = useState<"pro" | "proband">("pro");
   const [days, setDays] = useState(20);
   // "" = usa o limite normal do plano (Pro 20 / Band 40).
@@ -158,6 +170,7 @@ function ConvitesContent() {
   // template
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [shareBody, setShareBody] = useState("");
   const [savingTpl, setSavingTpl] = useState(false);
   const [tplMsg, setTplMsg] = useState("");
   const [showTpl, setShowTpl] = useState(false);
@@ -171,10 +184,21 @@ function ConvitesContent() {
       setSmtpReady(d.smtpReady);
       setSubject(d.template?.subject ?? "");
       setBody(d.template?.body ?? "");
+      setShareBody(d.template?.shareBody ?? "");
     }
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+
+  async function copy(text: string, what: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(what);
+      setTimeout(() => setCopied(""), 2000);
+    } catch {
+      alert("Não consegui copiar. Selecione o texto e copie manualmente.");
+    }
+  }
 
   /** "Nome <email>" por linha, ou só o e-mail. */
   function parseRecipients() {
@@ -214,17 +238,50 @@ function ConvitesContent() {
     }
   }
 
+  /** Modo link: cria o convite sem enviar nada e devolve o texto pronto. */
+  async function generate() {
+    setSending(true); setMsg(""); setGenerated(null);
+    try {
+      const res = await fetch("/api/admin/invites", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify({
+          channel: "link",
+          name: linkName.trim() || null,
+          email: linkEmail.trim() || null,
+          plan, days, sender,
+          message: shareBody,
+          separations: separations.trim() === "" ? null : Number(separations),
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setMsg(`❌ ${d.error}`); return; }
+      setGenerated({ message: d.message, url: d.url });
+      load();
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function saveTemplate() {
     setSavingTpl(true); setTplMsg("");
     try {
       const res = await fetch("/api/admin/invites/template", {
-        method: "PUT", headers: adminHeaders(), body: JSON.stringify({ subject, body }),
+        method: "PUT", headers: adminHeaders(), body: JSON.stringify({ subject, body, shareBody }),
       });
       const d = await res.json();
       setTplMsg(res.ok ? "✅ Texto salvo." : `❌ ${d.error}`);
     } finally {
       setSavingTpl(false);
     }
+  }
+
+  /** Recupera o texto de um convite por link já criado e joga na área de transferência. */
+  async function copyInvite(id: number) {
+    const res = await fetch(`/api/admin/invites/${id}`, { headers: adminHeaders() });
+    if (!res.ok) { alert("Não consegui carregar o texto deste convite."); return; }
+    const d = await res.json();
+    await copy(d.message, "Texto");
   }
 
   async function act(id: number, action: "resend" | "revoke") {
@@ -252,7 +309,8 @@ function ConvitesContent() {
           <strong style={{ color: "#ef4444" }}>SMTP não configurado.</strong>
           <p style={{ color: "var(--muted)", fontSize: 13, margin: "6px 0 0" }}>
             Defina <code>SMTP_USER</code> e <code>SMTP_PASSWORD</code> (senha de aplicativo do Zoho) nas variáveis
-            de ambiente. Sem isso os convites são gravados mas não saem.
+            de ambiente. Sem isso os convites por e-mail são gravados mas não saem — o modo
+            <strong> Gerar link</strong> continua funcionando normalmente.
           </p>
         </div>
       )}
@@ -263,23 +321,61 @@ function ConvitesContent() {
 
       {/* ─── Novo convite ─────────────────────────────────────────────── */}
       <div style={card}>
-        <h2 style={{ color: "var(--text)", fontSize: 16, fontWeight: 800, margin: "0 0 16px" }}>Novo convite</h2>
+        <h2 style={{ color: "var(--text)", fontSize: 16, fontWeight: 800, margin: "0 0 14px" }}>Novo convite</h2>
 
-        <div style={{ marginBottom: 14 }}>
-          <label style={label}>Destinatários — um por linha, &quot;Nome &lt;email@dominio&gt;&quot; ou só o e-mail</label>
-          <textarea value={emails} onChange={(e) => setEmails(e.target.value)} rows={4}
-            placeholder={"João Silva <joao@email.com>\nmaria@email.com"}
-            style={{ ...input, fontFamily: "ui-monospace, monospace", fontSize: 13, resize: "vertical" }} />
-          <p style={{ color: "var(--muted2)", fontSize: 12, margin: "6px 0 0" }}>
-            {count} destinatário(s) · máx. 20 por envio — convite é conversa, não campanha.
-          </p>
-          {count > 0 && parseRecipients().some((r) => !r.name) && (
-            <p style={{ color: "#f59e0b", fontSize: 12, margin: "6px 0 0" }}>
-              ⚠️ {parseRecipients().filter((r) => !r.name).length} sem nome. O e-mail funciona, mas
-              convite sem nome soa como mala direta — que é o que levanta suspeita de golpe.
-            </p>
-          )}
+        {/* Seletor de canal */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+          {([
+            { k: "email" as const, icon: "✉️", t: "Enviar por e-mail", d: "sai do contato@l2techs.com" },
+            { k: "link" as const, icon: "🔗", t: "Gerar link", d: "você manda por WhatsApp" },
+          ]).map((o) => (
+            <button key={o.k} onClick={() => { setMode(o.k); setMsg(""); setGenerated(null); }}
+              style={{
+                flex: 1, textAlign: "left", padding: "12px 14px", borderRadius: 10, cursor: "pointer",
+                background: mode === o.k ? "#f59e0b18" : "var(--surface2)",
+                border: `1px solid ${mode === o.k ? "#f59e0b" : "var(--border)"}`,
+              }}>
+              <div style={{ color: "var(--text)", fontWeight: 800, fontSize: 14 }}>{o.icon} {o.t}</div>
+              <div style={{ color: "var(--muted2)", fontSize: 12, marginTop: 2 }}>{o.d}</div>
+            </button>
+          ))}
         </div>
+
+        {mode === "email" ? (
+          <div style={{ marginBottom: 14 }}>
+            <label style={label}>Destinatários — um por linha, &quot;Nome &lt;email@dominio&gt;&quot; ou só o e-mail</label>
+            <textarea value={emails} onChange={(e) => setEmails(e.target.value)} rows={4}
+              placeholder={"João Silva <joao@email.com>\nmaria@email.com"}
+              style={{ ...input, fontFamily: "ui-monospace, monospace", fontSize: 13, resize: "vertical" }} />
+            <p style={{ color: "var(--muted2)", fontSize: 12, margin: "6px 0 0" }}>
+              {count} destinatário(s) · máx. 20 por envio — convite é conversa, não campanha.
+            </p>
+            {count > 0 && parseRecipients().some((r) => !r.name) && (
+              <p style={{ color: "#f59e0b", fontSize: 12, margin: "6px 0 0" }}>
+                ⚠️ {parseRecipients().filter((r) => !r.name).length} sem nome. O e-mail funciona, mas
+                convite sem nome soa como mala direta — que é o que levanta suspeita de golpe.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 14 }}>
+            <div>
+              <label style={label}>Nome de quem vai receber</label>
+              <input value={linkName} onChange={(e) => setLinkName(e.target.value)}
+                placeholder="João Silva" style={input} />
+            </div>
+            <div>
+              <label style={label}>WhatsApp (opcional)</label>
+              <input value={linkPhone} onChange={(e) => setLinkPhone(e.target.value)}
+                placeholder="5531999998888" style={input} />
+            </div>
+            <div>
+              <label style={label}>E-mail (opcional, só para registro)</label>
+              <input value={linkEmail} onChange={(e) => setLinkEmail(e.target.value)}
+                placeholder="joao@email.com" style={input} />
+            </div>
+          </div>
+        )}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14, marginBottom: 16 }}>
           <div>
@@ -311,11 +407,55 @@ function ConvitesContent() {
           (Pro {PLAN_DEFAULT.pro} / Pro Band {PLAN_DEFAULT.proband}).
         </p>
 
-        <button onClick={send} disabled={sending || count === 0}
-          style={{ background: "#f59e0b", color: "#000", border: "none", padding: "11px 24px", borderRadius: 8, fontWeight: 800, fontSize: 14, cursor: sending || count === 0 ? "not-allowed" : "pointer", opacity: sending || count === 0 ? 0.5 : 1 }}>
-          {sending ? "Enviando…" : `Enviar ${count || ""} convite(s)`}
-        </button>
+        {mode === "email" ? (
+          <button onClick={send} disabled={sending || count === 0}
+            style={{ background: "#f59e0b", color: "#000", border: "none", padding: "11px 24px", borderRadius: 8, fontWeight: 800, fontSize: 14, cursor: sending || count === 0 ? "not-allowed" : "pointer", opacity: sending || count === 0 ? 0.5 : 1 }}>
+            {sending ? "Enviando…" : `Enviar ${count || ""} convite(s)`}
+          </button>
+        ) : (
+          <button onClick={generate} disabled={sending}
+            style={{ background: "#f59e0b", color: "#000", border: "none", padding: "11px 24px", borderRadius: 8, fontWeight: 800, fontSize: 14, cursor: sending ? "not-allowed" : "pointer", opacity: sending ? 0.5 : 1 }}>
+            {sending ? "Gerando…" : "Gerar convite"}
+          </button>
+        )}
         {msg && <p style={{ color: "var(--text)", fontSize: 13, margin: "12px 0 0" }}>{msg}</p>}
+
+        {/* Resultado do modo link */}
+        {generated && (
+          <div style={{ marginTop: 18, border: "1px solid #8b5cf655", borderRadius: 12, padding: "16px 18px", background: "#8b5cf60d" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+              <strong style={{ color: "var(--text)", fontSize: 14 }}>Convite criado. Copie e mande você mesmo:</strong>
+              {copied && <span style={{ color: "#22c55e", fontSize: 12, fontWeight: 700 }}>✓ {copied} copiado</span>}
+            </div>
+
+            <textarea readOnly value={generated.message} rows={12}
+              onFocus={(e) => e.currentTarget.select()}
+              style={{ ...input, fontSize: 13, lineHeight: 1.6, resize: "vertical", fontFamily: "inherit" }} />
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+              <button onClick={() => copy(generated.message, "Texto")}
+                style={{ background: "#f59e0b", color: "#000", border: "none", padding: "9px 18px", borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+                Copiar mensagem
+              </button>
+              <button onClick={() => copy(generated.url, "Link")}
+                style={{ background: "var(--surface2)", color: "var(--text)", border: "1px solid var(--border)", padding: "9px 18px", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                Copiar só o link
+              </button>
+              <a href={`https://wa.me/${linkPhone.replace(/\D/g, "")}?text=${encodeURIComponent(generated.message)}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{ background: "#25D366", color: "#000", padding: "9px 18px", borderRadius: 8, fontWeight: 800, fontSize: 13, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+                Abrir no WhatsApp
+              </a>
+            </div>
+
+            <p style={{ color: "var(--muted2)", fontSize: 12, lineHeight: 1.6, margin: "12px 0 0" }}>
+              O link já está valendo e o rastreio é o mesmo do e-mail: assim que a pessoa abrir, a linha
+              dela na tabela muda para <strong>Clicou</strong>. Como você está mandando por um canal onde
+              a pessoa já te conhece, o texto é curto de propósito — sem rodapé institucional nem bloco
+              antiphishing, que ali só atrapalhariam.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ─── Texto padrão ─────────────────────────────────────────────── */}
@@ -345,6 +485,18 @@ function ConvitesContent() {
               O bloco de segurança, o botão, a URL por extenso e o rodapé com descadastro são adicionados
               automaticamente ao final — não precisa (nem deve) escrevê-los aqui.
             </p>
+
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16, marginBottom: 12 }}>
+              <label style={label}>Mensagem curta (modo &quot;Gerar link&quot; — WhatsApp/DM)</label>
+              <textarea value={shareBody} onChange={(e) => setShareBody(e.target.value)} rows={11}
+                style={{ ...input, fontFamily: "ui-monospace, monospace", fontSize: 13, lineHeight: 1.6, resize: "vertical" }} />
+              <p style={{ color: "var(--muted2)", fontSize: 12, lineHeight: 1.7, margin: "8px 0 0" }}>
+                Mesmas variáveis. Deixe <code>{"{{link}}"}</code> sozinho numa linha: app de mensagem
+                quebra a detecção do link quando há pontuação colada no fim. Aqui não entra rodapé nem
+                bloco de segurança — numa conversa a pessoa já sabe quem é você, e texto longo não é lido.
+              </p>
+            </div>
+
             <button onClick={saveTemplate} disabled={savingTpl}
               style={{ background: "var(--surface2)", color: "var(--text)", border: "1px solid var(--border)", padding: "9px 18px", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
               {savingTpl ? "Salvando…" : "Salvar texto"}
@@ -383,8 +535,13 @@ function ConvitesContent() {
                   return (
                     <tr key={it.id} style={{ borderTop: "1px solid var(--border)", color: "var(--text)" }}>
                       <td style={{ padding: "10px 10px 10px 0" }}>
-                        <div style={{ fontWeight: 700 }}>{it.name || "—"}</div>
-                        <div style={{ color: "var(--muted2)", fontSize: 12 }}>{it.email}</div>
+                        <div style={{ fontWeight: 700 }}>
+                          {it.channel === "link" && <span title="Convite por link (envio manual)">🔗 </span>}
+                          {it.name || "—"}
+                        </div>
+                        <div style={{ color: "var(--muted2)", fontSize: 12 }}>
+                          {it.email || (it.channel === "link" ? "sem e-mail · enviado pela mão" : "—")}
+                        </div>
                         {it.error && <div style={{ color: "#ef4444", fontSize: 11, marginTop: 2 }}>{it.error}</div>}
                       </td>
                       <td style={{ padding: "10px", color: "var(--muted)" }}>
@@ -407,10 +564,17 @@ function ConvitesContent() {
                       <td style={{ padding: "10px 0 10px 10px", whiteSpace: "nowrap" }}>
                         {it.status !== "accepted" && it.status !== "revoked" && (
                           <>
-                            <button onClick={() => act(it.id, "resend")} title="Reenviar (mesmo link)"
-                              style={{ background: "var(--surface2)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 9px", fontSize: 12, cursor: "pointer", marginRight: 6 }}>
-                              Reenviar
-                            </button>
+                            {it.channel === "link" ? (
+                              <button onClick={() => copyInvite(it.id)} title="Copiar o texto do convite de novo"
+                                style={{ background: "var(--surface2)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 9px", fontSize: 12, cursor: "pointer", marginRight: 6 }}>
+                                Copiar texto
+                              </button>
+                            ) : (
+                              <button onClick={() => act(it.id, "resend")} title="Reenviar (mesmo link)"
+                                style={{ background: "var(--surface2)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 9px", fontSize: 12, cursor: "pointer", marginRight: 6 }}>
+                                Reenviar
+                              </button>
+                            )}
                             <button onClick={() => act(it.id, "revoke")} title="Cancelar convite"
                               style={{ background: "transparent", color: "#ef4444", border: "1px solid #ef444455", borderRadius: 6, padding: "4px 9px", fontSize: 12, cursor: "pointer" }}>
                               Cancelar

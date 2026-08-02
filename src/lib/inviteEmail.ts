@@ -59,6 +59,32 @@ Abraço,
 {{remetente}}`;
 
 /**
+ * Texto curto para envio MANUAL (WhatsApp, DM, Telegram).
+ *
+ * Por que é diferente do e-mail: numa conversa a pessoa já sabe quem você é, o
+ * canal já é confiável e mensagem longa não é lida. Some o rodapé institucional,
+ * o bloco antiphishing e o descadastro — nada disso faz sentido aqui. O que
+ * permanece é o essencial: quem fala, o que é, o que a pessoa ganha, o link
+ * inteiro e visível, e a ausência de cobrança dita com todas as letras.
+ *
+ * O link vai numa linha só, sem texto colado, porque os apps de mensagem
+ * quebram a detecção do link quando há pontuação grudada no fim.
+ */
+export const DEFAULT_SHARE_BODY = `Oi, {{nome}}! Aqui é o {{remetente}}.
+
+Tô abrindo o Backing Track Store pra um grupo pequeno de músicos testarem antes do lançamento e separei um acesso pra você.
+
+É uma plataforma pra ensaiar: separa a música em faixas (bateria, baixo, guitarra, teclado, voz), você tira o instrumento que toca e toca por cima, com a cifra rolando sincronizada.
+
+Teu acesso {{plano}} fica liberado por {{dias}} dias, com {{separacoes}} separações. Sem cobrança e sem cadastrar cartão — no fim volta sozinho pro plano gratuito.
+
+É só abrir e entrar com o Google:
+
+{{link}}
+
+Vale até {{validade}}. Qualquer coisa me chama por aqui mesmo.`;
+
+/**
  * Primeiro nome, ou string VAZIA quando não há nome. Vazio de propósito: quem
  * limpa a frase depois é `tidy()`. Devolver um fallback aqui (era "Olá") gerava
  * "Olá, Olá!" quando o template já trazia a saudação.
@@ -83,15 +109,28 @@ export function greeting(name?: string | null): string {
  * quebrada — que é exatamente a impressão que a gente está evitando.
  */
 function tidy(s: string): string {
-  return s
+  const cleaned = s
     .replace(/,\s*([!?.,])/g, "$1")   // "Olá, !" → "Olá!"
-    .replace(/^\s*,\s*/, "")          // ", seu acesso" → "seu acesso"
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/^(\p{Ll})/u, (c) => c.toUpperCase());
+    .replace(/[ \t]{2,}/g, " ");
+  const stripped = cleaned.replace(/^\s*,\s*/, ""); // ", seu acesso" → "seu acesso"
+
+  // Só recapitaliza a linha se ela realmente perdeu uma vírgula órfã no início.
+  // Sem essa condição, uma linha que começa minúscula de propósito vira outra
+  // coisa — o caso real foi o link sozinho na mensagem virando "Https://".
+  return stripped === cleaned
+    ? cleaned
+    : stripped.replace(/^(\p{Ll})/u, (c) => c.toUpperCase());
 }
 
 export function formatDate(d: Date): string {
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+  // Fuso fixo: o servidor roda em UTC na Vercel, e sem isto uma data gerada
+  // à noite aparece um dia à frente para quem lê no Brasil.
+  return d.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    timeZone: "America/Sao_Paulo",
+  });
 }
 
 export type InviteVars = {
