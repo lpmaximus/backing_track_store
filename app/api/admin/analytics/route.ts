@@ -114,13 +114,25 @@ export async function GET(req: NextRequest) {
           orderByMetric: "activeUsers",
           limit: 8,
         },
+        // País × página: mata a dúvida "é bot ou é visitante real do /en?" sem
+        // precisar abrir o GA — se o país abriu página do site (não só a raiz),
+        // e o tempo médio não é zero, é gente de verdade.
+        {
+          dimensions: ["country", "pagePath"],
+          metrics: ["sessions", "averageSessionDuration"],
+          startDate,
+          endDate,
+          orderByMetric: "sessions",
+          limit: 40,
+          excludePrefix: { dimension: "pagePath", value: "/admin" },
+        },
       ]),
       runRealtimeActiveUsers().catch(() => 0),
     ]);
 
     const [totalsR, dailyR, nvrR, pagesR, channelsR] = batchA;
     const [devicesR, citiesR, prevR, countriesR, regionsR] = batchB;
-    const [browsersR, sourcesR, osR] = batchC;
+    const [browsersR, sourcesR, osR, countryPageR] = batchC;
 
     const t = totalsR?.rows?.[0];
     const p = prevR?.rows?.[0];
@@ -162,6 +174,12 @@ export async function GET(req: NextRequest) {
       countries: toSlices(countriesR).filter(named),
       regions: toSlices(regionsR).filter(named),
       cities: toSlices(citiesR).filter(named),
+      // Bot ou visitante real do /en? Cruza país com a página que ele abriu e
+      // quanto tempo ficou. Sessão de 0s na raiz espalhada por país isolado é
+      // bot; sessão com duração real em /en/algo é gente de verdade.
+      countryPages: (countryPageR?.rows ?? [])
+        .map((r) => ({ country: dim(r, 0), path: dim(r, 1), sessions: num(r, 0), avgSeconds: Math.round(num(r, 1)) }))
+        .filter((r) => r.country && r.country !== "(not set)" && r.path),
       generatedAt: new Date().toISOString(),
     };
 

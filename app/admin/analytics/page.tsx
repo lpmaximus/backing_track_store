@@ -37,6 +37,7 @@ type Analytics = {
   countries: Slice[];
   regions: Slice[];
   cities: Slice[];
+  countryPages: { country: string; path: string; sessions: number; avgSeconds: number }[];
   generatedAt: string;
 };
 
@@ -154,6 +155,75 @@ function mergeByLabel(items: Slice[], translate: Record<string, string>): Slice[
     acc.set(label, (acc.get(label) ?? 0) + i.value);
   }
   return [...acc.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+}
+
+type CountryPageRow = { country: string; path: string; sessions: number; avgSeconds: number };
+
+// Heurística simples, não prova definitiva: sessão sem duração e só na raiz é
+// o padrão clássico de bot/crawler/monitor; qualquer coisa com tempo real de
+// permanência ou que abriu conteúdo específico (/en/..., /song/..., /catalogo)
+// é tratada como visitante de verdade. Fica visível pra quem olha decidir por
+// si — não escondemos a linha, só marcamos.
+function classifyRow(r: CountryPageRow): "bot" | "real" {
+  const rootOnly = r.path === "/" || r.path === "/en";
+  if (rootOnly && r.avgSeconds < 5) return "bot";
+  return "real";
+}
+
+function CountryPagesTable({ rows }: { rows: CountryPageRow[] }) {
+  if (rows.length === 0) return <p style={{ color: "var(--muted2)", fontSize: 13, margin: 0 }}>Sem dados no período.</p>;
+
+  const byCountry = new Map<string, CountryPageRow[]>();
+  for (const r of rows) {
+    if (!byCountry.has(r.country)) byCountry.set(r.country, []);
+    byCountry.get(r.country)!.push(r);
+  }
+  const countries = [...byCountry.entries()].sort(
+    (a, b) => b[1].reduce((s, r) => s + r.sessions, 0) - a[1].reduce((s, r) => s + r.sessions, 0),
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {countries.map(([country, pages]) => {
+        const allBot = pages.every((p) => classifyRow(p) === "bot");
+        return (
+          <div key={country}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <span style={{ color: "var(--text)", fontWeight: 700, fontSize: 12 }}>{country}</span>
+              {allBot && (
+                <span style={{ background: "#ef444422", color: "#ef4444", fontSize: 10, fontWeight: 800, borderRadius: 999, padding: "1px 7px" }}>
+                  provável bot
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {pages.map((p) => {
+                const bot = classifyRow(p) === "bot";
+                return (
+                  <div key={p.path} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, paddingLeft: 10 }}>
+                    <span
+                      style={{
+                        color: bot ? "var(--muted2)" : "var(--text)",
+                        flex: 1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={p.path}
+                    >
+                      {p.path}
+                    </span>
+                    <span style={{ color: "var(--muted2)", fontSize: 11, width: 50, textAlign: "right" }}>{p.avgSeconds}s</span>
+                    <span style={{ color: "var(--text)", fontWeight: 700, width: 30, textAlign: "right" }}>{p.sessions}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function Ranking({ items, translate }: { items: Slice[]; translate?: Record<string, string> }) {
@@ -453,6 +523,13 @@ function AnalyticsContent() {
               <p style={{ color: "var(--muted2)", fontSize: 11, margin: "12px 0 0" }}>
                 Precisão até o nível de cidade — o Google infere pelo IP e não devolve o endereço.
               </p>
+            </Panel>
+
+            <Panel
+              title="🕵️ País × página (visitante real ou bot?)"
+              hint="Sessão real tem duração e abre conteúdo; bot bate na raiz e some em 0s"
+            >
+              <CountryPagesTable rows={data.countryPages} />
             </Panel>
           </div>
 
