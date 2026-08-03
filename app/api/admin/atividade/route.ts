@@ -7,18 +7,24 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db, userActivity, users, songs } from "@/src/db";
-import { and, gte, eq, ne, isNull, or, lt, desc, count, countDistinct } from "drizzle-orm";
+import { and, gte, eq, ne, isNull, or, lt, desc, count, countDistinct, notInArray } from "drizzle-orm";
 import { isAdminRequest } from "@/src/lib/adminAuth";
 import { EVENT_LABELS, type ActivityEvent } from "@/src/lib/activity";
 import { roleLabel } from "@/src/lib/roles";
+import { internalTestEmailsOrUndefined } from "@/src/lib/internalTest";
 
 export const dynamic = "force-dynamic";
 
 const ALLOWED_DAYS = [7, 30, 90];
 const DORMANT_DAYS = 30;
 
-// O painel mede os usuários, não a equipe: contas admin ficam de fora de tudo.
-const NOT_ADMIN = ne(users.role, "admin");
+// O painel mede os usuários, não a equipe: admin E contas de teste interno
+// (ver src/lib/internalTest.ts) ficam de fora de tudo. A conta de teste tem
+// role normal de propósito, por isso não basta excluir por role.
+const testEmails = internalTestEmailsOrUndefined();
+const NOT_ADMIN = testEmails
+  ? and(ne(users.role, "admin"), notInArray(users.email, testEmails))
+  : ne(users.role, "admin");
 
 export async function GET(req: NextRequest) {
   if (!isAdminRequest(req)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });

@@ -19,6 +19,7 @@ export const authConfig: NextAuthConfig = {
       if (token) {
         (session.user as unknown as { id: string; role: string }).id   = token.id as string;
         (session.user as unknown as { id: string; role: string }).role = token.role as string;
+        session.user.isInternalTester = token.isInternalTester === true;
       }
       return session;
     },

@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { authConfig } from "./auth.config";
 import { expireTrialIfDue } from "@/src/lib/trials";
 import { track } from "@/src/lib/activity";
+import { isInternalTestEmail } from "@/src/lib/internalTest";
 
 // Conta impedida de logar: suspensa, banida ou em processo de exclusão (R3).
 function isLoginBlocked(u: { status?: string | null; deletionScheduledAt?: Date | null }): boolean {
@@ -83,6 +84,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .limit(1);
         if (dbUser) {
           token.id = String(dbUser.id);
+          token.isInternalTester = isInternalTestEmail(dbUser.email);
           // Analytics de produto: marca a entrada no sistema. Só no primeiro
           // login/refresh do token, não em toda requisição. Best effort.
           if (user) void track(dbUser.id, "login");

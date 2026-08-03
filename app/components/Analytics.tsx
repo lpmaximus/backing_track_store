@@ -4,11 +4,16 @@
  * Google Analytics com exclusão de tráfego interno.
  *
  * Sem isto, cada vez que o dono abre /admin o GA conta uma visita — e o painel
- * de audiência acaba medindo quem o construiu, não o público. Duas travas:
+ * de audiência acaba medindo quem o construiu, não o público. Quatro travas:
  *
- *  1. Área /admin nunca é medida (nem o script carrega, se a entrada foi direta).
- *  2. Usuário com role "admin" nunca é medido, em página nenhuma.
- *  3. Só mede em produção de verdade — nem `npm run dev`, nem deploy de preview.
+ *  1. Área /admin nunca é medida (nem o script carrega, se a entrada foi direta)
+ *     — cobre qualquer consulta de manutenção, de qualquer conta.
+ *  2. Usuário com role "admin" nunca é medido, em página nenhuma do site.
+ *  3. Conta marcada como teste interno (ver src/lib/internalTest.ts) também não
+ *     — existe porque a conta usada para testar como usuário comum
+ *     (lpmax.geek@gmail.com) precisa manter role normal para o teste valer,
+ *     então não cai na trava 2. Só um booleano chega ao navegador, nunca o e-mail.
+ *  4. Só mede em produção de verdade — nem `npm run dev`, nem deploy de preview.
  *     Sem esta trava, testar o site no localhost deslogado (ou em janela anônima,
  *     onde não há role de admin) polui o painel com o próprio desenvolvimento:
  *     foi o que aconteceu em 28/07/2026, com /en/bands e /en/setlists aparecendo
@@ -44,7 +49,8 @@ export default function Analytics() {
 
   const isAdminArea = pathname?.startsWith("/admin") ?? false;
   const isAdminUser = session?.user?.role === "admin";
-  const excluded = !IS_LIVE || isAdminArea || isAdminUser;
+  const isTestAccount = session?.user?.isInternalTester === true;
+  const excluded = !IS_LIVE || isAdminArea || isAdminUser || isTestAccount;
 
   useEffect(() => {
     if (typeof window === "undefined") return;

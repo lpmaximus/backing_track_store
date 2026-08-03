@@ -13,18 +13,23 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db, userActivity, users, songs } from "@/src/db";
-import { and, gte, lt, eq, ne, isNull, or, count, countDistinct, desc } from "drizzle-orm";
+import { and, gte, lt, eq, ne, isNull, or, count, countDistinct, desc, notInArray } from "drizzle-orm";
 import { batchRunReports, ga4Configured, num, dim } from "@/src/lib/ga4";
 import { EVENT_LABELS, type ActivityEvent } from "@/src/lib/activity";
 import { sendMail, mailerConfigured } from "@/src/lib/mailer";
+import { internalTestEmailsOrUndefined } from "@/src/lib/internalTest";
 
 export const runtime = "nodejs";
 
 const DAYS = 7; // janela do resumo: a semana corrente contra a anterior
 const DORMANT_DAYS = 30;
 
-// Contas admin não entram no resumo: o relatório mede o público, não a equipe.
-const NOT_ADMIN = ne(users.role, "admin");
+// Contas admin e de teste interno não entram no resumo: o relatório mede o
+// público, não a equipe (ver src/lib/internalTest.ts).
+const testEmails = internalTestEmailsOrUndefined();
+const NOT_ADMIN = testEmails
+  ? and(ne(users.role, "admin"), notInArray(users.email, testEmails))
+  : ne(users.role, "admin");
 
 function isCron(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
