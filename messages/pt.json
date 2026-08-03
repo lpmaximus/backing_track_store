@@ -144,7 +144,9 @@
     "bandFeature2": "Até 6 integrantes",
     "bandFeature3": "Setlists compartilhadas",
     "bandFeature4": "Auto-mute por instrumento",
-    "priceHidden": "Preço ainda não divulgado"
+    "priceHidden": "Preço ainda não divulgado",
+    "metaTitle": "Planos e preços",
+    "metaDescription": "Compare os planos do BackingTrack.store: gratuito, Pro e Banda. Separação de instrumentos, cifra sincronizada, setlists e modo palco."
   },
   "pricing": {
     "title": "Escolha seu plano",

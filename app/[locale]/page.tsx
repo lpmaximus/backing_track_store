@@ -1,12 +1,25 @@
+import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/src/i18n/navigation";
 import type { Locale } from "@/src/i18n/routing";
+import { alternatesFor } from "@/src/lib/seo";
 import { getPrice } from "@/src/lib/pricingIntl";
 import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
 import HeroCarousel from "@/app/components/HeroCarousel";
 import FaqSection, { type FaqItem } from "@/app/components/FaqSection";
 import BlurredPrice from "@/app/components/BlurredPrice";
+
+// Título e descrição vêm do layout (são os da marca). Aqui só o canonical:
+// sem isto a home ficaria sem canonical depois de removermos o do layout.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: Locale }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  return { alternates: alternatesFor("/", locale) };
+}
 
 export default async function HomePage({
   params,

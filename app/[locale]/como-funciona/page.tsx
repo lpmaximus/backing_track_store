@@ -4,6 +4,7 @@ import { Link } from "@/src/i18n/navigation";
 import type { Locale } from "@/src/i18n/routing";
 import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
+import { alternatesFor } from "@/src/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -12,7 +13,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "howItWorks" });
-  return { title: t("metaTitle"), description: t("metaDescription") };
+  return {
+    title: t("metaTitle"),
+    description: t("metaDescription") ,
+    alternates: alternatesFor("/como-funciona", locale),
+  };
 }
 
 export default async function ComoFuncionaPage({

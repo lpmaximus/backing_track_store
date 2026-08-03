@@ -4,6 +4,7 @@ import type { Locale } from "@/src/i18n/routing";
 import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
 import ContatoForm from "./ContatoForm";
+import { alternatesFor } from "@/src/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -12,7 +13,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "contact" });
-  return { title: t("metaTitle"), description: t("metaDescription") };
+  return {
+    title: t("metaTitle"),
+    description: t("metaDescription") ,
+    alternates: alternatesFor("/contato", locale),
+  };
 }
 
 // Server Component: SiteHeader usa auth()/db (Neon) e NÃO pode ser importado

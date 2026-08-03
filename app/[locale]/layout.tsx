@@ -11,9 +11,13 @@ export function generateStaticParams() {
 }
 
 /**
- * Metadata por idioma + hreflang.
- * O Google precisa ver, em cada versão, o link para a outra — sem isso ele
- * trata /en como conteúdo duplicado e escolhe sozinho qual indexar.
+ * Metadata por idioma.
+ *
+ * ⚠️ NÃO declarar `alternates` aqui. No App Router o campo é herdado por toda
+ * página que não o sobrescreve — e como este layout só conhece a home, o
+ * resultado era o site inteiro apontando canonical para "/" (bug em produção,
+ * corrigido em 03/08/2026). Canonical e hreflang agora são por página, via
+ * `alternatesFor()` em src/lib/seo.ts.
  */
 export async function generateMetadata({
   params,
@@ -28,14 +32,6 @@ export async function generateMetadata({
     metadataBase: new URL(base),
     title: { default: t("title"), template: `%s · BackingTrack.store` },
     description: t("description"),
-    alternates: {
-      canonical: `${base}${getPathname({ href: "/", locale })}`,
-      languages: {
-        "pt-BR": `${base}${getPathname({ href: "/", locale: "pt" })}`,
-        en: `${base}${getPathname({ href: "/", locale: "en" })}`,
-        "x-default": base,
-      },
-    },
     openGraph: {
       title: t("title"),
       description: t("description"),

@@ -6,6 +6,7 @@ import LegalPage from "@/app/components/LegalPage";
 import type { Locale } from "@/src/i18n/routing";
 import TermsContentPt from "./ContentPt";
 import TermsContentEn from "./ContentEn";
+import { alternatesFor } from "@/src/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -14,7 +15,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "legalPages" });
-  return { title: t("termsTitle"), description: t("termsDescription") };
+  return {
+    title: t("termsTitle"),
+    description: t("termsDescription") ,
+    alternates: alternatesFor("/termos", locale),
+  };
 }
 
 /**

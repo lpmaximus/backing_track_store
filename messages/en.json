@@ -144,7 +144,9 @@
     "bandFeature2": "Up to 6 members",
     "bandFeature3": "Shared setlists",
     "bandFeature4": "Auto-mute by instrument",
-    "priceHidden": "Price not announced yet"
+    "priceHidden": "Price not announced yet",
+    "metaTitle": "Plans and pricing",
+    "metaDescription": "Compare BackingTrack.store plans: free, Pro and Band. Stem separation, synced chord charts, setlists and stage mode."
   },
   "pricing": {
     "title": "Choose your plan",

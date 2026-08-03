@@ -1,8 +1,26 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
+import type { Locale } from "@/src/i18n/routing";
+import { alternatesFor } from "@/src/lib/seo";
 import { db, songs as songsTable } from "@/src/db";
 import { eq, ilike, or, and } from "drizzle-orm";
 import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
 import CatalogSection from "@/app/components/CatalogSection";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: Locale }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "catalog" });
+  return {
+    title: t("title"),
+    description: t("subtitle"),
+    alternates: alternatesFor("/catalogo", locale),
+  };
+}
 
 /** Rota dedicada do catálogo (BUY-002: antes vivia embutido na landing page). */
 export default async function CatalogoPage({

@@ -6,6 +6,7 @@ import LegalPage from "@/app/components/LegalPage";
 import type { Locale } from "@/src/i18n/routing";
 import PrivacyContentPt from "./ContentPt";
 import PrivacyContentEn from "./ContentEn";
+import { alternatesFor } from "@/src/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -14,7 +15,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "legalPages" });
-  return { title: t("privacyTitle"), description: t("privacyDescription") };
+  return {
+    title: t("privacyTitle"),
+    description: t("privacyDescription") ,
+    alternates: alternatesFor("/privacidade", locale),
+  };
 }
 
 export default async function PrivacidadePage({

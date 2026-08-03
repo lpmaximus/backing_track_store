@@ -6,6 +6,7 @@ import LegalPage from "@/app/components/LegalPage";
 import type { Locale } from "@/src/i18n/routing";
 import CookiesContentPt from "./ContentPt";
 import CookiesContentEn from "./ContentEn";
+import { alternatesFor } from "@/src/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -14,7 +15,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "legalPages" });
-  return { title: t("cookiesTitle"), description: t("cookiesDescription") };
+  return {
+    title: t("cookiesTitle"),
+    description: t("cookiesDescription") ,
+    alternates: alternatesFor("/cookies", locale),
+  };
 }
 
 export default async function CookiesPage({

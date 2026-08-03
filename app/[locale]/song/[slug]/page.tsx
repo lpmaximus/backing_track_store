@@ -19,6 +19,7 @@ import { markFirstUse } from "@/src/lib/invites";
 import SongPlayer from "./SongPlayer";
 import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
+import { alternatesFor } from "@/src/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -32,13 +33,16 @@ export async function generateMetadata({
   if (!song) return {};
   const t = await getTranslations({ locale, namespace: "song" });
   return {
-    title: `${song.title} | BackingTrack.store`,
+    // Sem "| BackingTrack.store" aqui: o template do layout já acrescenta
+    // "· BackingTrack.store" e o título saía com a marca duplicada.
+    title: song.title,
     description: t("metaDescription", {
       title: song.title,
       artist: song.artist,
       key: song.key,
       bpm: song.bpm,
     }),
+    alternates: alternatesFor({ pathname: "/song/[slug]", params: { slug } }, locale),
   };
 }
 

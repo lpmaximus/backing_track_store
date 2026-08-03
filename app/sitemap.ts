@@ -68,14 +68,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .where(eq(songsTable.published, true));
     const genreList = genreRows.map(r => r.genre).filter((g): g is string => !!g);
 
-    genreEntries = genreList.flatMap(g =>
-      routing.locales.map((locale: Locale) => ({
-        url: `${base}${getPathname({ href: "/catalogo", locale })}?genre=${encodeURIComponent(g)}`,
+    genreEntries = genreList.flatMap(g => {
+      const query = `?genre=${encodeURIComponent(g)}`;
+      const languages: Record<string, string> = {};
+      for (const l of routing.locales) {
+        languages[htmlLang[l]] = `${base}${getPathname({ href: "/catalogo", locale: l })}${query}`;
+      }
+      return routing.locales.map((locale: Locale) => ({
+        url: `${base}${getPathname({ href: "/catalogo", locale })}${query}`,
         lastModified: now,
         changeFrequency: "weekly" as const,
         priority: 0.5,
-      })),
-    );
+        // O ?genre faz parte da URL indexável — o hreflang tem que carregá-lo.
+        alternates: { languages },
+      }));
+    });
   } catch {
     genreEntries = [];
   }
@@ -93,14 +100,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         eq(songsTable.moderationStatus, "approved"),
       ));
 
-    songEntries = rows.flatMap(({ slug, updatedAt }) =>
-      routing.locales.map((locale: Locale) => ({
-        url: `${base}${getPathname({ href: { pathname: "/song/[slug]", params: { slug } }, locale })}`,
+    songEntries = rows.flatMap(({ slug, updatedAt }) => {
+      const href = { pathname: "/song/[slug]" as const, params: { slug } };
+      return routing.locales.map((locale: Locale) => ({
+        url: `${base}${getPathname({ href, locale })}`,
         lastModified: updatedAt ?? now,
         changeFrequency: "monthly" as const,
         priority: 0.8,
-      })),
-    );
+        // Sem isto o Google vê /song/x e /en/song/x como duplicatas.
+        alternates: alternates(href, base),
+      }));
+    });
   } catch {
     songEntries = [];
   }
