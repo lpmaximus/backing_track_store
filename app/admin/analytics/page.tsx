@@ -38,6 +38,7 @@ type Analytics = {
   regions: Slice[];
   cities: Slice[];
   countryPages: { country: string; path: string; sessions: number; avgSeconds: number }[];
+  countryTech: { country: string; browser: string; os: string; sessions: number; avgSeconds: number }[];
   generatedAt: string;
 };
 
@@ -222,6 +223,75 @@ function CountryPagesTable({ rows }: { rows: CountryPageRow[] }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+type CountryTechRow = { country: string; browser: string; os: string; sessions: number; avgSeconds: number };
+
+// Navegador/SO fora do trivial (Safari, macOS, Linux) costuma ser lido como
+// "deve ser gente de verdade", mas isso sozinho não prova nada: automação tipo
+// Playwright escolhe perfil raro justamente para não parecer robô. O que
+// realmente separa é a DURAÇÃO — por isso a marcação abaixo olha o tempo, e o
+// navegador entra só como contexto de onde aquele acesso veio.
+const RARE_STACK = /safari|firefox|opera|edge/i;
+
+function isRare(r: CountryTechRow): boolean {
+  return RARE_STACK.test(r.browser) || /Macintosh|Linux/i.test(r.os);
+}
+
+function CountryTechTable({ rows }: { rows: CountryTechRow[] }) {
+  if (rows.length === 0) return <p style={{ color: "var(--muted2)", fontSize: 13, margin: 0 }}>Sem dados no período.</p>;
+
+  const byCountry = new Map<string, CountryTechRow[]>();
+  for (const r of rows) {
+    if (!byCountry.has(r.country)) byCountry.set(r.country, []);
+    byCountry.get(r.country)!.push(r);
+  }
+  const countries = [...byCountry.entries()].sort(
+    (a, b) => b[1].reduce((s, r) => s + r.sessions, 0) - a[1].reduce((s, r) => s + r.sessions, 0),
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {countries.map(([country, stacks]) => (
+        <div key={country}>
+          <div style={{ color: "var(--text)", fontWeight: 700, fontSize: 12, marginBottom: 4 }}>{country}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            {stacks
+              .sort((a, b) => b.sessions - a.sessions)
+              .map((s) => {
+                // Sessão sem duração nenhuma é o sinal que pesa, venha do
+                // navegador que vier.
+                const noTime = s.avgSeconds < 5;
+                return (
+                  <div
+                    key={`${s.browser}-${s.os}`}
+                    style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, paddingLeft: 10 }}
+                  >
+                    <span
+                      style={{
+                        color: noTime ? "var(--muted2)" : "var(--text)",
+                        flex: 1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={`${s.browser} · ${s.os}`}
+                    >
+                      {s.browser} · {OS_LABELS[s.os] ?? s.os}
+                      {isRare(s) && !noTime && (
+                        <span style={{ color: "#16a34a", fontSize: 10, fontWeight: 800, marginLeft: 6 }}>raro</span>
+                      )}
+                    </span>
+                    <span style={{ color: "var(--muted2)", fontSize: 11, width: 50, textAlign: "right" }}>{s.avgSeconds}s</span>
+                    <span style={{ color: "var(--text)", fontWeight: 700, width: 30, textAlign: "right" }}>{s.sessions}</span>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -530,6 +600,17 @@ function AnalyticsContent() {
               hint="Sessão real tem duração e abre conteúdo; bot bate na raiz e some em 0s"
             >
               <CountryPagesTable rows={data.countryPages} />
+            </Panel>
+
+            <Panel
+              title="🧩 País × navegador/SO"
+              hint="De onde veio o navegador raro — duração continua sendo o que separa gente de bot"
+            >
+              <CountryTechTable rows={data.countryTech ?? []} />
+              <p style={{ color: "var(--muted2)", fontSize: 11, margin: "12px 0 0" }}>
+                Navegador incomum não prova visitante humano (automação escolhe perfil raro de propósito). O que
+                pesa é o tempo de sessão: linha esmaecida ficou menos de 5s.
+              </p>
             </Panel>
           </div>
 

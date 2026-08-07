@@ -126,13 +126,28 @@ export async function GET(req: NextRequest) {
           limit: 40,
           excludePrefix: { dimension: "pagePath", value: "/admin" },
         },
+        // País × navegador/SO. Os painéis de "Navegador e sistema" e de
+        // "Localização" são listas separadas: dá para ver que existe 1 macOS e
+        // 1 Linux no total, mas não DE ONDE eles vieram — e é exatamente essa a
+        // pergunta quando aparece acesso de Iowa ou Frankfurt. Aqui os dois
+        // ficam na mesma linha. Serve para os dois lados: navegador exótico com
+        // sessão longa reforça visitante real; frota inteira do mesmo
+        // navegador/SO com 0s num país só é a assinatura clássica de bot.
+        {
+          dimensions: ["country", "browser", "operatingSystem"],
+          metrics: ["sessions", "averageSessionDuration"],
+          startDate,
+          endDate,
+          orderByMetric: "sessions",
+          limit: 30,
+        },
       ]),
       runRealtimeActiveUsers().catch(() => 0),
     ]);
 
     const [totalsR, dailyR, nvrR, pagesR, channelsR] = batchA;
     const [devicesR, citiesR, prevR, countriesR, regionsR] = batchB;
-    const [browsersR, sourcesR, osR, countryPageR] = batchC;
+    const [browsersR, sourcesR, osR, countryPageR, countryTechR] = batchC;
 
     const t = totalsR?.rows?.[0];
     const p = prevR?.rows?.[0];
@@ -180,6 +195,18 @@ export async function GET(req: NextRequest) {
       countryPages: (countryPageR?.rows ?? [])
         .map((r) => ({ country: dim(r, 0), path: dim(r, 1), sessions: num(r, 0), avgSeconds: Math.round(num(r, 1)) }))
         .filter((r) => r.country && r.country !== "(not set)" && r.path),
+      // De onde veio o navegador raro. Responde "aquele único macOS/Linux é o
+      // visitante estrangeiro ou é alguém do Brasil?" — que as listas separadas
+      // de navegador e de país não conseguem responder.
+      countryTech: (countryTechR?.rows ?? [])
+        .map((r) => ({
+          country: dim(r, 0),
+          browser: dim(r, 1),
+          os: dim(r, 2),
+          sessions: num(r, 0),
+          avgSeconds: Math.round(num(r, 1)),
+        }))
+        .filter((r) => r.country && r.country !== "(not set)" && r.browser),
       generatedAt: new Date().toISOString(),
     };
 
