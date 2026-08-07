@@ -2,11 +2,15 @@
  * /api/admin/users  (R3 / ADR-BTS-003)
  *   GET   → lista usuários (plano, papel, status, uso do mês, assinatura).
  *   PATCH → ações: setRole | setStatus | scheduleDeletion | cancelDeletion |
- *           resetPassword | resendCharge.
+ *           hardDelete | resetPassword | resendCharge.
  *
  * Decisões (2026-07-18): "Cobrar" = só reenviar link Asaas + trocar plano
  * manual (sem cobrança avulsa nova); exclusão = hard delete com retenção de
  * 30 dias (agenda aqui; purga em /api/admin/users/purge).
+ *
+ * 2026-08-07: adicionado `hardDelete` — exclusão imediata e irreversível, sem
+ * a janela de 30 dias. Exige `confirmEmail` idêntico ao e-mail do usuário e
+ * recusa contas com papel admin (evita apagar a própria conta por engano).
  */
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
@@ -93,7 +97,7 @@ export async function PATCH(req: NextRequest) {
   if (!isAdminRequest(req)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
   try {
-    const body = (await req.json()) as { userId?: number; action?: string; role?: string; status?: string; reason?: string };
+    const body = (await req.json()) as { userId?: number; action?: string; role?: string; status?: string; reason?: string; confirmEmail?: string };
     const userId = Number(body.userId);
     if (!userId || !body.action) return NextResponse.json({ error: "userId e action obrigatórios" }, { status: 400 });
 
@@ -122,6 +126,25 @@ export async function PATCH(req: NextRequest) {
       case "cancelDeletion": {
         await db.update(users).set({ deletionScheduledAt: null, updatedAt: new Date() }).where(eq(users.id, userId));
         return NextResponse.json({ ok: true });
+      }
+      case "hardDelete": {
+        // Exclusão imediata e irreversível (LGPD, a pedido do titular ou
+        // limpeza de conta de teste). Sem retenção — não há como desfazer.
+        if (user.role === "admin") {
+          return NextResponse.json({ error: "Conta admin não pode ser excluída pelo painel. Troque o papel antes." }, { status: 403 });
+        }
+        // Trava anti-engano: o admin precisa digitar o e-mail exato.
+        const confirm = (body.confirmEmail ?? "").trim().toLowerCase();
+        if (!confirm || confirm !== user.email.trim().toLowerCase()) {
+          return NextResponse.json({ error: "Confirmação inválida: digite o e-mail exato do usuário." }, { status: 400 });
+        }
+        // O cascade do schema remove setlists, membros de banda, comentários,
+        // notificações, etc. Músicas enviadas ficam com uploader nulo (o
+        // acervo compartilhado não é apagado junto).
+        const deleted = await db.delete(users).where(eq(users.id, userId)).returning({ id: users.id });
+        if (!deleted.length) return NextResponse.json({ error: "Nada foi excluído" }, { status: 404 });
+        console.warn(`[admin] hardDelete usuário #${userId} <${user.email}>`);
+        return NextResponse.json({ ok: true, deleted: true, id: userId, email: user.email });
       }
       case "resetPassword": {
         // Gera senha temporária, salva o hash e devolve o texto UMA vez ao admin.

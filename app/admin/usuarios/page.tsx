@@ -41,8 +41,21 @@ function UsuariosContent() {
     if (!res.ok) { setMsg(`❌ ${data.error}`); return; }
     if (data.tempPassword) setMsg(`🔑 Senha temporária de #${userId}: ${data.tempPassword} (mostra uma vez)`);
     else if (data.paymentLink) setMsg(`💳 Link de cobrança de #${userId}: ${data.paymentLink}`);
+    else if (data.deleted) setMsg(`🗑️ Usuário ${data.email} (#${userId}) excluído definitivamente do banco.`);
     else setMsg("✅ Feito.");
     load();
+  }
+
+  // Exclusão imediata: dupla trava (confirm + digitar o e-mail exato), porque
+  // não existe retenção nem desfazer — o registro sai do banco na hora.
+  function hardDelete(u: AdminUser) {
+    if (!confirm(`EXCLUIR AGORA e para sempre a conta de ${u.email}?\n\nIsso apaga o usuário e todos os dados vinculados (bandas, setlists, comentários, notificações). NÃO há retenção de 30 dias e NÃO dá para desfazer.`)) return;
+    const typed = prompt(`Confirme digitando o e-mail exato do usuário:\n${u.email}`) ?? "";
+    if (typed.trim().toLowerCase() !== u.email.trim().toLowerCase()) {
+      setMsg("❌ Exclusão cancelada: e-mail digitado não confere.");
+      return;
+    }
+    act(u.id, "hardDelete", { confirmEmail: typed.trim() });
   }
 
   const filtered = users.filter((u) => !q || u.email.toLowerCase().includes(q.toLowerCase()) || (u.name ?? "").toLowerCase().includes(q.toLowerCase()));
@@ -103,6 +116,9 @@ function UsuariosContent() {
               ) : (
                 <ActBtn onClick={() => confirm("Agendar exclusão (30 dias de retenção)?") && act(u.id, "scheduleDeletion")} label="Excluir (30d)" color="var(--danger)" />
               )}
+              {u.role !== "admin" && (
+                <ActBtn onClick={() => hardDelete(u)} label="Excluir agora ⚠" color="var(--danger)" solid />
+              )}
             </div>
           </div>
         ))}
@@ -111,10 +127,15 @@ function UsuariosContent() {
   );
 }
 
-function ActBtn({ onClick, label, color }: { onClick: () => void; label: string; color?: string }) {
+function ActBtn({ onClick, label, color, solid }: { onClick: () => void; label: string; color?: string; solid?: boolean }) {
   return (
     <button onClick={onClick}
-      style={{ background: "var(--surface2)", border: `1px solid ${color ?? "var(--border)"}`, color: color ?? "var(--text)", padding: "5px 10px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+      style={{
+        background: solid ? (color ?? "var(--danger)") : "var(--surface2)",
+        border: `1px solid ${color ?? "var(--border)"}`,
+        color: solid ? "#fff" : (color ?? "var(--text)"),
+        padding: "5px 10px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontWeight: 600,
+      }}>
       {label}
     </button>
   );
