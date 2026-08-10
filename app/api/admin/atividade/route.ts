@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db, userActivity, users, songs } from "@/src/db";
-import { and, gte, eq, ne, isNull, or, lt, desc, count, countDistinct, notInArray } from "drizzle-orm";
+import { and, gte, eq, ne, isNull, or, lt, desc, count, countDistinct, notInArray, sql } from "drizzle-orm";
 import { isAdminRequest } from "@/src/lib/adminAuth";
 import { EVENT_LABELS, type ActivityEvent } from "@/src/lib/activity";
 import { roleLabel } from "@/src/lib/roles";
@@ -17,6 +17,10 @@ export const dynamic = "force-dynamic";
 
 const ALLOWED_DAYS = [7, 30, 90];
 const DORMANT_DAYS = 30;
+// Feed de acessos: o suficiente para "o que aconteceu hoje/ontem" sem virar
+// dump da tabela inteira no navegador.
+const RECENT_LIMIT = 80;
+const PEOPLE_LIMIT = 300;
 
 // O painel mede os usuários, não a equipe: admin E contas de teste interno
 // (ver src/lib/internalTest.ts) ficam de fora de tudo. A conta de teste tem
@@ -46,6 +50,9 @@ export async function GET(req: NextRequest) {
       topUsers,
       dormant,
       newUsers,
+      recent,
+      people,
+      peopleEvents,
     ] = await Promise.all([
       // Base de cadastrados (exclui contas em exclusão)
       db.select({ n: count() }).from(users).where(and(isNull(users.deletionScheduledAt), NOT_ADMIN)),
@@ -131,12 +138,61 @@ export async function GET(req: NextRequest) {
         .select({ n: count() })
         .from(users)
         .where(and(isNull(users.deletionScheduledAt), NOT_ADMIN, gte(users.createdAt, since))),
+
+      // ── Últimos acessos ──────────────────────────────────────────────────
+      // Feed cru de quem entrou e o que fez, em ordem cronológica inversa.
+      // Só usuário logado: o GA4 não expõe hit a hit, então visitante anônimo
+      // continua aparecendo só nos totais lá em cima.
+      db
+        .select({
+          id: userActivity.id,
+          event: userActivity.event,
+          at: userActivity.createdAt,
+          name: users.name,
+          email: users.email,
+          role: users.role,
+          songTitle: songs.title,
+          songArtist: songs.artist,
+          songSlug: songs.slug,
+        })
+        .from(userActivity)
+        .innerJoin(users, eq(users.id, userActivity.userId))
+        .leftJoin(songs, eq(songs.id, userActivity.songId))
+        .where(NOT_ADMIN)
+        .orderBy(desc(userActivity.createdAt))
+        .limit(RECENT_LIMIT),
+
+      // ── Lista de cadastrados ─────────────────────────────────────────────
+      // Ordenada pelo último sinal de vida: quem está sumido cai para o fim.
+      db
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role,
+          status: users.status,
+          createdAt: users.createdAt,
+          lastSeenAt: users.lastSeenAt,
+          deletionScheduledAt: users.deletionScheduledAt,
+        })
+        .from(users)
+        .where(NOT_ADMIN)
+        .orderBy(sql`${users.lastSeenAt} desc nulls last`)
+        .limit(PEOPLE_LIMIT),
+
+      // Eventos no período por usuário — coluna "atividade" da lista acima.
+      db
+        .select({ userId: userActivity.userId, n: count() })
+        .from(userActivity)
+        .where(gte(userActivity.createdAt, since))
+        .groupBy(userActivity.userId),
     ]);
 
     const registered = totals[0]?.n ?? 0;
     const active = activeNow[0]?.n ?? 0;
     const prevActive = activePrev[0]?.n ?? 0;
     const novos = newUsers[0]?.n ?? 0;
+    const eventsByUser = new Map(peopleEvents.map((e) => [e.userId, e.n]));
 
     return NextResponse.json({
       days,
@@ -159,6 +215,32 @@ export async function GET(req: NextRequest) {
         value: u.n,
         lastSeenAt: u.lastSeenAt,
       })),
+      recent: recent.map((r) => ({
+        id: r.id,
+        event: r.event,
+        eventLabel: EVENT_LABELS[r.event as ActivityEvent] ?? r.event,
+        at: r.at,
+        user: r.name || r.email,
+        email: r.email,
+        role: roleLabel(r.role),
+        rawRole: r.role,
+        song: r.songTitle ? `${r.songTitle} — ${r.songArtist}` : null,
+        songSlug: r.songSlug ?? null,
+      })),
+      recentLimit: RECENT_LIMIT,
+      people: people.map((u) => ({
+        id: u.id,
+        name: u.name || u.email.split("@")[0],
+        email: u.email,
+        role: roleLabel(u.role),
+        rawRole: u.role,
+        status: u.status,
+        createdAt: u.createdAt,
+        lastSeenAt: u.lastSeenAt,
+        deleting: Boolean(u.deletionScheduledAt),
+        events: eventsByUser.get(u.id) ?? 0,
+      })),
+      peopleLimit: PEOPLE_LIMIT,
       generatedAt: new Date().toISOString(),
     });
   } catch (err) {

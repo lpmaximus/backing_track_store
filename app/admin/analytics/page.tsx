@@ -341,6 +341,32 @@ function Sparkline({ data }: { data: { date: string; users: number }[] }) {
   );
 }
 
+type AccessRow = {
+  id: number;
+  event: string;
+  eventLabel: string;
+  at: string;
+  user: string;
+  email: string;
+  role: string;
+  rawRole: string;
+  song: string | null;
+  songSlug: string | null;
+};
+
+type PersonRow = {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  rawRole: string;
+  status: string;
+  createdAt: string;
+  lastSeenAt: string | null;
+  deleting: boolean;
+  events: number;
+};
+
 type Activity = {
   days: number;
   pendingMigration?: boolean;
@@ -355,7 +381,217 @@ type Activity = {
   byEvent: (Slice & { people: number })[];
   topSongs: (Slice & { slug: string })[];
   topUsers: (Slice & { role: string; lastSeenAt: string | null })[];
+  recent: AccessRow[];
+  recentLimit: number;
+  people: PersonRow[];
+  peopleLimit: number;
 };
+
+const EVENT_ICONS: Record<string, string> = {
+  login: "🔑",
+  play: "▶️",
+  mixer: "🎛️",
+  cifra: "🎼",
+  letra: "🎤",
+  setlist_open: "📋",
+  setlist_create: "➕",
+  stage_mode: "🎪",
+  upload: "⬆️",
+  export: "⬇️",
+};
+
+const ROLE_COLORS: Record<string, string> = {
+  free: "var(--muted2)",
+  pro: "#f59e0b",
+  proband: "#8b5cf6",
+};
+
+/** "há 4 min" / "há 3 h" / "12/08 14:30" — o que importa é ser lido de relance. */
+function ago(iso: string | null): string {
+  if (!iso) return "nunca";
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 0) return "agora";
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "agora";
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h} h`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `há ${d} d`;
+  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
+function fmtStamp(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function RoleTag({ role, raw }: { role: string; raw?: string }) {
+  const color = ROLE_COLORS[raw ?? ""] ?? "var(--muted2)";
+  return (
+    <span style={{ color, border: `1px solid ${color}55`, borderRadius: 999, fontSize: 10, fontWeight: 800, padding: "1px 7px", whiteSpace: "nowrap" }}>
+      {role}
+    </span>
+  );
+}
+
+/** Feed cronológico de quem entrou e o que fez. Só usuário logado. */
+function RecentAccessList({ rows, limit }: { rows: AccessRow[]; limit: number }) {
+  const [showAll, setShowAll] = useState(false);
+  if (rows.length === 0) {
+    return <p style={{ color: "var(--muted2)", fontSize: 13, margin: 0 }}>Nenhum acesso registrado ainda.</p>;
+  }
+  const visible = showAll ? rows : rows.slice(0, 15);
+  return (
+    <div>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {visible.map((r) => (
+          <div
+            key={r.id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 12,
+              padding: "6px 0",
+              borderBottom: "1px solid var(--border)",
+            }}
+          >
+            <span style={{ width: 18, flexShrink: 0 }} aria-hidden>{EVENT_ICONS[r.event] ?? "•"}</span>
+            <span
+              style={{ color: "var(--text)", fontWeight: 700, width: 150, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              title={r.email}
+            >
+              {r.user}
+            </span>
+            <RoleTag role={r.role} raw={r.rawRole} />
+            <span style={{ color: "var(--muted)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {r.eventLabel}
+              {r.song && <span style={{ color: "var(--muted2)" }}> · {r.song}</span>}
+            </span>
+            <span style={{ color: "var(--muted2)", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }} title={fmtStamp(r.at)}>
+              {ago(r.at)}
+            </span>
+          </div>
+        ))}
+      </div>
+      {rows.length > 15 && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          style={{ marginTop: 10, background: "none", border: "none", color: "#f59e0b", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0 }}
+        >
+          {showAll ? "Mostrar menos" : `Ver todos os ${rows.length}`}
+        </button>
+      )}
+      <p style={{ color: "var(--muted2)", fontSize: 11, margin: "10px 0 0" }}>
+        Últimos {limit} eventos de contas logadas, independente do período selecionado. Visitante anônimo não entra
+        aqui — o Google Analytics só devolve totais, nunca acesso a acesso.
+      </p>
+    </div>
+  );
+}
+
+/** Lista de cadastrados, do mais recentemente visto ao mais sumido. */
+function PeopleList({ people, days }: { people: PersonRow[]; days: number }) {
+  const [query, setQuery] = useState("");
+  const [showAll, setShowAll] = useState(false);
+
+  if (people.length === 0) {
+    return <p style={{ color: "var(--muted2)", fontSize: 13, margin: 0 }}>Nenhum usuário cadastrado ainda.</p>;
+  }
+
+  const q = query.trim().toLowerCase();
+  const filtered = q ? people.filter((p) => p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)) : people;
+  const visible = showAll ? filtered : filtered.slice(0, 20);
+
+  return (
+    <div>
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Buscar por nome ou e-mail…"
+        aria-label="Buscar usuário cadastrado"
+        style={{
+          width: "100%", padding: "7px 10px", marginBottom: 10, fontSize: 12,
+          background: "var(--surface2)", color: "var(--text)",
+          border: "1px solid var(--border)", borderRadius: 8,
+        }}
+      />
+
+      <div style={{ display: "flex", gap: 8, fontSize: 10, fontWeight: 800, color: "var(--muted2)", textTransform: "uppercase", letterSpacing: "0.06em", paddingBottom: 6, borderBottom: "1px solid var(--border)" }}>
+        <span style={{ flex: 1 }}>Usuário</span>
+        <span style={{ width: 70, textAlign: "right" }}>Cadastro</span>
+        <span style={{ width: 60, textAlign: "right" }}>Eventos</span>
+        <span style={{ width: 74, textAlign: "right" }}>Visto</span>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {visible.map((p) => {
+          const inativo = !p.lastSeenAt;
+          return (
+            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, padding: "7px 0", borderBottom: "1px solid var(--border)" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ color: "var(--text)", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {p.name}
+                  </span>
+                  <RoleTag role={p.role} raw={p.rawRole} />
+                  {p.status !== "active" && (
+                    <span style={{ background: "#ef444422", color: "#ef4444", fontSize: 10, fontWeight: 800, borderRadius: 999, padding: "1px 7px" }}>
+                      {p.status === "blocked" ? "bloqueado" : "banido"}
+                    </span>
+                  )}
+                  {p.deleting && (
+                    <span style={{ background: "#f59e0b22", color: "#f59e0b", fontSize: 10, fontWeight: 800, borderRadius: 999, padding: "1px 7px" }}>
+                      exclusão agendada
+                    </span>
+                  )}
+                </div>
+                <span style={{ color: "var(--muted2)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
+                  {p.email}
+                </span>
+              </div>
+              <span style={{ color: "var(--muted2)", fontSize: 11, width: 70, textAlign: "right", flexShrink: 0 }}>
+                {new Date(p.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+              </span>
+              <span style={{ color: p.events > 0 ? "var(--text)" : "var(--muted2)", fontWeight: 700, width: 60, textAlign: "right", flexShrink: 0 }}>
+                {p.events}
+              </span>
+              <span
+                style={{ color: inativo ? "#ef4444" : "var(--muted)", fontSize: 11, width: 74, textAlign: "right", flexShrink: 0 }}
+                title={p.lastSeenAt ? fmtStamp(p.lastSeenAt) : "Nunca deu sinal de vida"}
+              >
+                {ago(p.lastSeenAt)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {filtered.length === 0 && (
+        <p style={{ color: "var(--muted2)", fontSize: 13, margin: "10px 0 0" }}>Nenhum usuário bate com &ldquo;{query}&rdquo;.</p>
+      )}
+
+      {filtered.length > 20 && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          style={{ marginTop: 10, background: "none", border: "none", color: "#f59e0b", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0 }}
+        >
+          {showAll ? "Mostrar menos" : `Ver todos os ${filtered.length}`}
+        </button>
+      )}
+
+      <p style={{ color: "var(--muted2)", fontSize: 11, margin: "10px 0 0" }}>
+        &ldquo;Eventos&rdquo; conta os últimos {days} dias; &ldquo;visto&rdquo; é o último sinal de vida, sem recorte de
+        período. Para trocar plano, bloquear ou excluir, use <a href="/admin/usuarios" style={{ color: "#f59e0b" }}>Usuários</a>.
+      </p>
+    </div>
+  );
+}
 
 function UsersPanel({ days }: { days: number }) {
   const [data, setData] = useState<Activity | null>(null);
@@ -399,6 +635,18 @@ function UsersPanel({ days }: { days: number }) {
           delta={data.activeDelta}
         />
         <Kpi label="Dormentes" value={data.dormant.toLocaleString("pt-BR")} sub="sem sinal há 30+ dias" />
+      </div>
+
+      {/* Feed e lista ficam antes dos agregados: quando se abre o painel a
+          pergunta quase sempre é "quem entrou agora?", não "qual o ranking". */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 }}>
+        <Panel title="🕒 Últimos acessos" hint="Quem entrou e o que fez, do mais recente para o mais antigo">
+          <RecentAccessList rows={data.recent ?? []} limit={data.recentLimit ?? 80} />
+        </Panel>
+
+        <Panel title="👥 Usuários cadastrados" hint={`${data.people?.length ?? 0} conta(s) na lista — ordenadas pelo último acesso`}>
+          <PeopleList people={data.people ?? []} days={days} />
+        </Panel>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
