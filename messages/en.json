@@ -855,5 +855,14 @@
     "onList": "You're on the list!",
     "ok": "Great! You'll be among the first to know.",
     "errConnection": "No connection. Please try again."
+  },
+  "freePromo": {
+    "badge": "FREE PLAN",
+    "title": "Play for free, <accent>forever.</accent>",
+    "subtitle": "Create your account and play along with separated instruments, chords and lyrics on screen. Free never expires and never asks for a card — it's a plan, not a trial.",
+    "cta": "Create free account",
+    "ctaSecondary": "Browse the catalog",
+    "note": "Takes under a minute. No credit card.",
+    "trial": "Want to try the Pro features for a limited time? <link>Request a trial invite</link>."
   }
 }

@@ -208,6 +208,14 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .mixmock .tagmute { font-size: 9px; font-weight: 800; color: var(--accent); width: 44px; text-align: right; }
 @media (max-width: 880px) { .bandsec-inner { grid-template-columns: 1fr; padding: 60px 24px; } }
 
+/* Banner promocional do plano Free (topo da home) — duas colunas: chamada +
+   lista de vantagens. A lista vira 2 colunas em telas médias para não empurrar
+   o hero para baixo demais, e 1 coluna no celular. */
+.freepromo-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 44px; align-items: center; }
+.freepromo-list { column-gap: 28px; }
+@media (min-width: 881px) { .freepromo-list { columns: 2; } .freepromo-list li { break-inside: avoid; } }
+@media (max-width: 880px) { .freepromo-grid { grid-template-columns: 1fr; gap: 26px; } }
+
 /* Header — nav completa em telas largas, hamburguer (MobileNav) abaixo de 880px */
 .mobile-nav-toggle { display: none; }
 @media (max-width: 880px) {

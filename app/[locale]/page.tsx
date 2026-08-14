@@ -8,6 +8,7 @@ import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
 import HeroCarousel from "@/app/components/HeroCarousel";
 import FaqSection, { type FaqItem } from "@/app/components/FaqSection";
+import FreePromoBanner from "@/app/components/FreePromoBanner";
 import BlurredPrice from "@/app/components/BlurredPrice";
 
 // Título e descrição vêm do layout (são os da marca). Aqui só o canonical:
@@ -110,6 +111,9 @@ export default async function HomePage({
           </p>
         </div>
       </div>
+
+      {/* PROMO DO PLANO FREE — só aparece para visitante deslogado */}
+      <FreePromoBanner />
 
       <main style={{ minHeight: "100vh", background: "var(--bg)" }}>
 
