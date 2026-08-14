@@ -858,11 +858,11 @@
   },
   "freePromo": {
     "badge": "PLANO FREE",
-    "title": "Toque de graça, <accent>para sempre.</accent>",
-    "subtitle": "Crie sua conta e já toque com os instrumentos separados, cifra e letra na tela. O Free não expira e não pede cartão — é plano, não é teste.",
+    "title": "Toque de graça, <accent>sem cartão.</accent>",
+    "subtitle": "Crie sua conta e já toque com os instrumentos separados, cifra e letra na tela. O Free é plano, não é teste.",
     "cta": "Criar conta grátis",
     "ctaSecondary": "Ver o catálogo",
-    "note": "Leva menos de 1 minuto. Sem cartão de crédito.",
+    "note": "Leva menos de 1 minuto para criar sua conta.",
     "trial": "Quer experimentar os recursos do Pro por tempo limitado? <link>Peça um convite de teste</link>."
   }
 }

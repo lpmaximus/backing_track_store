@@ -858,11 +858,11 @@
   },
   "freePromo": {
     "badge": "FREE PLAN",
-    "title": "Play for free, <accent>forever.</accent>",
-    "subtitle": "Create your account and play along with separated instruments, chords and lyrics on screen. Free never expires and never asks for a card — it's a plan, not a trial.",
+    "title": "Play for free, <accent>no card needed.</accent>",
+    "subtitle": "Create your account and play along with separated instruments, chords and lyrics on screen. Free is a plan, not a trial.",
     "cta": "Create free account",
     "ctaSecondary": "Browse the catalog",
-    "note": "Takes under a minute. No credit card.",
+    "note": "Creating your account takes under a minute.",
     "trial": "Want to try the Pro features for a limited time? <link>Request a trial invite</link>."
   }
 }
