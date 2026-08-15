@@ -53,6 +53,13 @@ function EntrarForm() {
         setLoading(false);
         return;
       }
+
+      // Cadastro concluído — evento pro Pixel do TikTok (campanha de conversão).
+      // Só dispara aqui porque só aqui sabemos que é um cadastro novo por
+      // e-mail/senha; login/cadastro via Google não passa por este branch.
+      (window as unknown as { ttq?: { track: (e: string) => void } }).ttq?.track(
+        "CompleteRegistration"
+      );
     }
 
     const result = await signIn("credentials", {

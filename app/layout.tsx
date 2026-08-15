@@ -3,6 +3,7 @@ import "./globals.css";
 import { getLocale } from "next-intl/server";
 import { SessionProvider } from "next-auth/react";
 import Analytics from "./components/Analytics";
+import TikTokPixel from "./components/TikTokPixel";
 import AdSense from "./components/AdSense";
 import { htmlLang, type Locale } from "@/src/i18n/routing";
 
@@ -33,6 +34,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {/* Dentro do SessionProvider: precisa saber se quem navega é admin
               para não medir o próprio dono do site. Ver components/Analytics. */}
           <Analytics />
+          {/* Mesma trava de exclusão do Analytics — ver components/TikTokPixel. */}
+          <TikTokPixel />
           {/* Só carrega nas páginas públicas e para quem não é assinante.
               O porquê da lista de permissão está em components/AdSense. */}
           <AdSense />
