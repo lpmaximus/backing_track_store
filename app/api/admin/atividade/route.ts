@@ -140,7 +140,10 @@ export async function GET(req: NextRequest) {
         .where(and(isNull(users.deletionScheduledAt), NOT_ADMIN, gte(users.createdAt, since))),
 
       // ── Últimos acessos ──────────────────────────────────────────────────
-      // Feed cru de quem entrou e o que fez, em ordem cronológica inversa.
+      // Feed cru de quem entrou e o que fez, em ordem cronológica inversa,
+      // RESTRITO ao período escolhido: com "1 dia" selecionado não faz sentido
+      // a lista abrir com evento de 7 ou 16 dias atrás, como acontecia quando
+      // este feed ignorava o filtro.
       // Só usuário logado: o GA4 não expõe hit a hit, então visitante anônimo
       // continua aparecendo só nos totais lá em cima.
       db
@@ -158,11 +161,14 @@ export async function GET(req: NextRequest) {
         .from(userActivity)
         .innerJoin(users, eq(users.id, userActivity.userId))
         .leftJoin(songs, eq(songs.id, userActivity.songId))
-        .where(NOT_ADMIN)
+        .where(and(gte(userActivity.createdAt, since), NOT_ADMIN))
         .orderBy(desc(userActivity.createdAt))
         .limit(RECENT_LIMIT),
 
       // ── Lista de cadastrados ─────────────────────────────────────────────
+      // Também restrita ao período: quem apareceu nele, seja porque se cadastrou
+      // (createdAt) ou porque deu algum sinal de vida (lastSeenAt). A base
+      // completa continua no KPI "Cadastrados" e na aba Usuários.
       // Ordenada pelo último sinal de vida: quem está sumido cai para o fim.
       db
         .select({
@@ -176,7 +182,7 @@ export async function GET(req: NextRequest) {
           deletionScheduledAt: users.deletionScheduledAt,
         })
         .from(users)
-        .where(NOT_ADMIN)
+        .where(and(NOT_ADMIN, or(gte(users.lastSeenAt, since), gte(users.createdAt, since))))
         .orderBy(sql`${users.lastSeenAt} desc nulls last`)
         .limit(PEOPLE_LIMIT),
 

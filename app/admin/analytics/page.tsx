@@ -440,10 +440,14 @@ function RoleTag({ role, raw }: { role: string; raw?: string }) {
 }
 
 /** Feed cronológico de quem entrou e o que fez. Só usuário logado. */
-function RecentAccessList({ rows, limit }: { rows: AccessRow[]; limit: number }) {
+function RecentAccessList({ rows, limit, days }: { rows: AccessRow[]; limit: number; days: number }) {
   const [showAll, setShowAll] = useState(false);
   if (rows.length === 0) {
-    return <p style={{ color: "var(--muted2)", fontSize: 13, margin: 0 }}>Nenhum acesso registrado ainda.</p>;
+    return (
+      <p style={{ color: "var(--muted2)", fontSize: 13, margin: 0 }}>
+        Nenhum acesso {days === 1 ? "nas últimas 24 h" : `nos últimos ${days} dias`}.
+      </p>
+    );
   }
   const visible = showAll ? rows : rows.slice(0, 15);
   return (
@@ -488,8 +492,8 @@ function RecentAccessList({ rows, limit }: { rows: AccessRow[]; limit: number })
         </button>
       )}
       <p style={{ color: "var(--muted2)", fontSize: 11, margin: "10px 0 0" }}>
-        Últimos {limit} eventos de contas logadas, independente do período selecionado. Visitante anônimo não entra
-        aqui — o Google Analytics só devolve totais, nunca acesso a acesso.
+        Eventos de contas logadas {days === 1 ? "nas últimas 24 h" : `nos últimos ${days} dias`} (teto de {limit}).
+        Visitante anônimo não entra aqui — o Google Analytics só devolve totais, nunca acesso a acesso.
       </p>
     </div>
   );
@@ -501,7 +505,11 @@ function PeopleList({ people, days }: { people: PersonRow[]; days: number }) {
   const [showAll, setShowAll] = useState(false);
 
   if (people.length === 0) {
-    return <p style={{ color: "var(--muted2)", fontSize: 13, margin: 0 }}>Nenhum usuário cadastrado ainda.</p>;
+    return (
+      <p style={{ color: "var(--muted2)", fontSize: 13, margin: 0 }}>
+        Nenhum cadastrado apareceu {days === 1 ? "nas últimas 24 h" : `nos últimos ${days} dias`}.
+      </p>
+    );
   }
 
   const q = query.trim().toLowerCase();
@@ -586,8 +594,9 @@ function PeopleList({ people, days }: { people: PersonRow[]; days: number }) {
       )}
 
       <p style={{ color: "var(--muted2)", fontSize: 11, margin: "10px 0 0" }}>
-        &ldquo;Eventos&rdquo; conta os últimos {days} dias; &ldquo;visto&rdquo; é o último sinal de vida, sem recorte de
-        período. Para trocar plano, bloquear ou excluir, use <a href="/admin/usuarios" style={{ color: "#f59e0b" }}>Usuários</a>.
+        Lista restrita ao período: quem se cadastrou ou deu sinal de vida {days === 1 ? "nas últimas 24 h" : `nos últimos ${days} dias`}.
+        &ldquo;Visto&rdquo; é o último sinal, sem recorte. Para ver a base inteira, trocar plano, bloquear ou excluir,
+        use <a href="/admin/usuarios" style={{ color: "#f59e0b" }}>Usuários</a>.
       </p>
     </div>
   );
@@ -640,11 +649,11 @@ function UsersPanel({ days }: { days: number }) {
       {/* Feed e lista ficam antes dos agregados: quando se abre o painel a
           pergunta quase sempre é "quem entrou agora?", não "qual o ranking". */}
       <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 }}>
-        <Panel title="🕒 Últimos acessos" hint="Quem entrou e o que fez, do mais recente para o mais antigo">
-          <RecentAccessList rows={data.recent ?? []} limit={data.recentLimit ?? 80} />
+        <Panel title="🕒 Últimos acessos" hint="Quem entrou e o que fez no período, do mais recente para o mais antigo">
+          <RecentAccessList rows={data.recent ?? []} limit={data.recentLimit ?? 80} days={days} />
         </Panel>
 
-        <Panel title="👥 Usuários cadastrados" hint={`${data.people?.length ?? 0} conta(s) na lista — ordenadas pelo último acesso`}>
+        <Panel title="👥 Usuários cadastrados" hint={`${data.people?.length ?? 0} conta(s) com movimento no período — ordenadas pelo último acesso`}>
           <PeopleList people={data.people ?? []} days={days} />
         </Panel>
       </div>

@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * TikTok Pixel — mesma lógica de exclusão do Analytics.tsx (ver esse arquivo
- * para o porquê de cada trava): nunca mede /admin, usuário admin, conta de
- * teste interno, nem fora de produção real. Sem isso o Pixel aprenderia com
- * o próprio tráfego de quem constrói o site, não com visitantes de anúncio.
+ * TikTok Pixel — usa exatamente as mesmas travas de exclusão do GA4
+ * (src/lib/useTrackingExcluded), incluindo a marca por dispositivo que impede
+ * o dono do site de ser medido quando navega deslogado. Sem isso o Pixel
+ * aprenderia com o tráfego de quem constrói o site, não com o visitante que
+ * chegou pelo anúncio — e a otimização da campanha iria atrás do público errado.
  *
  * Pixel criado em 2026-08-15 no TikTok Ads Manager (conta L2techs_adv),
  * ID DA05SBRC77U6N6ARQK0G. Evento de cadastro disparado manualmente em
@@ -15,29 +16,20 @@
  */
 import Script from "next/script";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { useEffect } from "react";
+import { useTrackingExcluded } from "@/src/lib/useTrackingExcluded";
 
 const PIXEL_ID = "DA05SBRC77U6N6ARQK0G";
 
-const IS_LIVE =
-  process.env.NODE_ENV === "production" &&
-  (process.env.NEXT_PUBLIC_VERCEL_ENV ?? "production") === "production";
-
 export default function TikTokPixel() {
   const pathname = usePathname();
-  const { data: session, status } = useSession();
-
-  const isAdminArea = pathname?.startsWith("/admin") ?? false;
-  const isAdminUser = session?.user?.role === "admin";
-  const isTestAccount = session?.user?.isInternalTester === true;
-  const excluded = !IS_LIVE || isAdminArea || isAdminUser || isTestAccount;
+  const excluded = useTrackingExcluded();
 
   useEffect(() => {
-    if (typeof window === "undefined" || excluded || status === "loading") return;
+    if (typeof window === "undefined" || excluded) return;
     const ttq = (window as unknown as { ttq?: { page: () => void } }).ttq;
     ttq?.page();
-  }, [pathname, excluded, status]);
+  }, [pathname, excluded]);
 
   if (excluded) return null;
 
