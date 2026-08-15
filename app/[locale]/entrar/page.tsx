@@ -49,10 +49,21 @@ function EntrarForm() {
     setError("");
 
     if (tab === "cadastro") {
+      // event_id compartilhado entre o disparo client-side (ttq.track abaixo)
+      // e o server-side (Events API, dentro de /api/auth/register) — é assim
+      // que a TikTok deduplica os dois e conta 1 conversão, não 2. Ver
+      // https://ads.tiktok.com/help/article/event-deduplication.
+      // Criado ANTES do fetch: o evento de teste de 2026-08-15 mostrou que o
+      // pixel client-side sozinho não estava sendo contabilizado como dado
+      // real (só em "Eventos de teste"), daí a Events API server-side como
+      // caminho mais confiável — não depende de bloqueador de anúncio, cookie
+      // de terceiros ou do JS carregar a tempo.
+      const eventId = crypto.randomUUID();
+
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, password, name, eventId }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -64,9 +75,9 @@ function EntrarForm() {
       // Cadastro concluído — evento pro Pixel do TikTok (campanha de conversão).
       // Só dispara aqui porque só aqui sabemos que é um cadastro novo por
       // e-mail/senha; login/cadastro via Google não passa por este branch.
-      (window as unknown as { ttq?: { track: (e: string) => void } }).ttq?.track(
-        "CompleteRegistration"
-      );
+      (window as unknown as {
+        ttq?: { track: (e: string, props?: object, opts?: { event_id: string }) => void };
+      }).ttq?.track("CompleteRegistration", {}, { event_id: eventId });
     }
 
     const result = await signIn("credentials", {
