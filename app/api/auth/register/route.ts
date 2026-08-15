@@ -70,6 +70,10 @@ async function trackTikTokCompleteRegistration(opts: {
     const json = await res.json().catch(() => null);
     if (!res.ok || json?.code !== 0) {
       console.error("[tiktok-events-api] resposta com erro", res.status, json);
+    } else {
+      // TEMP: log de sucesso pra depurar o rollout de 2026-08-15 — remover
+      // depois de confirmar que o evento chega como dado real na TikTok.
+      console.log("[tiktok-events-api] evento enviado com sucesso", res.status, json);
     }
   } catch (err) {
     console.error("[tiktok-events-api] falha ao enviar evento", err);
@@ -87,6 +91,10 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 12);
     await db.insert(users).values({ email, name: name ?? null, passwordHash, provider: "credentials", role: "free" });
+
+    // TEMP: log de depuracao do rollout de 2026-08-15 — remover junto com o
+    // console.log de sucesso acima assim que confirmarmos o evento na TikTok.
+    console.log("[tiktok-events-api] eventId recebido no cadastro?", Boolean(eventId), eventId);
 
     if (eventId) {
       const ip =
