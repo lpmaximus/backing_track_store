@@ -15,7 +15,7 @@ import { internalTestEmailsOrUndefined } from "@/src/lib/internalTest";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_DAYS = [7, 30, 90];
+const ALLOWED_DAYS = [1, 7, 30, 90];
 const DORMANT_DAYS = 30;
 // Feed de acessos: o suficiente para "o que aconteceu hoje/ontem" sem virar
 // dump da tabela inteira no navegador.

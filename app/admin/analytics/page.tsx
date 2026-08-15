@@ -42,7 +42,7 @@ type Analytics = {
   generatedAt: string;
 };
 
-const PERIODS = [7, 30, 90];
+const PERIODS = [1, 7, 30, 90];
 
 const CHANNEL_LABELS: Record<string, string> = {
   "Organic Search": "Busca orgânica",
@@ -745,7 +745,7 @@ function AnalyticsContent() {
                 border: "1px solid var(--border)",
               }}
             >
-              {p} dias
+              {p} {p === 1 ? "dia" : "dias"}
             </button>
           ))}
         </div>

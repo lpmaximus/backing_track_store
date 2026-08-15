@@ -13,7 +13,7 @@ import { batchRunReports, runRealtimeActiveUsers, ga4Configured, num, dim, type 
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_DAYS = [7, 30, 90];
+const ALLOWED_DAYS = [1, 7, 30, 90];
 const TTL_MS = 10 * 60 * 1000;
 const cache = new Map<number, { at: number; payload: unknown }>();
 
