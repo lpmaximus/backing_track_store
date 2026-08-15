@@ -40,6 +40,7 @@ export const pathnames = {
   // App logado
   "/upload": { pt: "/upload", en: "/upload" },
   "/perfil": { pt: "/perfil", en: "/my-songs" },
+  "/estudio": { pt: "/estudio", en: "/studio" },
   "/compartilhadas": { pt: "/compartilhadas", en: "/shared" },
   "/conta": { pt: "/conta", en: "/account" },
   "/song/[slug]": { pt: "/song/[slug]", en: "/song/[slug]" },
