@@ -62,7 +62,14 @@ export default function HeroCarousel() {
           <h3>{slide.title}</h3>
           <div className="caro-sub">{slide.sub}</div>
           <p>{slide.desc}</p>
-          <Link href={slide.href} className="caro-cta">{slide.cta}</Link>
+          {/* Slide 5 promete "Começar grátis" — precisa cair na aba de
+              cadastro de /entrar, não na de login (ver entrar/page.tsx). */}
+          <Link
+            href={slide.href === "/entrar" ? { pathname: "/entrar", query: { tab: "cadastro" } } : slide.href}
+            className="caro-cta"
+          >
+            {slide.cta}
+          </Link>
         </div>
         <div className="caro-dots">
           {SLIDES.map((_, i) => (

@@ -86,7 +86,7 @@ export default async function FreePromoBanner() {
 
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 22 }}>
               <Link
-                href="/entrar"
+                href={{ pathname: "/entrar", query: { tab: "cadastro" } }}
                 style={{
                   display: "inline-block",
                   background: "var(--accent)",

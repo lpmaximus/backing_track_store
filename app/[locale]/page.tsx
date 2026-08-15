@@ -55,7 +55,9 @@ export default async function HomePage({
       dark: false,
       features: [tp("freeFeature1"), tp("freeFeature2"), tp("freeFeature3")],
       cta: tp("start"),
-      href: "/entrar" as const,
+      // Mesma correção do header/promo: "Começar" precisa abrir a aba de
+      // cadastro de /entrar, não a de login.
+      href: { pathname: "/entrar", query: { tab: "cadastro" } } as const,
       disabled: false,
     },
     {

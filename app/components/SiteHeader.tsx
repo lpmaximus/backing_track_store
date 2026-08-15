@@ -4,6 +4,7 @@ import { Link } from "@/src/i18n/navigation";
 import UserMenu from "./UserMenu";
 import BrandLogo from "./BrandLogo";
 import MobileNav, { type NavItem } from "./MobileNav";
+import { roleCan } from "@/src/lib/permissions";
 
 export default async function SiteHeader() {
   const session = await auth();
@@ -23,6 +24,12 @@ export default async function SiteHeader() {
           { label: t("setlists"), href: "/setlists" },
           { label: t("bands"), href: "/bandas" },
         ] as NavItem[])
+      : []),
+    // Meu Estúdio só aparece para quem tem o tier. A nav já é dinâmica por
+    // login; aqui ela passa a ser dinâmica por capacidade também — mostrar um
+    // item que leva a uma tela de "assine para usar" é pior do que não mostrar.
+    ...(user && roleCan(user.role, "copy_song")
+      ? ([{ label: t("studio"), href: "/estudio" }] as NavItem[])
       : []),
   ];
 
@@ -74,7 +81,7 @@ export default async function SiteHeader() {
             }}>
               {t("signIn")}
             </Link>
-            <Link href="/entrar" style={{
+            <Link href={{ pathname: "/entrar", query: { tab: "cadastro" } }} style={{
               padding: "10px 22px", fontSize: 13, fontWeight: 700, borderRadius: 8,
               background: "var(--text)", color: "#fff",
               display: "inline-flex", alignItems: "center",

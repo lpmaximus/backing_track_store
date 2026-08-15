@@ -24,7 +24,14 @@ function EntrarForm() {
   const t = useTranslations("signIn");
   const tc = useTranslations("common");
 
-  const [tab,      setTab]      = useState<"login" | "cadastro">("login");
+  // Todo CTA que promete "criar conta" / "começar grátis" precisa abrir
+  // direto na aba de cadastro — sem isso a pessoa cai na aba de Entrar (com
+  // campo de senha) e não percebe que precisa trocar de aba. Foi o que
+  // aconteceu na campanha de tráfego de 15/08/2026: TikTok trouxe visitantes,
+  // ninguém completou cadastro, e a causa era esta — não falta de CTA.
+  const [tab, setTab] = useState<"login" | "cadastro">(
+    searchParams.get("tab") === "cadastro" ? "cadastro" : "login",
+  );
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [name,     setName]     = useState("");
