@@ -494,8 +494,25 @@
         "chorus": "Chorus (instrumento)",
         "delay": "Delay",
         "studio": "Voz de estúdio (acabamento)"
-      }
-    }
+      },
+      "importFile": "Faixa de arquivo",
+      "importing": "Enviando o arquivo…",
+      "fileTooBig": "Arquivo grande demais (máximo {mb} MB).",
+      "fileFormat": "Formato não suportado. Use MP3, WAV, M4A, OGG ou WebM."
+    },
+    "cutHint": "Arraste sobre a onda de uma faixa para marcar o trecho e clique em Cortar. O corte fica só na sua versão e dá para desfazer quando quiser.",
+    "cutSelected": "Trecho {start}–{end}",
+    "cutApply": "Cortar",
+    "cutListen": "Ouvir daqui",
+    "cutCancel": "Cancelar",
+    "cutTotal": "{n} corte(s) · {seconds}s apagados",
+    "cutUndoOne": "Clique para trazer este trecho de volta",
+    "cutClear": "Limpar cortes",
+    "cutApplyFile": "Aplicar no arquivo",
+    "cutApplyFileBusy": "Aplicando…",
+    "cutApplyFileTitle": "Grava os cortes dentro do arquivo da gravação. Não dá para desfazer.",
+    "cutApplyConfirm": "Aplicar os cortes de \"{label}\" no arquivo? A partir daí não dá para trazer os trechos de volta — só gravando de novo.",
+    "cutApplyError": "Não foi possível aplicar os cortes no arquivo. Tente de novo."
   },
   "setlists": {
     "title": "Minhas Setlists",
@@ -950,6 +967,22 @@
     "take": "Pegar",
     "taken": "Na sua área",
     "tracksTitle": "Faixas desta versão",
-    "tracksHelp": "Desligue o que não quer ouvir na sua versão. A música do catálogo não muda para ninguém."
+    "tracksHelp": "Desligue o que não quer ouvir na sua versão. A música do catálogo não muda para ninguém.",
+    "createTitle": "Música nova, do zero",
+    "createHelp": "Comece uma música em branco, sem áudio nenhum, e vá montando faixa por faixa — gravando pelo microfone ou trazendo arquivos que você já tem.",
+    "createButton": "Criar música nova",
+    "createNameLabel": "Nome da música",
+    "createNamePlaceholder": "Ex.: Ideia do domingo",
+    "createBpm": "BPM",
+    "createKey": "Tom",
+    "createNote": "O projeto é só seu: não entra no catálogo nem aparece para mais ninguém. Dá para mudar nome, BPM e tom depois.",
+    "createConfirm": "Criar e abrir",
+    "creating": "Criando…",
+    "createCancel": "Cancelar",
+    "createError": "Não foi possível criar a música. Tente de novo.",
+    "projectsTitle": "Minhas músicas do zero",
+    "fromCatalogTitle": "Pegas do catálogo",
+    "deleteProject": "Apagar",
+    "confirmDeleteProject": "Apagar \"{name}\"? A música e todas as faixas gravadas nela vão junto, e não dá para desfazer."
   }
 }

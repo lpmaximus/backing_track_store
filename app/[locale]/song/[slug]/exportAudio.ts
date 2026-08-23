@@ -23,6 +23,62 @@
  * e degrada o material; quem exporta quer o stem limpo pra tratar fora daqui.
  */
 
+import type { Cut } from "@/src/lib/cuts";
+
+/**
+ * Devolve uma CÓPIA do buffer com os trechos cortados zerados.
+ *
+ * Os cortes vêm na linha do tempo da MÚSICA; o buffer está na linha do tempo
+ * dele mesmo. A conversão é a mesma convenção do offset no player:
+ *   posição dentro do arquivo = posição da música + offset
+ *
+ * Cópia, e não edição no lugar, porque o buffer original é o que o Tone.js está
+ * tocando: zerar as amostras dele apagaria o áudio do player junto, e o corte
+ * deixaria de ser reversível sem recarregar a página.
+ *
+ * A borda leva uma rampa de ~5ms. Cortar no meio da onda produz um degrau, e
+ * degrau em áudio é um clique bem audível — justamente no ponto que a pessoa
+ * escolheu para limpar.
+ */
+export function applyCuts(buffer: AudioBuffer, cuts: Cut[], offsetSec = 0): AudioBuffer {
+  if (cuts.length === 0) return buffer;
+
+  const sr = buffer.sampleRate;
+  const rampa = Math.max(1, Math.round(0.005 * sr));
+
+  const OfflineCtx: typeof OfflineAudioContext =
+    window.OfflineAudioContext ??
+    (window as unknown as { webkitOfflineAudioContext: typeof OfflineAudioContext })
+      .webkitOfflineAudioContext;
+  // O contexto serve só para fabricar o buffer de saída — nada é renderizado.
+  const ctx = new OfflineCtx(buffer.numberOfChannels, buffer.length, sr);
+  const out = ctx.createBuffer(buffer.numberOfChannels, buffer.length, sr);
+
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    const src = buffer.getChannelData(c);
+    const dst = out.getChannelData(c);
+    dst.set(src);
+
+    for (const cut of cuts) {
+      const ini = Math.max(0, Math.floor((cut.start + offsetSec) * sr));
+      const fim = Math.min(buffer.length, Math.ceil((cut.end + offsetSec) * sr));
+      if (fim <= ini) continue;
+
+      for (let i = ini; i < fim; i++) dst[i] = 0;
+
+      // Desce até o corte e volta depois dele.
+      for (let i = 0; i < rampa; i++) {
+        const antes = ini - rampa + i;
+        if (antes >= 0 && antes < buffer.length) dst[antes] = src[antes] * (1 - i / rampa);
+        const depois = fim + i;
+        if (depois >= 0 && depois < buffer.length) dst[depois] = src[depois] * (i / rampa);
+      }
+    }
+  }
+
+  return out;
+}
+
 /** Uma faixa a entrar na mixagem, com o ganho já resolvido pela mesa. */
 export type MixPart = {
   buffer: AudioBuffer;

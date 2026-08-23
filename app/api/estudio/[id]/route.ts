@@ -6,16 +6,20 @@
  * WHERE de toda consulta — id de outra pessoa devolve 404, sem confirmar que
  * aquela versão existe.
  *
- * ⚠️ Nenhuma rota daqui escreve em `songs`. Renomear muda o nome NA SUA
- * versão; a música do catálogo continua com o título original para todo mundo.
- * Se algum dia isso mudar, deixa de ser "minha versão" e vira edição do acervo
- * compartilhado — outra decisão, com outra régua de permissão.
+ * ⚠️ Nenhuma rota daqui escreve em `songs` — com UMA exceção, criada junto com
+ * os projetos de estúdio: quando a "música" é um projeto em branco
+ * (`songs.source_type = 'studio_project'`), ela não é acervo de ninguém, é o
+ * próprio trabalho da pessoa. Aí devolver não faz sentido — o DELETE apaga o
+ * projeto inteiro. Para música do catálogo nada mudou: renomear muda o nome NA
+ * SUA versão e o título original continua igual para todo mundo.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { db, userSongs, songs, stems } from "@/src/db";
+import { db, userSongs, songs, stems, userTakes } from "@/src/db";
 import { and, eq } from "drizzle-orm";
 import { roleCan } from "@/src/lib/permissions";
+import { sanitizeTrackCuts } from "@/src/lib/cuts";
+import { deleteObject, keyFromPublicUrl } from "@/src/lib/r2";
 
 async function guarda(
   params: Promise<{ id: string }>,
@@ -53,6 +57,7 @@ export async function PATCH(
     const body = (await req.json()) as {
       title?: string | null;
       disabledStems?: string[];
+      trackCuts?: unknown;
     };
 
     const patch: Partial<typeof userSongs.$inferInsert> = { updatedAt: new Date() };
@@ -93,6 +98,35 @@ export async function PATCH(
       }
     }
 
+    if (body.trackCuts !== undefined) {
+      // As chaves aceitas são exatamente as faixas que existem para ESTA pessoa
+      // nesta música: os stems da música e as gravações dela. Sem esse filtro a
+      // coluna acumularia corte em faixa que não existe mais — invisível, porque
+      // corte em faixa inexistente não faz barulho nenhum, e eterno, porque
+      // ninguém teria como apagar.
+      const [instrumentos, takesDoUsuario] = await Promise.all([
+        db.select({ instrument: stems.instrument }).from(stems).where(eq(stems.songId, versao.songId)),
+        db
+          .select({ id: userTakes.id })
+          .from(userTakes)
+          .where(and(eq(userTakes.songId, versao.songId), eq(userTakes.userId, g.userId))),
+      ]);
+
+      const chaves = new Set<string>([
+        ...instrumentos.map(s => s.instrument),
+        ...takesDoUsuario.map(t => `take:${t.id}`),
+        // Música sem stems toca pelo mix completo, e essa faixa se chama "mix"
+        // no player. Cortar nela é o caso mais comum de quem ainda não separou.
+        "mix",
+      ]);
+
+      // Sem teto vindo de `songs.duration` de propósito: é metadado, às vezes
+      // zerado (projeto em branco, upload ainda processando) ou arredondado, e
+      // validar contra ele apagaria corte legítimo de quem tem o áudio certo.
+      // O teto de sanidade vive em src/lib/cuts.ts.
+      patch.trackCuts = sanitizeTrackCuts(body.trackCuts, chaves);
+    }
+
     const [atualizada] = await db
       .update(userSongs)
       .set(patch)
@@ -122,9 +156,56 @@ export async function DELETE(
   if (g instanceof NextResponse) return g;
 
   try {
-    // Devolver apaga SÓ a folha de configuração. As gravações continuam onde
-    // estavam (user_takes é chaveado por música, não por versão) e a música do
-    // catálogo segue intacta. Se a pessoa pegar de novo, reencontra os takes.
+    const [versao] = await db
+      .select({ songId: userSongs.songId })
+      .from(userSongs)
+      .where(and(eq(userSongs.id, g.versaoId), eq(userSongs.userId, g.userId)))
+      .limit(1);
+    if (!versao) return NextResponse.json({ error: "Não encontrada" }, { status: 404 });
+
+    const [musica] = await db
+      .select({ sourceType: songs.sourceType, uploadedByUserId: songs.uploadedByUserId })
+      .from(songs)
+      .where(eq(songs.id, versao.songId))
+      .limit(1);
+
+    const ehProjetoDoUsuario =
+      musica?.sourceType === "studio_project" && musica.uploadedByUserId === g.userId;
+
+    // ── Projeto de estúdio: apagar é apagar ──────────────────────────────────
+    // Não existe catálogo por trás para "devolver". A linha em `songs` é o
+    // próprio projeto, e deixá-la órfã (sem a versão que a lista) tornaria o
+    // projeto invisível e impossível de apagar depois. As gravações e a versão
+    // saem junto pelo ON DELETE CASCADE de user_takes/user_songs.
+    if (ehProjetoDoUsuario) {
+      const takesDoProjeto = await db
+        .select({ audioUrl: userTakes.audioUrl })
+        .from(userTakes)
+        .where(eq(userTakes.songId, versao.songId));
+
+      await db.delete(songs).where(eq(songs.id, versao.songId));
+
+      // O banco primeiro, o bucket depois: uma falha aqui deixa arquivo órfão
+      // no R2 (invisível e barato), enquanto a ordem inversa deixaria faixa
+      // listada apontando para áudio que não existe mais.
+      for (const t of takesDoProjeto) {
+        const key = keyFromPublicUrl(t.audioUrl);
+        if (!key) continue;
+        try {
+          await deleteObject(key);
+        } catch (err) {
+          console.error("[DELETE /api/estudio/:id] objeto órfão no R2:", key, err);
+        }
+      }
+
+      return NextResponse.json({ ok: true, deletedSong: true });
+    }
+
+    // ── Música do catálogo: devolver apaga SÓ a folha de configuração ────────
+    // As gravações continuam onde estavam (user_takes é chaveado por música,
+    // não por versão) e a música segue intacta para todo mundo. Se a pessoa
+    // pegar de novo, reencontra os takes — e os cortes, esses sim, se perdem
+    // junto com a configuração, que é o que "devolver" quer dizer.
     await db
       .delete(userSongs)
       .where(and(eq(userSongs.id, g.versaoId), eq(userSongs.userId, g.userId)));

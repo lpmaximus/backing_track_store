@@ -7,6 +7,7 @@ import DownloadPanel from "./DownloadPanel";
 import { fxVazio, type TakeFx } from "@/src/lib/takeFx";
 // A mesma cadeia usada no download — ver o cabeçalho de takeFxNodes.ts.
 import { montarFx } from "./takeFxNodes";
+import { normalizeCuts, totalCortado, type Cut, type TrackCuts } from "@/src/lib/cuts";
 
 export type Stem = {
   id: number;
@@ -84,6 +85,34 @@ type Props = {
   // Analytics de produto: o usuário baixou áudio (mixagem ou faixas separadas).
   // Alimenta o evento "export" do log de atividade.
   onExport?: (kind: "mix" | "stems", count: number) => void;
+
+  // ─── Cortes por faixa (apagar trecho pelo gráfico) ─────────────────────────
+  // Trechos silenciados NA VERSÃO desta pessoa, por chave de faixa. Chegam da
+  // configuração salva (user_songs.track_cuts) e voltam por `onCutsChange`, que
+  // é quem persiste. O player não fala com a API: ele só toca e desenha.
+  cuts?: TrackCuts;
+  onCutsChange?: (next: TrackCuts) => void;
+  /** Sem isto o arrasto na onda não seleciona nada — a onda só dá seek. */
+  canCut?: boolean;
+  /**
+   * "Aplicar de vez": grava os cortes DENTRO do arquivo da gravação. Só existe
+   * para faixa própria (take) — consolidar um stem do catálogo obrigaria a
+   * duplicar o áudio por usuário, e o R2 guarda um arquivo por faixa, não um
+   * por pessoa. Quem implementa o upload é o SongPlayer; aqui só entregamos o
+   * buffer já decodificado, que é o que evita baixar o áudio de novo.
+   */
+  onApplyCuts?: (info: {
+    takeId: number;
+    key: string;
+    buffer: AudioBuffer;
+    cuts: Cut[];
+    offsetSec: number;
+  }) => Promise<void>;
+  /**
+   * A linha do tempo nasce das GRAVAÇÕES, não dos stems. É o modo dos projetos
+   * em branco: não existe música por baixo, existe o que a pessoa gravou.
+   */
+  projectMode?: boolean;
 };
 
 // ─── Aparência por instrumento ────────────────────────────────────────────────
@@ -112,6 +141,18 @@ const STEM_COLORS: Record<string, string> = {
   take: "#ec4899",
 };
 const DEFAULT_COLOR = "#8a8a8c";
+
+/**
+ * Referências ESTÁVEIS para "nenhum corte".
+ *
+ * Não é preciosismo: o laço de posição chama `setCurrent` a cada quadro, então
+ * o player re-renderiza 60 vezes por segundo. Um `?? []` escrito no meio do JSX
+ * criaria um array novo a cada um desses renders, quebrando o `memo` da onda
+ * (canvas redesenhado 60×/s por faixa) e a estabilidade da lista que vai para o
+ * painel de download — que re-semearia a seleção em laço.
+ */
+const SEM_CORTES: TrackCuts = {};
+const SEM_CORTES_LISTA: Cut[] = [];
 
 // ─── Mixer no plano Free ─────────────────────────────────────────────────────
 // Decisão de 2026-07-28: a landing sempre prometeu "Player com stems" no Free,
@@ -211,8 +252,15 @@ function mergePeaks(list: number[][]): number[] {
 
 // ─── Onda em canvas ───────────────────────────────────────────────────────────
 const WaveCanvas = memo(function WaveCanvas({
-  peaks, color, height, dimmed,
-}: { peaks: number[]; color: string; height: number; dimmed: boolean }) {
+  peaks, color, height, dimmed, cuts, duration,
+}: {
+  peaks: number[]; color: string; height: number; dimmed: boolean;
+  /** Trechos cortados, em segundos da música. Desenhados apagados, não sumidos:
+   *  a pessoa precisa ver ONDE cortou para poder desfazer. */
+  cuts?: Cut[];
+  /** Duração da música — sem ela não há como mapear segundo → barra. */
+  duration?: number;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current;
@@ -222,14 +270,47 @@ const WaveCanvas = memo(function WaveCanvas({
     const ctx = cv.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = color;
     const barW = W / peaks.length;
     const gap = barW > 3 ? 1 : 0;
+
+    const dur = duration && duration > 0 ? duration : 0;
+    const cortada = (i: number) => {
+      if (!dur || !cuts || cuts.length === 0) return false;
+      const t0 = (i / peaks.length) * dur;
+      const t1 = ((i + 1) / peaks.length) * dur;
+      return cuts.some(c => t1 > c.start && t0 < c.end);
+    };
+
     for (let i = 0; i < peaks.length; i++) {
       const bh = Math.max(1, peaks[i] * (H - 2));
-      ctx.fillRect(i * barW, (H - bh) / 2, Math.max(1, barW - gap), bh);
+      const foi = cortada(i);
+      // Barra cortada vira um traço fino na linha do meio: some o conteúdo (que
+      // é o que o corte fez com o som) e fica a marca de que ali havia algo.
+      ctx.fillStyle = foi ? "rgba(140,140,150,0.35)" : color;
+      const h = foi ? Math.min(bh, 2) : bh;
+      ctx.fillRect(i * barW, (H - h) / 2, Math.max(1, barW - gap), h);
     }
-  }, [peaks, color, height]);
+
+    // Faixa listrada por cima do trecho cortado — a marca que sobrevive mesmo
+    // onde o áudio original já era silêncio e não havia barra para apagar.
+    if (dur && cuts) {
+      for (const c of cuts) {
+        const x0 = Math.max(0, (c.start / dur) * W);
+        const x1 = Math.min(W, (c.end / dur) * W);
+        if (x1 <= x0) continue;
+        ctx.fillStyle = "rgba(120,120,130,0.12)";
+        ctx.fillRect(x0, 0, x1 - x0, H);
+        ctx.strokeStyle = "rgba(150,150,160,0.5)";
+        ctx.setLineDash([3, 3]);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x0 + 0.5, 0); ctx.lineTo(x0 + 0.5, H);
+        ctx.moveTo(x1 - 0.5, 0); ctx.lineTo(x1 - 0.5, H);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }, [peaks, color, height, cuts, duration]);
   return (
     <canvas
       ref={ref}
@@ -264,7 +345,10 @@ type Track = {
  */
 function aplicarFx(e: Engine, key: string, fx: TakeFx | null | undefined) {
   const player = e.players[key];
-  const vol = e.vols[key];
+  // A cadeia termina no nó de CORTE, não no volume: o corte é o último elo
+  // antes da mesa, e precisa silenciar também a cauda do reverb. Ligar o efeito
+  // direto no volume faria o trecho cortado continuar soando com efeito.
+  const vol = e.cutGains[key] ?? e.vols[key];
   if (!player || !vol) return;
 
   e.fx[key]?.forEach(n => { try { n.dispose(); } catch {} });
@@ -290,6 +374,17 @@ type Engine = {
   Tone: ToneMod;
   players: Record<string, import("tone").Player>;
   vols: Record<string, import("tone").Volume>;
+  /**
+   * Nó exclusivo do CORTE, entre a faixa (já com efeito) e o volume dela.
+   *
+   * Separado do volume de propósito: o volume é da mesa e a pessoa mexe nele o
+   * tempo todo; o corte é automação agendada no tempo. Compartilhar o mesmo nó
+   * faria um apagar o outro — mover o fader no meio de um trecho cortado
+   * traria o áudio de volta, e o corte "não funcionaria" de forma intermitente.
+   */
+  cutGains: Record<string, import("tone").Gain>;
+  /** Cortes ativos por faixa. Espelho do estado do React para uso no `startAll`. */
+  cuts: Record<string, Cut[]>;
   master: import("tone").Volume;
   pitch: import("tone").PitchShift;
   duration: number;
@@ -312,6 +407,51 @@ type Engine = {
 };
 
 /**
+ * Agenda o silêncio dos trechos cortados de UMA faixa.
+ *
+ * Automação no tempo, e não "pular o trecho": pular encurtaria a faixa e a
+ * tiraria de sincronia com todas as outras, com a cifra e com a letra. Aqui a
+ * linha do tempo continua intacta e o que muda é só o que se ouve.
+ *
+ * As bordas levam uma rampa de 5ms — corte seco no meio da onda estala.
+ */
+function agendarCortes(e: Engine, key: string, at: number, pos: number, rate: number) {
+  const g = e.cutGains[key];
+  if (!g) return;
+
+  const cortes = e.cuts[key] ?? [];
+  const param = g.gain;
+
+  // Limpa o que ficou agendado da última âncora (play/seek/loop anteriores),
+  // senão a automação antiga continua valendo e a faixa muda sozinha.
+  try { param.cancelScheduledValues(at); } catch {}
+
+  if (cortes.length === 0) {
+    param.setValueAtTime(1, at);
+    return;
+  }
+
+  const RAMPA = 0.005;
+  // Começar já dentro de um corte é comum: a pessoa dá play em cima do trecho.
+  param.setValueAtTime(cortes.some(c => pos >= c.start && pos < c.end) ? 0 : 1, at);
+
+  for (const c of cortes) {
+    // Da posição da música para o relógio do áudio: o que está no futuro entra
+    // proporcional à velocidade de reprodução.
+    const entra = at + (c.start - pos) / rate;
+    const sai = at + (c.end - pos) / rate;
+    if (sai <= at) continue; // corte já passou
+
+    if (entra > at + RAMPA) {
+      param.setValueAtTime(1, entra - RAMPA);
+      param.linearRampToValueAtTime(0, entra);
+    }
+    param.setValueAtTime(0, Math.max(sai - RAMPA, at));
+    param.linearRampToValueAtTime(1, Math.max(sai, at + RAMPA));
+  }
+}
+
+/**
  * Dá start em TODAS as faixas na mesma âncora de tempo, respeitando o
  * deslocamento de cada uma.
  *
@@ -332,6 +472,11 @@ function startAll(e: Engine, at: number, pos: number, rate: number) {
     p.playbackRate = rate;
     try { p.stop(); } catch {}
 
+    // O corte é agendado mesmo para faixa que não vai dar start (take mais
+    // curto que a música, por exemplo): o nó precisa voltar a 1 de qualquer
+    // jeito, senão fica preso em 0 desde a última passagem por um corte.
+    agendarCortes(e, key, at, pos, rate);
+
     const local = pos + (e.offsets[key] ?? 0);
     const buf = p.buffer?.duration ?? 0;
 
@@ -348,6 +493,7 @@ function startAll(e: Engine, at: number, pos: number, rate: number) {
 export default function WavePlayer({
   audioUrl, stems, takes = [], transportRef, isPro = false, soloInstrument = null, songTitle, songArtist, onTimeUpdate, onDurationReady, speed = 1, pitch = 0,
   loopStart = null, loopEnd = null, initialMix = null, onMixerTouch, onExport,
+  cuts = SEM_CORTES, onCutsChange, canCut = false, onApplyCuts, projectMode = false,
 }: Props) {
   // `tx` e não `t`: dentro do mixer `t` já é a faixa sendo mapeada.
   const tx = useTranslations("song");
@@ -371,7 +517,10 @@ export default function WavePlayer({
           ? [{ key: "mix", instrument: "mix", label: songTitle, audioUrl }]
           : [];
 
-    if (base.length === 0) return base;
+    // Sem base e sem projeto não há linha do tempo em que pendurar gravação —
+    // é o caso da música cujo áudio ainda não subiu. Em projeto em branco é o
+    // contrário: as gravações SÃO a música, e sem elas não há nada mesmo.
+    if (base.length === 0 && !projectMode) return base;
 
     // Prefixo "take:" evita colisão com nome de instrumento — sem ele, um take
     // chamado "bass" derrubaria o stem de baixo do mapa de players.
@@ -391,13 +540,16 @@ export default function WavePlayer({
       // `tracks` — e com ele o `trackSig` — recarregando todo o áudio a cada
       // clique no seletor de efeito.
     );
-  }, [stems, takes, audioUrl, songTitle, tx]);
+  }, [stems, takes, audioUrl, songTitle, tx, projectMode]);
 
   // Multitrack aparece pra qualquer um com stems, inclusive visitante sem
   // cadastro (efeito de divulgação: vê a mesa, ouve o mix completo). O que
   // isPro passa a controlar é QUAIS canais podem ser mutados/solados dentro
   // dela — ver `canControlTrack` — não a visão em si.
-  const showMultitrack = stems.length > 0;
+  //
+  // No projeto em branco não há stem nenhum, e mesmo assim a mesa é o ponto:
+  // é ali que as faixas gravadas aparecem uma sobre a outra.
+  const showMultitrack = stems.length > 0 || (projectMode && tracks.length > 0);
   const hasAudio = tracks.length > 0;
 
   /**
@@ -446,6 +598,7 @@ export default function WavePlayer({
   const durRef    = useRef(0);       useEffect(() => { durRef.current = duration; }, [duration]);
   const loopRef   = useRef(false);   useEffect(() => { loopRef.current = loop; }, [loop]);
   const regionRef = useRef(region);  useEffect(() => { regionRef.current = region; }, [region]);
+  const cutsRef   = useRef<TrackCuts>(cuts); useEffect(() => { cutsRef.current = cuts; }, [cuts]);
 
   const posNow = useCallback(() => {
     const e = engineRef.current;
@@ -470,18 +623,25 @@ export default function WavePlayer({
 
       const players: Record<string, import("tone").Player> = {};
       const vols: Record<string, import("tone").Volume> = {};
+      const cutGains: Record<string, import("tone").Gain> = {};
       let failed = false;
 
       await Promise.all(tracks.map(t => new Promise<void>(resolve => {
         const vol = new Tone.Volume(0);
         vol.connect(master);
         vols[t.key] = vol;
+        // faixa → [efeito] → corte → volume → master. O corte fica DEPOIS do
+        // efeito para silenciar também a cauda dele, e ANTES do volume para não
+        // brigar com o fader da mesa. Ver Engine.cutGains.
+        const cut = new Tone.Gain(1);
+        cut.connect(vol);
+        cutGains[t.key] = cut;
         const player = new Tone.Player({
           url: t.audioUrl,
           onload: () => resolve(),
           onerror: () => { failed = true; resolve(); },
         });
-        player.connect(vol);
+        player.connect(cut);
         players[t.key] = player;
       })));
 
@@ -509,6 +669,16 @@ export default function WavePlayer({
         }
       }
 
+      // Projeto em branco: não existe música por baixo, então a linha do tempo
+      // é a gravação mais longa. Sem esta passada a duração ficaria em zero e
+      // nada seria desenhado — o projeto pareceria vazio mesmo cheio de faixas.
+      if (dur === 0 && projectMode) {
+        for (const t of tracks) {
+          const buf = players[t.key].buffer.get() as AudioBuffer | undefined;
+          if (buf) dur = Math.max(dur, buf.duration - (t.offsetMs ?? 0) / 1000);
+        }
+      }
+
       for (const t of tracks) {
         if (t.takeId == null) continue;
         const buf = players[t.key].buffer.get() as AudioBuffer | undefined;
@@ -520,9 +690,12 @@ export default function WavePlayer({
       const startOffset = reg && reg.start < dur ? reg.start : 0;
 
       engineRef.current = {
-        Tone, players, vols, master, pitch: pitchNode,
+        Tone, players, vols, cutGains, master, pitch: pitchNode,
         duration: dur, offset: startOffset, ctxStart: 0, playing: false, pitchActive: false,
         offsets: Object.fromEntries(tracks.map(t => [t.key, (t.offsetMs ?? 0) / 1000])),
+        // Os cortes salvos já entram aqui: quem abre a música de novo tem de
+        // ouvir exatamente o que ouvia quando fechou.
+        cuts: { ...cutsRef.current },
         fx: {},
         fxSig: {},
       };
@@ -554,6 +727,7 @@ export default function WavePlayer({
       if (e) {
         Object.values(e.players).forEach(p => { try { p.stop(); } catch {} p.dispose(); });
         Object.values(e.fx).forEach(cadeia => cadeia.forEach(n => { try { n.dispose(); } catch {} }));
+        Object.values(e.cutGains).forEach(g => { try { g.dispose(); } catch {} });
         Object.values(e.vols).forEach(v => v.dispose());
         e.master.dispose();
         e.pitch.dispose();
@@ -598,6 +772,31 @@ export default function WavePlayer({
     e.offset = pos;
     e.ctxStart = at;
   }, [tracks, ready, posNow]);
+
+  // ── Cortes aplicados a quente ─────────────────────────────────────────────
+  // Cortar é uma ação sobre o que se está OUVINDO: a pessoa marca o trecho com
+  // a música tocando e espera o silêncio na hora. Re-ancorar as faixas na
+  // posição atual reagenda a automação sem interromper a reprodução — sem isso
+  // o corte só valeria no próximo play, e pareceria que o botão não funcionou.
+  const cutsSig = useMemo(() => JSON.stringify(cuts), [cuts]);
+  useEffect(() => {
+    const e = engineRef.current;
+    if (!e) return;
+    e.cuts = { ...cutsRef.current };
+
+    const pos = posNow();
+    const at = e.Tone.now() + 0.03;
+    if (e.playing) {
+      startAll(e, at, pos, speedRef.current);
+      e.offset = pos;
+      e.ctxStart = at;
+    } else {
+      // Parado, basta devolver cada nó ao estado que o próximo play espera —
+      // senão uma faixa que ficou muda dentro de um corte apagado continuaria
+      // muda até alguém tocar de novo.
+      for (const key of Object.keys(e.cutGains)) agendarCortes(e, key, at, pos, speedRef.current);
+    }
+  }, [cutsSig, ready, posNow]);
 
   // ── Loop de posição ───────────────────────────────────────────────────────
   const startRaf = useCallback(() => {
@@ -717,7 +916,11 @@ export default function WavePlayer({
     if (e.playing) {
       e.offset = posNow();
       const at = e.Tone.now() + 0.05;
-      Object.values(e.players).forEach(p => { try { p.stop(); } catch {} p.playbackRate = speed; p.start(at, e.offset); });
+      // `startAll` e não um p.start() por faixa: é ele que respeita o offset de
+      // cada gravação e reagenda os cortes na velocidade nova. Mudar o
+      // andamento com um laço solto aqui desalinhava o take e ressuscitava o
+      // trecho cortado.
+      startAll(e, at, e.offset, speed);
       e.ctxStart = at;
     } else {
       Object.values(e.players).forEach(p => { p.playbackRate = speed; });
@@ -852,6 +1055,23 @@ export default function WavePlayer({
     );
   }, [tracks, soloed, muted]);
 
+  /**
+   * As faixas do painel de download vão com os cortes junto: o arquivo baixado
+   * precisa soar como o que se ouve aqui. Sem isso o trecho apagado
+   * ressuscitaria no download, e a pessoa só descobriria depois de mandar o
+   * arquivo para a banda.
+   *
+   * Memoizado porque o painel re-semeia a seleção de faixas quando a lista
+   * muda de identidade — um array novo a cada quadro do laço de posição faria
+   * essa semeadura virar laço infinito.
+   */
+  const tracksParaDownload = useMemo(
+    () => tracks.map(t => (cuts[t.key]?.length ? { ...t, cuts: cuts[t.key] } : t)),
+    // `cutsSig` e não `cuts`: é o conteúdo que importa. Ver o efeito de cortes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tracks, cutsSig],
+  );
+
   // Pula `delta` segundos a partir da posição atual (avançar/voltar).
   const skip = (delta: number) => seek(posNow() + delta);
 
@@ -873,6 +1093,117 @@ export default function WavePlayer({
     const frac = (ev.clientX - rect.left) / rect.width;
     seek(frac * duration);
   };
+
+  // ── Selecionar o trecho a apagar, na própria onda ──────────────────────────
+  //
+  // A onda de cada faixa acumula dois gestos: clique curto continua sendo seek
+  // (é o que todo player faz, e tirar isso quebraria o hábito), arrasto vira
+  // seleção. O que separa os dois é a distância percorrida — abaixo de 5px é
+  // tremida de mão, não intenção de arrastar.
+  //
+  // Só quando `canCut`: quem não pegou a música para a sua área não tem onde
+  // guardar corte nenhum, e uma seleção que não vira nada é pior que nada.
+  const [sel, setSel] = useState<{ key: string; start: number; end: number } | null>(null);
+  const dragRef = useRef<{ key: string; rect: DOMRect; x0: number; moved: boolean } | null>(null);
+  const [aplicando, setAplicando] = useState<string | null>(null);
+  const [erroCorte, setErroCorte] = useState<string | null>(null);
+
+  const fracDe = (clientX: number, rect: DOMRect) =>
+    Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+
+  const onWavePointerDown = (ev: React.PointerEvent<HTMLDivElement>, key: string) => {
+    if (!canCut || !ready || duration <= 0) return;
+    dragRef.current = {
+      key,
+      rect: ev.currentTarget.getBoundingClientRect(),
+      x0: ev.clientX,
+      moved: false,
+    };
+    // Captura o ponteiro para o arrasto continuar valendo se o cursor sair da
+    // faixa — o gesto natural para marcar um trecho passa por cima das outras.
+    try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch {}
+  };
+
+  const onWavePointerMove = (ev: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    if (!d) return;
+    if (!d.moved && Math.abs(ev.clientX - d.x0) < 5) return;
+    d.moved = true;
+    const a = fracDe(d.x0, d.rect) * duration;
+    const b = fracDe(ev.clientX, d.rect) * duration;
+    setSel({ key: d.key, start: Math.min(a, b), end: Math.max(a, b) });
+  };
+
+  const onWavePointerUp = (ev: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d) return;
+    try { ev.currentTarget.releasePointerCapture(ev.pointerId); } catch {}
+    if (d.moved) return; // a seleção fica na tela esperando o botão
+    setSel(null);
+    seek(fracDe(ev.clientX, d.rect) * duration);
+  };
+
+  /** Junta a seleção aos cortes da faixa e devolve o mapa novo para o pai salvar. */
+  const cortarSelecao = useCallback(() => {
+    if (!sel || !onCutsChange) return;
+    const atuais = cuts[sel.key] ?? [];
+    // `normalizeCuts` é a MESMA função que a rota usa: funde sobreposição e
+    // ordena, então cortar duas vezes o mesmo trecho não empilha duplicata.
+    const proximos = normalizeCuts([...atuais, { start: sel.start, end: sel.end }]);
+    onCutsChange({ ...cuts, [sel.key]: proximos });
+    setSel(null);
+  }, [sel, cuts, onCutsChange]);
+
+  const removerCorte = useCallback((key: string, i: number) => {
+    if (!onCutsChange) return;
+    const restantes = (cuts[key] ?? []).filter((_, idx) => idx !== i);
+    const proximos = { ...cuts };
+    if (restantes.length) proximos[key] = restantes;
+    else delete proximos[key];
+    onCutsChange(proximos);
+  }, [cuts, onCutsChange]);
+
+  const limparCortes = useCallback((key: string) => {
+    if (!onCutsChange) return;
+    const proximos = { ...cuts };
+    delete proximos[key];
+    onCutsChange(proximos);
+  }, [cuts, onCutsChange]);
+
+  /**
+   * "Aplicar de vez" — grava os cortes dentro do arquivo da gravação.
+   *
+   * Irreversível, e por isso pede confirmação: a partir daqui não é mais
+   * configuração da sua versão, é o áudio. Só aparece em faixa própria (take);
+   * stem do catálogo é o mesmo arquivo para todo mundo.
+   */
+  const aplicarNoArquivo = useCallback(async (t: Track) => {
+    if (!onApplyCuts || t.takeId == null) return;
+    const lista = cuts[t.key] ?? [];
+    if (lista.length === 0) return;
+    if (!confirm(tx("cutApplyConfirm", { label: t.label }))) return;
+
+    const buffer = getBuffer(t.key);
+    if (!buffer) { setErroCorte(tx("cutApplyError")); return; }
+
+    setErroCorte(null);
+    setAplicando(t.key);
+    try {
+      await onApplyCuts({
+        takeId: t.takeId,
+        key: t.key,
+        buffer,
+        cuts: lista,
+        offsetSec: (t.offsetMs ?? 0) / 1000,
+      });
+    } catch (err) {
+      console.error("[corte] falha ao aplicar no arquivo", err);
+      setErroCorte(tx("cutApplyError"));
+    } finally {
+      setAplicando(null);
+    }
+  }, [onApplyCuts, cuts, getBuffer, tx]);
 
   const PlayButton = (
     <button onClick={togglePlay} disabled={!ready && hasAudio}
@@ -979,8 +1310,15 @@ export default function WavePlayer({
                 const isMuted = !locked && !!muted[t.key];
                 const isSolo = !locked && !!soloed[t.key];
                 const g = trackVol[t.key] ?? 1;
+                const cortes = cuts[t.key] ?? SEM_CORTES_LISTA;
+                const selDaFaixa = sel && sel.key === t.key ? sel : null;
                 return (
-                  <div key={t.key} className="mixer-track-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 16px", borderBottom: "1px solid var(--border)" }}>
+                  // Agrupa a linha da faixa com a barra de cortes dela.
+                  // `fit-content`: em tela estreita a mesa rola na horizontal
+                  // (.mixer-tracks), e sem isto o grupo ficaria preso à largura
+                  // visível enquanto a linha dentro dele tem 480px de mínimo.
+                  <div key={t.key} style={{ minWidth: "fit-content" }}>
+                  <div className="mixer-track-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 16px", borderBottom: cortes.length || selDaFaixa ? "none" : "1px solid var(--border)" }}>
                     {/* M / S — travado (bloqueado) mostra cadeado no lugar dos botões */}
                     <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                       {locked ? (
@@ -1020,10 +1358,135 @@ export default function WavePlayer({
                         onChange={e => { onMixerTouch?.(); setTrackVol(p => ({ ...p, [t.key]: Number(e.target.value) })); }}
                         style={{ width: 64, flexShrink: 0 }} aria-label={`Volume ${t.label}`} />
                     )}
-                    {/* onda (clique = seek) */}
-                    <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={onWaveClick}>
-                      <WaveCanvas peaks={peaks[t.key] ?? []} color={colorFor(t.instrument)} height={40} dimmed={!on} />
+                    {/* onda — clique dá seek; arrasto (com corte liberado) marca o trecho */}
+                    <div
+                      style={{ flex: 1, minWidth: 0, cursor: "pointer", position: "relative", touchAction: canCut ? "pan-y" : undefined }}
+                      onClick={canCut ? undefined : onWaveClick}
+                      onPointerDown={canCut ? (ev) => onWavePointerDown(ev, t.key) : undefined}
+                      onPointerMove={canCut ? onWavePointerMove : undefined}
+                      onPointerUp={canCut ? onWavePointerUp : undefined}
+                      onPointerCancel={canCut ? () => { dragRef.current = null; } : undefined}
+                    >
+                      <WaveCanvas
+                        peaks={peaks[t.key] ?? []}
+                        color={colorFor(t.instrument)}
+                        height={40}
+                        dimmed={!on}
+                        cuts={cortes}
+                        duration={duration}
+                      />
+                      {/* Trecho sendo marcado agora — some ao cortar ou cancelar. */}
+                      {selDaFaixa && duration > 0 && (
+                        <div
+                          aria-hidden="true"
+                          style={{
+                            position: "absolute", top: 0, bottom: 0,
+                            left: `${(selDaFaixa.start / duration) * 100}%`,
+                            width: `${Math.max(0.4, ((selDaFaixa.end - selDaFaixa.start) / duration) * 100)}%`,
+                            background: "rgba(255,154,0,0.22)",
+                            border: "1px solid var(--accent)",
+                            pointerEvents: "none",
+                          }}
+                        />
+                      )}
                     </div>
+                  </div>
+
+                  {/* ── Barra de cortes da faixa ──
+                      Só existe quando há algo a dizer: um trecho marcado ou
+                      cortes já feitos. Fora isso a mesa continua limpa. */}
+                  {canCut && (selDaFaixa || cortes.length > 0) && (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+                      padding: "0 16px 8px 82px", borderBottom: "1px solid var(--border)",
+                    }}>
+                      {selDaFaixa ? (
+                        <>
+                          <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                            {tx("cutSelected", {
+                              start: formatTime(selDaFaixa.start),
+                              end: formatTime(selDaFaixa.end),
+                            })}
+                          </span>
+                          <button
+                            onClick={cortarSelecao}
+                            style={{
+                              padding: "4px 12px", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                              background: "var(--accent)", color: "#000", border: "none",
+                            }}
+                          >
+                            ✂ {tx("cutApply")}
+                          </button>
+                          <button
+                            onClick={() => { seek(selDaFaixa.start); }}
+                            style={{
+                              padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                              background: "var(--surface2)", border: "1px solid var(--border2)", color: "var(--muted)",
+                            }}
+                          >
+                            {tx("cutListen")}
+                          </button>
+                          <button
+                            onClick={() => setSel(null)}
+                            style={{
+                              padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                              background: "transparent", border: "1px solid var(--border2)", color: "var(--muted2)",
+                            }}
+                          >
+                            {tx("cutCancel")}
+                          </button>
+                        </>
+                      ) : null}
+
+                      {cortes.length > 0 && (
+                        <>
+                          <span style={{ fontSize: 11, color: "var(--muted2)" }}>
+                            {tx("cutTotal", { n: cortes.length, seconds: totalCortado(cortes).toFixed(1) })}
+                          </span>
+                          {cortes.map((c, i) => (
+                            <button
+                              key={`${c.start}-${c.end}`}
+                              onClick={() => removerCorte(t.key, i)}
+                              title={tx("cutUndoOne")}
+                              style={{
+                                padding: "3px 8px", borderRadius: 500, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                                background: "var(--surface2)", border: "1px dashed var(--border2)", color: "var(--muted)",
+                                fontFamily: "var(--font-mono, monospace)",
+                              }}
+                            >
+                              {formatTime(c.start)}–{formatTime(c.end)} ✕
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => limparCortes(t.key)}
+                            style={{
+                              padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                              background: "transparent", border: "1px solid var(--border2)", color: "var(--muted2)",
+                            }}
+                          >
+                            {tx("cutClear")}
+                          </button>
+                          {/* Consolidar só faz sentido em gravação própria: stem
+                              do catálogo é o mesmo arquivo para todo mundo. */}
+                          {t.takeId != null && onApplyCuts && (
+                            <button
+                              onClick={() => aplicarNoArquivo(t)}
+                              disabled={aplicando !== null}
+                              title={tx("cutApplyFileTitle")}
+                              style={{
+                                padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+                                cursor: aplicando ? "default" : "pointer", opacity: aplicando ? 0.5 : 1,
+                                background: "rgba(255,154,0,0.12)", border: "1px solid rgba(255,154,0,0.4)",
+                                color: "var(--accent)",
+                              }}
+                            >
+                              {aplicando === t.key ? tx("cutApplyFileBusy") : tx("cutApplyFile")}
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                   </div>
                 );
               })}
@@ -1033,9 +1496,19 @@ export default function WavePlayer({
               <div style={{ position: "absolute", top: 0, bottom: 0, left: `calc(284px + (100% - 300px) * ${pct} / 100)`, width: 2, background: "var(--accent)", pointerEvents: "none", opacity: ready ? 1 : 0 }} />
             </div>
 
+            {/* Como cortar — a única pista de que arrastar na onda faz algo. */}
+            {canCut && (
+              <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <span style={{ fontSize: 11, color: "var(--muted2)", lineHeight: 1.6 }}>✂ {tx("cutHint")}</span>
+                {erroCorte && (
+                  <span style={{ fontSize: 11, color: "var(--danger)", fontWeight: 600 }}>⚠ {erroCorte}</span>
+                )}
+              </div>
+            )}
+
             {/* Download da seleção (Pro/ProBand) — mixagem e/ou faixas separadas */}
             <DownloadPanel
-              tracks={tracks}
+              tracks={tracksParaDownload}
               audible={audible}
               trackVol={trackVol}
               getBuffer={getBuffer}
@@ -1051,10 +1524,55 @@ export default function WavePlayer({
           /* ─── Modo single (mix) ─── */
           <>
             <div style={{ padding: "14px 18px 0" }}>
-              <div style={{ position: "relative", cursor: "pointer", opacity: ready ? 1 : 0.3, transition: "opacity 0.3s" }} onClick={onWaveClick}>
-                <WaveCanvas peaks={mixPeaks} color="var(--accent)" height={56} dimmed={false} />
+              <div
+                style={{ position: "relative", cursor: "pointer", opacity: ready ? 1 : 0.3, transition: "opacity 0.3s", touchAction: canCut ? "pan-y" : undefined }}
+                onClick={canCut ? undefined : onWaveClick}
+                onPointerDown={canCut ? (ev) => onWavePointerDown(ev, "mix") : undefined}
+                onPointerMove={canCut ? onWavePointerMove : undefined}
+                onPointerUp={canCut ? onWavePointerUp : undefined}
+                onPointerCancel={canCut ? () => { dragRef.current = null; } : undefined}
+              >
+                <WaveCanvas peaks={mixPeaks} color="var(--accent)" height={56} dimmed={false} cuts={cuts["mix"]} duration={duration} />
                 <div style={{ position: "absolute", top: 0, bottom: 0, left: `${pct}%`, width: 2, background: "var(--accent)", pointerEvents: "none" }} />
+                {sel && sel.key === "mix" && duration > 0 && (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute", top: 0, bottom: 0,
+                      left: `${(sel.start / duration) * 100}%`,
+                      width: `${Math.max(0.4, ((sel.end - sel.start) / duration) * 100)}%`,
+                      background: "rgba(255,154,0,0.22)", border: "1px solid var(--accent)", pointerEvents: "none",
+                    }}
+                  />
+                )}
               </div>
+
+              {/* Mesma barra de cortes da mesa, na única faixa que existe aqui. */}
+              {canCut && (sel?.key === "mix" || (cuts["mix"]?.length ?? 0) > 0) && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingTop: 8 }}>
+                  {sel?.key === "mix" && (
+                    <>
+                      <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                        {tx("cutSelected", { start: formatTime(sel.start), end: formatTime(sel.end) })}
+                      </span>
+                      <button onClick={cortarSelecao}
+                        style={{ padding: "4px 12px", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer", background: "var(--accent)", color: "#000", border: "none" }}>
+                        ✂ {tx("cutApply")}
+                      </button>
+                      <button onClick={() => setSel(null)}
+                        style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", background: "transparent", border: "1px solid var(--border2)", color: "var(--muted2)" }}>
+                        {tx("cutCancel")}
+                      </button>
+                    </>
+                  )}
+                  {(cuts["mix"] ?? []).map((c, i) => (
+                    <button key={`${c.start}-${c.end}`} onClick={() => removerCorte("mix", i)} title={tx("cutUndoOne")}
+                      style={{ padding: "3px 8px", borderRadius: 500, fontSize: 11, fontWeight: 600, cursor: "pointer", background: "var(--surface2)", border: "1px dashed var(--border2)", color: "var(--muted)", fontFamily: "var(--font-mono, monospace)" }}>
+                      {formatTime(c.start)}–{formatTime(c.end)} ✕
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div style={{ padding: "12px 18px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

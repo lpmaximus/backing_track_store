@@ -1,10 +1,22 @@
 /**
- * PATCH  /api/takes/:id — renomear, ajustar o offset ou mudar a visibilidade.
+ * PATCH  /api/takes/:id — renomear, ajustar o offset, trocar a visibilidade, o
+ *                         efeito, ou SUBSTITUIR o arquivo de áudio.
  * DELETE /api/takes/:id — apagar a gravação (banco + objeto no R2).
  *
  * Take não tem "admin pode mexer" como as músicas têm. É gravação pessoal:
  * quem não é o dono não edita nem apaga, ponto. Admin que precise remover
  * conteúdo abusivo faz pelo painel, com registro — não por esta rota.
+ *
+ * ── Substituir o arquivo (`audioUrl`) ────────────────────────────────────────
+ * É o "aplicar os cortes de vez": o navegador renderiza a gravação já sem os
+ * trechos cortados, sobe o resultado pelo mesmo presign de sempre e manda a URL
+ * para cá. O arquivo ANTIGO é apagado do R2 — de propósito, e é o que torna
+ * esta operação irreversível: a partir daqui o corte não é mais configuração,
+ * é o áudio. Quem quiser voltar atrás grava de novo.
+ *
+ * A alternativa (guardar as duas versões) foi descartada porque dobra o storage
+ * de gravação por pessoa para preservar um estado que a própria interface
+ * apresenta como definitivo.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
@@ -76,9 +88,39 @@ export async function PATCH(
       offsetMs?: number;
       visibility?: string;
       fx?: unknown;
+      /** Novo arquivo já enviado ao R2 — ver o cabeçalho deste arquivo. */
+      audioUrl?: string;
+      durationSec?: number;
     };
 
     const patch: Partial<typeof userTakes.$inferInsert> = { updatedAt: new Date() };
+
+    // Guardado antes do UPDATE: depois de trocar a linha não há mais como saber
+    // qual objeto do bucket ficou sem dono.
+    let urlAntiga: string | null = null;
+
+    if (body.audioUrl !== undefined) {
+      const novaUrl = String(body.audioUrl);
+
+      // Mesma conferência do commit em /api/takes: o cliente diz onde o arquivo
+      // está, então o servidor exige que seja o NOSSO bucket, na pasta DESTE
+      // usuário e DESTA música. Sem isso um cliente adulterado apontaria o take
+      // para o arquivo de outra pessoa — ou para um endereço qualquer.
+      const base = process.env.R2_PUBLIC_URL ?? "";
+      const prefixoEsperado = `${base}/audio/takes/${g.userId}/${take.songId}/`;
+      if (!base || !novaUrl.startsWith(prefixoEsperado)) {
+        return NextResponse.json({ error: "URL de áudio inválida" }, { status: 400 });
+      }
+      // Trocar pelo mesmo arquivo não é erro, mas não pode chegar ao apagamento
+      // lá embaixo: seria apagar o áudio que acabou de ser gravado na linha.
+      if (novaUrl !== take.audioUrl) {
+        urlAntiga = take.audioUrl;
+        patch.audioUrl = novaUrl;
+      }
+
+      const dur = Number(body.durationSec);
+      if (Number.isFinite(dur) && dur > 0) patch.durationSec = dur.toFixed(2);
+    }
 
     if (typeof body.name === "string") {
       const nome = body.name.trim().slice(0, 120);
@@ -112,11 +154,27 @@ export async function PATCH(
       .where(and(eq(userTakes.id, g.takeId), eq(userTakes.userId, g.userId)))
       .returning();
 
+    // O arquivo antigo sai do bucket DEPOIS que a linha já aponta para o novo.
+    // Na ordem inversa, uma falha no banco deixaria a gravação apontando para um
+    // objeto apagado e o player quebraria a cada play.
+    if (urlAntiga) {
+      const key = keyFromPublicUrl(urlAntiga);
+      if (key) {
+        try {
+          await deleteObject(key);
+        } catch (err) {
+          console.error("[PATCH /api/takes/:id] objeto órfão no R2:", key, err);
+        }
+      }
+    }
+
     // Mesma regra do GET /api/takes: a URL pública do R2 não sai do servidor.
+    // O `?v=` carrega o updatedAt — é o que faz o player recarregar o áudio
+    // quando o arquivo foi substituído mas o caminho continuou igual.
     return NextResponse.json({
       take: {
         ...atualizado,
-        audioUrl: `/api/takes/${g.takeId}/audio`,
+        audioUrl: `/api/takes/${g.takeId}/audio?v=${atualizado.updatedAt.getTime()}`,
         fx: sanitizeFx(atualizado.fx),
       },
     });

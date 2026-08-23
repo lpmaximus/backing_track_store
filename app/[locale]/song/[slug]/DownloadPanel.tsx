@@ -26,9 +26,11 @@ import {
   downloadBlob,
   safeFileName,
   extFromUrl,
+  applyCuts,
   type MixPart,
 } from "./exportAudio";
 import { fxVazio, type TakeFx } from "@/src/lib/takeFx";
+import type { Cut } from "@/src/lib/cuts";
 import { renderTakeComFx } from "./takeFxNodes";
 
 export type DownloadTrack = {
@@ -48,6 +50,12 @@ export type DownloadTrack = {
   fx?: TakeFx | null;
   /** Marca a faixa como gravação do usuário (só elas têm efeito e offset). */
   takeId?: number;
+  /**
+   * Trechos apagados nesta faixa (ver src/lib/cuts.ts). Entram no arquivo
+   * exportado: o download tem de soar como o player. Faixa com corte NÃO pode
+   * sair pelo caminho do "arquivo original" — ele é o áudio inteiro.
+   */
+  cuts?: Cut[];
 };
 
 type Props = {
@@ -128,16 +136,28 @@ export default function DownloadPanel({
             (t.offsetMs ?? 0) / 1000,
             songDuration && songDuration > 0 ? songDuration : buffer.duration,
           );
-          parts.push({ buffer: comFx, gain: trackVol[t.key] ?? 1, offsetSec: 0 });
+          // Corte DEPOIS do efeito, na mesma ordem da cadeia do player (faixa →
+          // efeito → corte): assim a cauda do reverb também emudece dentro do
+          // trecho apagado. Aplicar antes deixaria o rastro do reverb vazar
+          // exatamente para o pedaço que a pessoa quis limpar.
+          //
+          // O render já posicionou a gravação na linha do tempo da música, então
+          // aqui o corte entra sem offset — somá-lo de novo dobraria o
+          // deslocamento e o silêncio cairia no lugar errado.
+          const pronta = t.cuts?.length ? applyCuts(comFx, t.cuts, 0) : comFx;
+          parts.push({ buffer: pronta, gain: trackVol[t.key] ?? 1, offsetSec: 0 });
           continue;
         }
 
         // O offset da gravação do usuário viaja junto: sem ele a pessoa
-        // encaixa o take no player, baixa, e ouve o arquivo torto.
+        // encaixa o take no player, baixa, e ouve o arquivo torto. O mesmo
+        // offset converte o corte (que é tempo de música) para dentro do
+        // arquivo.
+        const off = (t.offsetMs ?? 0) / 1000;
         parts.push({
-          buffer,
+          buffer: t.cuts?.length ? applyCuts(buffer, t.cuts, off) : buffer,
           gain: trackVol[t.key] ?? 1,
-          offsetSec: (t.offsetMs ?? 0) / 1000,
+          offsetSec: off,
         });
       }
       if (parts.length === 0) throw new Error("no-buffer");
@@ -173,16 +193,41 @@ export default function DownloadPanel({
           // Gravação COM efeito não pode sair pelo arquivo original: ele é a
           // captação seca. Renderiza a cadeia e encoda, para a faixa avulsa
           // soar igual ao que se ouve no player e igual à mixagem.
-          if (t.takeId != null && !fxVazio(t.fx)) {
+          // Faixa com corte também sai renderizada, e não como arquivo
+          // original: o original é o áudio INTEIRO, e baixá-lo devolveria
+          // justamente o trecho que a pessoa apagou.
+          if (t.takeId != null && (!fxVazio(t.fx) || t.cuts?.length)) {
             const buffer = getBuffer(t.key);
             if (!buffer) throw new Error("no-buffer");
-            const comFx = await renderTakeComFx(
-              buffer,
-              t.fx,
-              (t.offsetMs ?? 0) / 1000,
-              songDuration && songDuration > 0 ? songDuration : buffer.duration,
-            );
-            const { blob, ext: e2 } = await exportMixdown([{ buffer: comFx, gain: 1 }]);
+            const off = (t.offsetMs ?? 0) / 1000;
+            const comFx = fxVazio(t.fx)
+              ? buffer
+              : await renderTakeComFx(
+                buffer,
+                t.fx,
+                off,
+                songDuration && songDuration > 0 ? songDuration : buffer.duration,
+              );
+            // Sem efeito, o buffer continua na linha do tempo do ARQUIVO e o
+            // corte precisa do offset; com efeito, o render já reposicionou.
+            const pronta = t.cuts?.length
+              ? applyCuts(comFx, t.cuts, fxVazio(t.fx) ? off : 0)
+              : comFx;
+            const { blob, ext: e2 } = await exportMixdown([{ buffer: pronta, gain: 1 }]);
+            downloadBlob(blob, `${baseName} - ${safeFileName(t.label)}.${e2}`);
+            done++;
+            setBusy({ phase: "stems", pct: (done + failed) / selected.length });
+            await new Promise((r) => setTimeout(r, 350));
+            continue;
+          }
+
+          // Stem do catálogo com corte: mesmo caso, mas sem efeito nem offset.
+          if (t.cuts?.length) {
+            const buffer = getBuffer(t.key);
+            if (!buffer) throw new Error("no-buffer");
+            const { blob, ext: e2 } = await exportMixdown([
+              { buffer: applyCuts(buffer, t.cuts, 0), gain: 1 },
+            ]);
             downloadBlob(blob, `${baseName} - ${safeFileName(t.label)}.${e2}`);
             done++;
             setBusy({ phase: "stems", pct: (done + failed) / selected.length });

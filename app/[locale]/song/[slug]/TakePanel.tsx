@@ -41,7 +41,7 @@ type Props = {
   bpm?: number | null;
 };
 
-type Fase = "parado" | "contando" | "gravando" | "revisando" | "salvando";
+type Fase = "parado" | "contando" | "gravando" | "revisando" | "salvando" | "importando";
 
 const CONTAGEM_BATIDAS = 4;
 const MAX_OFFSET_MS = 2000;
@@ -77,6 +77,51 @@ function escolherMime(): string {
 /** Content-Type aceito pela rota — sem os parâmetros de codec. */
 function tipoBase(mime: string): string {
   return mime.split(";")[0] || "audio/webm";
+}
+
+/**
+ * Teto do arquivo importado como faixa. Não é limite do R2 nem da rota — é o
+ * ponto em que o upload direto do navegador deixa de ser instantâneo e passa a
+ * parecer travado, sem barra de progresso para explicar a espera.
+ */
+const MAX_ARQUIVO_BYTES = 60 * 1024 * 1024;
+
+/** Content-Type aceito pela rota, decidido pelo tipo do arquivo ou pela extensão. */
+const TIPO_POR_EXTENSAO: Record<string, string> = {
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  m4a: "audio/mp4",
+  mp4: "audio/mp4",
+  aac: "audio/mp4",
+  ogg: "audio/ogg",
+  oga: "audio/ogg",
+  opus: "audio/ogg",
+  webm: "audio/webm",
+};
+
+function tipoDeArquivo(file: File): string | null {
+  const base = (file.type || "").split(";")[0].toLowerCase();
+  // A lista fechada da rota não conhece os apelidos que alguns navegadores dão
+  // ("audio/x-m4a", "audio/x-wav"), então o tipo declarado só vale se for um
+  // dos canônicos; fora disso, quem manda é a extensão.
+  if (["audio/mpeg", "audio/wav", "audio/mp4", "audio/ogg", "audio/webm"].includes(base)) return base;
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  return TIPO_POR_EXTENSAO[ext] ?? null;
+}
+
+/** Duração medida no navegador, para a lista não precisar baixar o áudio. */
+function duracaoDoArquivo(file: File): Promise<number> {
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const el = new Audio();
+    const fim = (v: number) => { URL.revokeObjectURL(url); resolve(v); };
+    el.preload = "metadata";
+    el.onloadedmetadata = () => fim(isFinite(el.duration) ? el.duration : 0);
+    // Metadado ilegível não impede o upload: a duração é conforto de interface,
+    // não requisito. Zero significa "não sei", e a lista simplesmente não mostra.
+    el.onerror = () => fim(0);
+    el.src = url;
+  });
 }
 
 function formatarDuracao(s: number | null | undefined): string {
@@ -436,6 +481,71 @@ export default function TakePanel({ songId, takes, onChange, transportRef, bpm }
     }
   }, [blob, songId, nome, duracao, descartar, recarregar, t]);
 
+  // ── Faixa vinda de arquivo ──────────────────────────────────────────────────
+  //
+  // Mesmo destino da gravação: vira uma faixa da mesa, com M/S, volume, offset,
+  // efeito e corte. O que muda é só a origem — em vez do microfone, um arquivo
+  // que a pessoa já tem (um loop de bateria, um violão gravado no celular, a
+  // ideia que ela mandou pra si mesma no WhatsApp).
+  //
+  // É o que torna o projeto em branco utilizável de verdade: sem isto, montar
+  // uma música do zero exigiria gravar TUDO ao vivo, aqui, agora.
+  const importarArquivo = useCallback(async (file: File) => {
+    setErro(null);
+
+    if (file.size > MAX_ARQUIVO_BYTES) {
+      setErro(t("takes.fileTooBig", { mb: Math.round(MAX_ARQUIVO_BYTES / 1024 / 1024) }));
+      return;
+    }
+
+    // O navegador nem sempre sabe o tipo (".m4a" costuma vir vazio ou como
+    // "audio/x-m4a"), e a rota só aceita uma lista fechada — ela vai direto
+    // para o Content-Type do objeto no R2. Na dúvida, decide pela extensão.
+    const tipo = tipoDeArquivo(file);
+    if (!tipo) { setErro(t("takes.fileFormat")); return; }
+
+    setFase("importando");
+    try {
+      const duracaoArquivo = await duracaoDoArquivo(file);
+
+      const pres = await fetch("/api/takes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: "presign", songId, contentType: tipo }),
+      });
+      if (!pres.ok) throw new Error((await pres.json()).error ?? "presign");
+      const { uploadUrl, publicUrl } = (await pres.json()) as { uploadUrl: string; publicUrl: string };
+
+      const put = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": tipo },
+        body: file,
+      });
+      if (!put.ok) throw new Error("upload");
+
+      const com = await fetch("/api/takes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          step: "commit",
+          songId,
+          publicUrl,
+          // O nome do arquivo (sem extensão) é o melhor palpite de nome da
+          // faixa: quem separou "baixo.wav" já disse o que aquilo é.
+          name: file.name.replace(/\.[^.]+$/, "").slice(0, 120) || t("takes.defaultName"),
+          durationSec: duracaoArquivo,
+        }),
+      });
+      if (!com.ok) throw new Error((await com.json()).error ?? "commit");
+
+      await recarregar();
+      setFase("parado");
+    } catch (e) {
+      setErro(e instanceof Error && e.message !== "upload" ? e.message : t("takes.saveError"));
+      setFase("parado");
+    }
+  }, [songId, recarregar, t]);
+
   const ajustar = useCallback(
     async (take: Take, delta: number) => {
       const novo = Math.max(-MAX_OFFSET_MS, Math.min(MAX_OFFSET_MS, take.offsetMs + delta));
@@ -624,9 +734,37 @@ export default function TakePanel({ songId, takes, onChange, transportRef, bpm }
       )}
 
       {fase === "parado" && (
-        <button onClick={gravar} style={{ ...botao, background: "var(--accent)", color: "#000", border: "none" }}>
-          {t("takes.record")}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <button onClick={gravar} style={{ ...botao, background: "var(--accent)", color: "#000", border: "none" }}>
+            {t("takes.record")}
+          </button>
+          {/* Faixa a partir de arquivo — mesmo destino da gravação. O input
+              fica escondido dentro do label porque o controle nativo de arquivo
+              não aceita estilo e destoaria do resto do painel. */}
+          <label style={{ ...botao, display: "inline-flex", alignItems: "center", gap: 7 }}>
+            <span aria-hidden="true">⬆</span>
+            {t("takes.importFile")}
+            <input
+              type="file"
+              accept="audio/*,.mp3,.wav,.m4a,.ogg,.opus,.webm"
+              style={{ display: "none" }}
+              onChange={e => {
+                const f = e.target.files?.[0];
+                // Zera o valor para que escolher O MESMO arquivo de novo (depois
+                // de um erro, por exemplo) volte a disparar o evento.
+                e.target.value = "";
+                if (f) void importarArquivo(f);
+              }}
+            />
+          </label>
+        </div>
+      )}
+
+      {fase === "importando" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--muted)" }}>
+          <span aria-hidden="true">⬆</span>
+          {t("takes.importing")}
+        </div>
       )}
 
       {fase === "contando" && (

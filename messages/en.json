@@ -494,8 +494,25 @@
         "chorus": "Chorus (instrument)",
         "delay": "Delay",
         "studio": "Studio vocal (polish)"
-      }
-    }
+      },
+      "importFile": "Track from file",
+      "importing": "Uploading the file…",
+      "fileTooBig": "File is too large (max {mb} MB).",
+      "fileFormat": "Unsupported format. Use MP3, WAV, M4A, OGG or WebM."
+    },
+    "cutHint": "Drag across a track's waveform to select a passage, then hit Cut. The cut lives in your version only and can be undone anytime.",
+    "cutSelected": "Passage {start}–{end}",
+    "cutApply": "Cut",
+    "cutListen": "Play from here",
+    "cutCancel": "Cancel",
+    "cutTotal": "{n} cut(s) · {seconds}s removed",
+    "cutUndoOne": "Click to bring this passage back",
+    "cutClear": "Clear cuts",
+    "cutApplyFile": "Apply to file",
+    "cutApplyFileBusy": "Applying…",
+    "cutApplyFileTitle": "Writes the cuts into the recording's file. This cannot be undone.",
+    "cutApplyConfirm": "Apply the cuts on \"{label}\" to the file? After this the passages can't be brought back — only re-recorded.",
+    "cutApplyError": "Couldn't apply the cuts to the file. Try again."
   },
   "setlists": {
     "title": "My Setlists",
@@ -950,6 +967,22 @@
     "take": "Pick up",
     "taken": "In your area",
     "tracksTitle": "Tracks in this version",
-    "tracksHelp": "Turn off what you do not want to hear in your version. The catalog song does not change for anyone."
+    "tracksHelp": "Turn off what you do not want to hear in your version. The catalog song does not change for anyone.",
+    "createTitle": "New song, from scratch",
+    "createHelp": "Start a blank song with no audio at all and build it track by track — recording from the mic or bringing in files you already have.",
+    "createButton": "New song",
+    "createNameLabel": "Song name",
+    "createNamePlaceholder": "e.g. Sunday idea",
+    "createBpm": "BPM",
+    "createKey": "Key",
+    "createNote": "The project is yours alone: it never enters the catalog and nobody else sees it. You can change name, BPM and key later.",
+    "createConfirm": "Create and open",
+    "creating": "Creating…",
+    "createCancel": "Cancel",
+    "createError": "Couldn't create the song. Try again.",
+    "projectsTitle": "My songs from scratch",
+    "fromCatalogTitle": "Taken from the catalog",
+    "deleteProject": "Delete",
+    "confirmDeleteProject": "Delete \"{name}\"? The song and every track recorded in it go with it, and this can't be undone."
   }
 }

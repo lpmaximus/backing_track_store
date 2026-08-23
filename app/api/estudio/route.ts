@@ -52,12 +52,18 @@ export async function GET(req: NextRequest) {
         // resolvido aqui e não no cliente, para que toda tela mostre o mesmo.
         title: userSongs.title,
         disabledStems: userSongs.disabledStems,
+        // Trechos silenciados por faixa nesta versão — ver src/lib/cuts.ts.
+        trackCuts: userSongs.trackCuts,
         createdAt: userSongs.createdAt,
         songTitle: songs.title,
         songArtist: songs.artist,
         songSlug: songs.slug,
         songThumbnailUrl: songs.thumbnailUrl,
         songDuration: songs.duration,
+        // 'studio_project' = música em branco criada aqui dentro, sem vínculo
+        // com áudio nenhum do catálogo. A lista do estúdio separa as duas
+        // coisas, e "devolver" significa coisas diferentes em cada uma.
+        songSourceType: songs.sourceType,
       })
       .from(userSongs)
       .innerJoin(songs, eq(userSongs.songId, songs.id));

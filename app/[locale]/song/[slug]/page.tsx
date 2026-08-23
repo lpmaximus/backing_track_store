@@ -31,6 +31,10 @@ export async function generateMetadata({
   const { slug, locale } = await params;
   const [song] = await db.select().from(songsTable).where(eq(songsTable.slug, slug)).limit(1);
   if (!song) return {};
+  // Projeto de estúdio é trabalho privado: não ganha título, descrição nem
+  // hreflang. Sem isto o nome do projeto de alguém apareceria na aba (e na
+  // prévia de compartilhamento) de quem tivesse só o link.
+  if (song.sourceType === "studio_project") return { robots: { index: false, follow: false } };
   const t = await getTranslations({ locale, namespace: "song" });
   return {
     // Sem "| BackingTrack.store" aqui: o template do layout já acrescenta
@@ -63,6 +67,18 @@ export default async function SongPage({
   const stems = await db.select().from(stemsTable).where(eq(stemsTable.songId, song.id));
 
   const session = await auth();
+
+  // ── Projeto de estúdio: só o dono entra ──────────────────────────────────
+  // Ele mora na mesma tabela das músicas e por isso tem URL pública como
+  // qualquer outra. Não é acervo: é a música que a pessoa está montando, com as
+  // gravações dela dentro. 404 (e não 403) para não confirmar que o projeto
+  // existe a quem só tem o link.
+  if (
+    song.sourceType === "studio_project" &&
+    (!session?.user || song.uploadedByUserId !== Number(session.user.id))
+  ) {
+    notFound();
+  }
   // Acesso Pro efetivo: role pro/proband/admin OU membro ativo de banda com
   // assinatura ativa (herda). Habilita o multitrack para o integrante de banda.
   const isPro = session?.user

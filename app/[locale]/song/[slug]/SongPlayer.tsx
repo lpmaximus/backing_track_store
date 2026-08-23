@@ -19,6 +19,8 @@ import type { ResolvedStem } from "@/src/lib/mix";
 import { roleCan } from "@/src/lib/permissions";
 import { CifraView, CifraText, type ChordSection, type LyricsLine } from "./CifraView";
 import { track } from "@/app/track";
+import type { TrackCuts } from "@/src/lib/cuts";
+import { applyCuts, exportMixdown } from "./exportAudio";
 
 // WavePlayer usa APIs de browser — importar só no client
 const WavePlayer = dynamic(() => import("./WavePlayer"), { ssr: false });
@@ -43,6 +45,12 @@ type Song = {
   lyricsSource?: string | null;
   beats?: number[] | null;
   published: boolean;
+  /**
+   * 'studio_project' = música em branco criada no Meu Estúdio, sem áudio de
+   * origem. Muda o player de lugar: a linha do tempo passa a nascer das
+   * GRAVAÇÕES, porque não existe base por baixo delas.
+   */
+  sourceType?: string | null;
 };
 
 type Props = {
@@ -125,6 +133,88 @@ export default function SongPlayer({
       STEM_LABEL_KEY[instrument] ? t(STEM_LABEL_KEY[instrument]) : (fallback ?? instrument),
     [t],
   );
+
+  // ── Cortes por faixa ───────────────────────────────────────────────────────
+  // Vivem na SUA versão da música: sem versão não há onde guardar, e por isso o
+  // player só libera a seleção quando ela existe (`canCut`). Ver src/lib/cuts.ts.
+  const projectMode = song.sourceType === "studio_project";
+  const cortes: TrackCuts = useMemo(() => versao?.trackCuts ?? {}, [versao]);
+
+  const salvarCortes = useCallback(async (proximos: TrackCuts) => {
+    if (!versao) return;
+    const anterior = versao;
+    // Otimista: cortar é uma ação sobre o som que está tocando, e esperar a
+    // resposta do servidor para emudecer o trecho tornaria o botão lento
+    // justamente no momento em que a pessoa está ajustando de ouvido.
+    setVersao({ ...versao, trackCuts: proximos });
+    const res = await fetch(`/api/estudio/${versao.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trackCuts: proximos }),
+    }).catch(() => null);
+    if (!res || !res.ok) { setVersao(anterior); return; }
+    // A rota normaliza (funde sobreposição, descarta faixa inexistente) — vale
+    // o que ela devolveu, não o que mandamos.
+    const d = (await res.json().catch(() => null)) as { version?: Versao } | null;
+    if (d?.version) setVersao(d.version);
+  }, [versao]);
+
+  /**
+   * "Aplicar de vez": grava os cortes DENTRO do arquivo da gravação.
+   *
+   * O trabalho pesado é do navegador, como no download: o buffer já está
+   * decodificado para tocar, então renderizar aqui não custa servidor, nem
+   * egress, nem espera. O que sobe é só o arquivo final.
+   *
+   * Depois de aplicado, os cortes daquela faixa são apagados da configuração —
+   * senão ficariam silenciando de novo um trecho que já não existe mais no
+   * áudio, e um segundo "aplicar" recortaria o mesmo pedaço duas vezes.
+   */
+  const aplicarCortesNoArquivo = useCallback(async (info: {
+    takeId: number; key: string; buffer: AudioBuffer; cuts: { start: number; end: number }[]; offsetSec: number;
+  }) => {
+    if (!versao) return;
+
+    const cortado = applyCuts(info.buffer, info.cuts, info.offsetSec);
+    const { blob } = await exportMixdown([{ buffer: cortado, gain: 1 }], undefined, cortado.duration);
+
+    const presign = await fetch("/api/takes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        step: "presign",
+        songId: song.id,
+        contentType: blob.type || "audio/mpeg",
+        // Substituição, não gravação nova: não conta contra o teto de faixas.
+        replaceTakeId: info.takeId,
+      }),
+    });
+    if (!presign.ok) throw new Error("presign");
+    const { uploadUrl, publicUrl } = (await presign.json()) as { uploadUrl: string; publicUrl: string };
+
+    const put = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": blob.type || "audio/mpeg" },
+      body: blob,
+    });
+    if (!put.ok) throw new Error("upload");
+
+    const patch = await fetch(`/api/takes/${info.takeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ audioUrl: publicUrl, durationSec: cortado.duration }),
+    });
+    if (!patch.ok) throw new Error("commit");
+
+    // Recarrega a lista inteira: o `?v=` novo na URL é o que faz o player
+    // perceber que o arquivo mudou e recarregar o áudio daquela faixa.
+    const lista = await fetch(`/api/takes?songId=${song.id}`).then(r => (r.ok ? r.json() : null));
+    if (lista?.takes) setTakes(lista.takes as Take[]);
+
+    const restantes = { ...cortes };
+    delete restantes[info.key];
+    await salvarCortes(restantes);
+  }, [versao, song.id, cortes, salvarCortes]);
 
   // As faixas que a pessoa desligou na versão dela simplesmente não são
   // carregadas — não entram na mesa, no download nem no motor de áudio. Filtrar
@@ -493,6 +583,12 @@ export default function SongPlayer({
           initialMix={setlistMix}
           takes={takes}
           transportRef={transportRef}
+          // Cortes: só quem tem a música na própria área tem onde guardá-los.
+          cuts={cortes}
+          onCutsChange={salvarCortes}
+          canCut={!!versao}
+          onApplyCuts={versao ? aplicarCortesNoArquivo : undefined}
+          projectMode={projectMode}
         />
         {canCopy && stems.length > 0 && (
           <EstudioPanel

@@ -16,12 +16,19 @@
 import { useCallback, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { Stem } from "./WavePlayer";
+import type { TrackCuts } from "@/src/lib/cuts";
 
 export type Versao = {
   id: number;
   songId: number;
   title: string;
   disabledStems: string[];
+  /**
+   * Trechos apagados por faixa NESTA versão — ver src/lib/cuts.ts. Opcional
+   * porque respostas antigas (e o objeto otimista de quem acabou de pegar a
+   * música) não trazem o campo; ausente é o mesmo que "nenhum corte".
+   */
+  trackCuts?: TrackCuts;
 };
 
 type Props = {

@@ -11,6 +11,9 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+// Caminho relativo (e não "@/src/…"): este arquivo também é lido pelo
+// drizzle-kit, que não passa pelo resolvedor de alias do Next.
+import type { TrackCuts } from "../lib/cuts";
 
 // ─── Songs ────────────────────────────────────────────────────────────────────
 export const songs = pgTable("songs", {
@@ -206,6 +209,14 @@ export const userSongs = pgTable(
     // que apareça depois na música entra ligado por padrão, em vez de sumir da
     // versão de quem pegou antes.
     disabledStems: jsonb("disabled_stems").$type<string[]>().notNull().default([]),
+    // Trechos silenciados por faixa NESTA versão — o "apagar parte do áudio
+    // pelo gráfico". Formato: { "drums": [{start,end}], "take:12": [...] },
+    // em segundos da linha do tempo da música. Ver src/lib/cuts.ts.
+    //
+    // Fica aqui, e não em `stems`, pela mesma razão que `disabledStems`: o
+    // arquivo no R2 é um só e serve todo mundo. Corte é decisão de quem está
+    // ensaiando, não alteração do acervo — e por ser configuração, desfaz.
+    trackCuts: jsonb("track_cuts").$type<TrackCuts>().notNull().default({}),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

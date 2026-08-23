@@ -50,9 +50,17 @@ const MAX_TAKES_POR_MUSICA = 12;
  * assinar e para apagar), mas NUNCA é devolvida ao navegador. Gravação de voz
  * é dado pessoal; entregar link público permanente seria expô-la para sempre a
  * quem obtivesse o endereço. Ver app/api/takes/[id]/audio/route.ts.
+ *
+ * `versao` (o `updatedAt` do take) vai como `?v=`. É o que faz o player notar
+ * que o ARQUIVO mudou quando o caminho continuou o mesmo — o caso de "aplicar
+ * os cortes de vez", em que o conteúdo é substituído no lugar. Sem isso a
+ * pessoa aplicaria o corte e continuaria ouvindo o áudio antigo.
  */
-function urlDeAudio(takeId: number): string {
-  return `/api/takes/${takeId}/audio`;
+function urlDeAudio(takeId: number, versao?: Date | string | null): string {
+  const v = versao ? new Date(versao).getTime() : 0;
+  return Number.isFinite(v) && v > 0
+    ? `/api/takes/${takeId}/audio?v=${v}`
+    : `/api/takes/${takeId}/audio`;
 }
 
 /**
@@ -120,6 +128,7 @@ export async function GET(req: NextRequest) {
         visibility: userTakes.visibility,
         fx: userTakes.fx,
         createdAt: userTakes.createdAt,
+        updatedAt: userTakes.updatedAt,
       })
       .from(userTakes)
       .where(and(eq(userTakes.userId, userId), eq(userTakes.songId, songId)))
@@ -128,7 +137,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       takes: rows.map(r => ({
         ...r,
-        audioUrl: urlDeAudio(r.id),
+        audioUrl: urlDeAudio(r.id, r.updatedAt),
         ext: extensaoDaUrl(r.audioUrl),
         // Normaliza aqui para o cliente nunca receber null nem valor estranho
         // de uma linha antiga — a UI trabalha sempre com o objeto completo.
@@ -155,6 +164,14 @@ export async function POST(req: NextRequest) {
       name?: string;
       durationSec?: number;
       offsetMs?: number;
+      /**
+       * Quando presente, este upload SUBSTITUI o arquivo de um take que já
+       * existe ("aplicar os cortes de vez") em vez de criar mais um. Só muda o
+       * teto: quem já está no limite não fica impedido de consolidar o que
+       * gravou. A troca em si é feita pelo PATCH /api/takes/:id, que confere de
+       * novo o dono e o prefixo da URL.
+       */
+      replaceTakeId?: number;
     };
 
     const songId = Number(body.songId);
@@ -174,12 +191,14 @@ export async function POST(req: NextRequest) {
     // O teto vale nos DOIS passos. Só no commit deixaria o usuário gravar,
     // esperar o upload terminar e só então ouvir "não cabe" — o trabalho já
     // teria sido feito e o objeto já estaria no bucket.
+    const substituindo = Number(body.replaceTakeId) > 0;
+
     const [contagem] = await db
       .select({ n: sql<number>`count(*)::int` })
       .from(userTakes)
       .where(and(eq(userTakes.userId, userId), eq(userTakes.songId, songId)));
 
-    if ((contagem?.n ?? 0) >= MAX_TAKES_POR_MUSICA) {
+    if (!substituindo && (contagem?.n ?? 0) >= MAX_TAKES_POR_MUSICA) {
       return NextResponse.json(
         { error: `Máximo de ${MAX_TAKES_POR_MUSICA} gravações por música` },
         { status: 409 },
@@ -254,7 +273,7 @@ export async function POST(req: NextRequest) {
         {
           take: {
             ...criado,
-            audioUrl: urlDeAudio(criado.id),
+            audioUrl: urlDeAudio(criado.id, criado.updatedAt),
             ext: extensaoDaUrl(criado.audioUrl),
             fx: sanitizeFx(criado.fx),
           },
