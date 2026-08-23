@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/src/i18n/navigation";
 import { isProRole, roleLabel } from "@/src/lib/roles";
+import { GENRE_OPTIONS, genreEmoji, normalizeGenre } from "@/src/lib/genres";
 
 type MySong = {
   id: number;
@@ -28,6 +29,23 @@ const PENDING_STATUSES = new Set<MySong["processingStatus"]>(["queued", "separat
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 }
+
+/** Comparação sem acento e sem caixa — "sertao" acha "Sertão". */
+function fold(s: string) {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+type SortKey = "recent" | "title" | "artist" | "bpm";
+
+const controlSelect: React.CSSProperties = {
+  background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 8,
+  padding: "8px 10px", fontSize: 13, fontWeight: 600, color: "var(--text)", cursor: "pointer",
+};
+
+const controlLabel: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 6,
+  color: "var(--muted)", fontSize: 12, fontWeight: 600,
+};
 
 export default function PerfilContent() {
   const t = useTranslations("mySongs");
@@ -76,6 +94,43 @@ export default function PerfilContent() {
   const isPro = isProRole(session?.user?.role);
   const tier = roleLabel(session?.user?.role);
   const readySongs = songs.filter(s => s.processingStatus === "ready");
+
+  // ── Busca / ordenação / filtro ───────────────────────────────────────────
+  // Tudo no cliente de propósito: /api/songs/mine já devolve a lista inteira
+  // do usuário (dezenas de itens, não milhares), então filtrar aqui evita um
+  // round-trip por tecla digitada.
+  const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortKey>("recent");
+  const [genreFilter, setGenreFilter] = useState("Todos");
+
+  // O seletor de gênero lista só os gêneros que existem nas músicas DESTE
+  // usuário — nunca a lista canônica inteira, que viraria uma parede de
+  // opções vazias.
+  const availableGenres = Array.from(new Set(readySongs.map(s => normalizeGenre(s.genre))))
+    .sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+  const q = fold(query);
+  const visible = readySongs
+    .filter(s => genreFilter === "Todos" || normalizeGenre(s.genre) === genreFilter)
+    .filter(s => !q || fold(s.title).includes(q) || fold(s.artist).includes(q))
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "title":  return a.title.localeCompare(b.title, "pt-BR");
+        case "artist": return a.artist.localeCompare(b.artist, "pt-BR")
+          || a.title.localeCompare(b.title, "pt-BR");
+        case "bpm":    return (b.bpm ?? 0) - (a.bpm ?? 0);
+        default:       return +new Date(b.createdAt) - +new Date(a.createdAt);
+      }
+    });
+
+  // Ordenar por artista já agrupa: entra um cabeçalho a cada troca de nome.
+  const groupByArtist = sortBy === "artist";
+  const filtering = query.trim() !== "" || genreFilter !== "Todos";
+
+  function clearFilters() {
+    setQuery("");
+    setGenreFilter("Todos");
+  }
 
   // ── Ações ────────────────────────────────────────────────────────────────
   async function toggleShare(song: MySong) {
@@ -183,6 +238,67 @@ export default function PerfilContent() {
             </Link>
           </div>
 
+          {/* Barra de busca / ordenação / filtro — só faz sentido com músicas */}
+          {!loading && readySongs.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 14 }}>
+              <div style={{
+                background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 8,
+                display: "flex", alignItems: "center", padding: "0 12px", gap: 8,
+                flex: "1 1 220px", minWidth: 180,
+              }}>
+                <span style={{ color: "var(--muted)", fontSize: 14 }}>🔍</span>
+                <input
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder={t("searchPlaceholder")}
+                  aria-label={t("searchPlaceholder")}
+                  style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 13, padding: "8px 0", minWidth: 0 }}
+                />
+                {query && (
+                  <button onClick={() => setQuery("")} aria-label={t("clearFilters")}
+                    style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer", padding: 0 }}>
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <label style={controlLabel}>
+                {t("sortLabel")}
+                <select value={sortBy} onChange={e => setSortBy(e.target.value as SortKey)} style={controlSelect}>
+                  <option value="recent">{t("sortRecent")}</option>
+                  <option value="title">{t("sortTitle")}</option>
+                  <option value="artist">{t("sortArtist")}</option>
+                  <option value="bpm">{t("sortBpm")}</option>
+                </select>
+              </label>
+
+              {availableGenres.length > 1 && (
+                <label style={controlLabel}>
+                  {t("fieldGenre")}
+                  <select value={genreFilter} onChange={e => setGenreFilter(e.target.value)} style={controlSelect}>
+                    <option value="Todos">{t("allGenres")}</option>
+                    {availableGenres.map(g => (
+                      <option key={g} value={g}>{`${genreEmoji(g)} ${g}`}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <span style={{ color: "var(--muted2)", fontSize: 12, marginLeft: "auto" }}>
+                {t("showing", { shown: visible.length, total: readySongs.length })}
+              </span>
+
+              {filtering && (
+                <button onClick={clearFilters} style={{
+                  background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 8,
+                  padding: "7px 12px", fontSize: 12, fontWeight: 600, color: "var(--text)", cursor: "pointer",
+                }}>
+                  {t("clearFilters")}
+                </button>
+              )}
+            </div>
+          )}
+
           {loading ? (
             <p style={{ color: "var(--muted)", fontSize: 13, textAlign: "center", padding: "40px 0" }}>{tc("loading")}</p>
           ) : readySongs.length === 0 ? (
@@ -192,20 +308,39 @@ export default function PerfilContent() {
               </p>
               <Link href="/upload" className="btn-primary" style={{ padding: "9px 22px", fontSize: 13, display: "inline-block" }}>{t("uploadCta")}</Link>
             </div>
+          ) : visible.length === 0 ? (
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 32, textAlign: "center" }}>
+              <p style={{ color: "var(--muted)", fontSize: 14, margin: "0 0 12px" }}>{t("noResults")}</p>
+              <button onClick={clearFilters} style={{
+                background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 8,
+                padding: "7px 16px", fontSize: 13, fontWeight: 600, color: "var(--text)", cursor: "pointer",
+              }}>
+                {t("clearFilters")}
+              </button>
+            </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {readySongs.map(s => (
-                <SongCard
-                  key={s.id}
-                  song={s}
-                  editing={editingId === s.id}
-                  busy={busyId === s.id}
-                  onEdit={() => setEditingId(s.id)}
-                  onCancelEdit={() => setEditingId(null)}
-                  onSave={(v) => saveEdit(s.id, v)}
-                  onToggleShare={() => toggleShare(s)}
-                  onRemove={() => remove(s)}
-                />
+              {visible.map((s, i) => (
+                <div key={s.id} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {groupByArtist && (i === 0 || visible[i - 1].artist !== s.artist) && (
+                    <p style={{
+                      color: "var(--muted)", fontSize: 11, fontWeight: 800, letterSpacing: "0.08em",
+                      textTransform: "uppercase", margin: i === 0 ? "4px 0 0" : "14px 0 0",
+                    }}>
+                      {s.artist}
+                    </p>
+                  )}
+                  <SongCard
+                    song={s}
+                    editing={editingId === s.id}
+                    busy={busyId === s.id}
+                    onEdit={() => setEditingId(s.id)}
+                    onCancelEdit={() => setEditingId(null)}
+                    onSave={(v) => saveEdit(s.id, v)}
+                    onToggleShare={() => toggleShare(s)}
+                    onRemove={() => remove(s)}
+                  />
+                </div>
               ))}
             </div>
           )}
@@ -236,7 +371,7 @@ function SongCard({
   const t = useTranslations("mySongs");
   const tc = useTranslations("common");
   const [form, setForm] = useState<EditValues>({
-    title: song.title, artist: song.artist, genre: song.genre, key: song.key, bpm: String(song.bpm),
+    title: song.title, artist: song.artist, genre: normalizeGenre(song.genre), key: song.key, bpm: String(song.bpm),
   });
   const [thumbUrl, setThumbUrl] = useState<string | null>(song.thumbnailUrl);
   const [uploadingThumb, setUploadingThumb] = useState(false);
@@ -245,7 +380,7 @@ function SongCard({
 
   useEffect(() => {
     if (editing) {
-      setForm({ title: song.title, artist: song.artist, genre: song.genre, key: song.key, bpm: String(song.bpm) });
+      setForm({ title: song.title, artist: song.artist, genre: normalizeGenre(song.genre), key: song.key, bpm: String(song.bpm) });
       setThumbUrl(song.thumbnailUrl);
       setThumbError("");
     }
@@ -298,6 +433,12 @@ function SongCard({
     color: "var(--text)", opacity: busy ? 0.5 : 1, whiteSpace: "nowrap",
   };
 
+  // Se a música tiver um gênero legado fora da lista (carga antiga, texto
+  // digitado à mão), ele entra como primeira opção para não sumir ao salvar.
+  const genreOptions = (GENRE_OPTIONS as readonly string[]).includes(form.genre)
+    ? [...GENRE_OPTIONS]
+    : [form.genre, ...GENRE_OPTIONS];
+
   const field = (label: string, key: keyof EditValues, opts?: { width?: number; type?: string }) => (
     <label style={{ display: "flex", flexDirection: "column", gap: 4, flex: opts?.width ? `0 0 ${opts.width}px` : 1, minWidth: 0 }}>
       <span style={{ color: "var(--muted)", fontSize: 11, fontWeight: 600 }}>{label}</span>
@@ -323,6 +464,12 @@ function SongCard({
               color: song.shared ? "var(--accent)" : "var(--muted2)",
             }}>
               {song.shared ? "● COMPARTILHADA" : "PRIVADA"}
+            </span>
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, letterSpacing: "0.04em",
+              background: "var(--surface3)", color: "var(--muted2)", display: "inline-flex", alignItems: "center", gap: 4,
+            }}>
+              {genreEmoji(song.genre)} {normalizeGenre(song.genre).toUpperCase()}
             </span>
           </p>
           <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>
@@ -401,7 +548,16 @@ function SongCard({
             {field("Artista", "artist")}
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {field(t("fieldGenre"), "genre")}
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 0 }}>
+              <span style={{ color: "var(--muted)", fontSize: 11, fontWeight: 600 }}>{t("fieldGenre")}</span>
+              <select
+                value={form.genre}
+                onChange={e => setForm(f => ({ ...f, genre: e.target.value }))}
+                style={{ background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 6, padding: "7px 10px", fontSize: 13, color: "var(--text)", width: "100%" }}
+              >
+                {genreOptions.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </label>
             {field(t("keyAria"), "key", { width: 90 })}
             {field("BPM", "bpm", { width: 90, type: "number" })}
           </div>

@@ -707,7 +707,17 @@
     "errThumbUpload": "Couldn't upload the image.",
     "editBtn": "✎ Edit",
     "deleteBtn": "🗑 Delete",
-    "keyAria": "Key"
+    "keyAria": "Key",
+    "searchPlaceholder": "Search by title or artist...",
+    "sortLabel": "Sort:",
+    "sortRecent": "Recent",
+    "sortTitle": "Title",
+    "sortArtist": "Artist",
+    "sortBpm": "BPM",
+    "allGenres": "All",
+    "showing": "{shown} of {total} tracks",
+    "noResults": "No tracks match these filters.",
+    "clearFilters": "Clear filters"
   },
   "shared": {
     "title": "Shared Songs",

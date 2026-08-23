@@ -707,7 +707,17 @@
     "errThumbUpload": "Falha ao enviar a imagem.",
     "editBtn": "✎ Editar",
     "deleteBtn": "🗑 Apagar",
-    "keyAria": "Tom"
+    "keyAria": "Tom",
+    "searchPlaceholder": "Buscar por título ou artista...",
+    "sortLabel": "Ordenar:",
+    "sortRecent": "Recentes",
+    "sortTitle": "Título",
+    "sortArtist": "Artista",
+    "sortBpm": "BPM",
+    "allGenres": "Todos",
+    "showing": "{shown} de {total} faixas",
+    "noResults": "Nenhuma faixa encontrada com esses filtros.",
+    "clearFilters": "Limpar filtros"
   },
   "shared": {
     "title": "Músicas Compartilhadas",

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getAdminPassword, setAdminPassword } from "../adminClient";
+import { GENRE_OPTIONS } from "@/src/lib/genres";
 
 // Barra de navegação entre os módulos do painel (espelha AdminGate).
 const ADMIN_NAV = [
@@ -44,7 +45,8 @@ const EMPTY_SONG: Omit<Song, "id" | "createdAt"> = {
   published: true,
 };
 
-const GENRES = ["Rock", "Pop", "MPB", "Bossa Nova", "Samba", "Jazz", "Forró", "Funk", "Sertanejo", "Gospel", "Reggae", "Blues", "Outro"];
+// Lista canônica compartilhada com /perfil e com o normalizador (src/lib/genres.ts).
+const GENRES = GENRE_OPTIONS;
 const KEYS = ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B"];
 
 function slugify(text: string) {

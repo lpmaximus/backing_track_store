@@ -11,6 +11,7 @@ import { auth } from "@/auth";
 import { db, songs, stems } from "@/src/db";
 import { eq } from "drizzle-orm";
 import { deleteObject, keyFromPublicUrl } from "@/src/lib/r2";
+import { normalizeGenre } from "@/src/lib/genres";
 
 // Só metadados editáveis pelo dono. Nada de slug, áudio, dono, status, etc.
 type EditableBody = {
@@ -75,7 +76,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.genre !== undefined) {
     const r = cleanStr(body.genre, "genre");
     if (r.err) return NextResponse.json({ error: r.err }, { status: 400 });
-    set.genre = r.value;
+    // Canoniza ("rock", "Punk Rock" → "Rock", "Punk") para o filtro de
+    // /perfil e do catálogo não virar uma lista de variações do mesmo gênero.
+    set.genre = normalizeGenre(r.value);
   }
   if (body.key !== undefined) {
     const r = cleanStr(body.key, "key");
