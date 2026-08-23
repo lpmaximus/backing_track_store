@@ -12,8 +12,11 @@ import AddToSetlist from "./AddToSetlist";
 import CifraEditor from "./CifraEditor";
 import Metronome from "./Metronome";
 import AdBanner from "@/app/components/AdBanner";
-import type { Stem } from "./WavePlayer";
+import TakePanel from "./TakePanel";
+import EstudioPanel, { type Versao } from "./EstudioPanel";
+import type { Stem, Take, Transport } from "./WavePlayer";
 import type { ResolvedStem } from "@/src/lib/mix";
+import { roleCan } from "@/src/lib/permissions";
 import { CifraView, CifraText, type ChordSection, type LyricsLine } from "./CifraView";
 import { track } from "@/app/track";
 
@@ -67,12 +70,73 @@ type Props = {
 };
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
+// Rótulo traduzido por instrumento — mesma tabela do WavePlayer. Fica aqui
+// para o painel do estúdio poder nomear as faixas sem duplicar o mapa.
+const STEM_LABEL_KEY: Record<string, string> = {
+  vocal: "stems.vocals", drums: "stems.drums", bass: "stems.bass",
+  guitar: "stems.guitar", harmony: "stems.piano", melody: "stems.other",
+};
+
 export default function SongPlayer({
   song, stems, isPro = false, soloInstrument = null, loopStart = null, loopEnd = null,
   setlistMix = null, setlistName = null, setlistTranspose = 0, setlistSpeed = 1,
   header, footer,
 }: Props) {
   const t = useTranslations("song");
+
+  // ── Overdub (BTS-Studio) ───────────────────────────────────────────────────
+  // Os takes são do usuário LOGADO nesta música — a rota filtra por userId, e é
+  // isso que sustenta o modelo de camadas: a base é compartilhável, a gravação
+  // da pessoa não viaja junto. Buscamos no cliente, e não no servidor junto da
+  // música, justamente para que a página da música continue sendo a mesma para
+  // todo mundo (cacheável, sem variar por sessão).
+  const { data: sessionTakes } = useSession();
+  const canRecord = roleCan(sessionTakes?.user?.role, "record_take");
+  const canCopy = roleCan(sessionTakes?.user?.role, "copy_song");
+  const [takes, setTakes] = useState<Take[]>([]);
+  const transportRef = useRef<Transport | null>(null);
+
+  useEffect(() => {
+    if (!canRecord) return;
+    let vivo = true;
+    fetch(`/api/takes?songId=${song.id}`)
+      .then(r => (r.ok ? r.json() : { takes: [] }))
+      .then((d: { takes?: Take[] }) => { if (vivo) setTakes(d.takes ?? []); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [canRecord, song.id]);
+
+  // ── Minha versão desta música (/estudio) ───────────────────────────────────
+  // Null = a pessoa não pegou a música; a página se comporta como sempre.
+  const [versao, setVersao] = useState<Versao | null>(null);
+
+  useEffect(() => {
+    if (!canCopy) return;
+    let vivo = true;
+    fetch(`/api/estudio?songId=${song.id}`)
+      .then(r => (r.ok ? r.json() : { version: null }))
+      .then((d: { version?: Versao | null }) => { if (vivo) setVersao(d.version ?? null); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [canCopy, song.id]);
+
+  const labelDoStem = useCallback(
+    (instrument: string, fallback: string | null) =>
+      STEM_LABEL_KEY[instrument] ? t(STEM_LABEL_KEY[instrument]) : (fallback ?? instrument),
+    [t],
+  );
+
+  // As faixas que a pessoa desligou na versão dela simplesmente não são
+  // carregadas — não entram na mesa, no download nem no motor de áudio. Filtrar
+  // aqui, e não escondê-las na interface, é o que faz a versão custar menos
+  // banda e memória do que a música inteira.
+  const stemsDaVersao = useMemo(
+    () => (versao ? stems.filter(s => !versao.disabledStems.includes(s.instrument)) : stems),
+    [stems, versao],
+  );
+
+  const tituloExibido = versao?.title ?? song.title;
+
   const [currentTime, setCurrentTime]   = useState(0);
   // Analytics de produto: o primeiro segundo de áudio que roda conta como "play".
   // Evita marcar quem só abriu a página e saiu. Ver src/lib/activity.ts.
@@ -108,6 +172,13 @@ export default function SongPlayer({
   const [editing, setEditing]           = useState(false);
   const [generating, setGenerating]     = useState(false);
   const [reported, setReported]         = useState(false);
+  // Desliga os polls de cifra/letra assim que o usuário salva uma correção.
+  // Os efeitos abaixo têm deps [song.id, isAuth] e o guard "já tem cifra" só é
+  // avaliado na montagem, então numa música SEM cifra — justo a que a pessoa abre
+  // pra corrigir — eles seguem batendo por ~3,5 min. Uma resposta em voo,
+  // calculada ANTES do PATCH, chegava depois e devolvia o rascunho antigo à tela:
+  // era o "corrijo e depois volta ao que estava".
+  const pollsStopped = useRef(false);
 
   // ── Letra (Whisper/WhisperX no vocal + correção da comunidade) — fundida na cifra ──
   const [lyrics, setLyrics]                     = useState<LyricsLine[] | null>(song.lyrics ?? null);
@@ -162,12 +233,13 @@ export default function SongPlayer({
     let cancelled = false;
     let tries = 0;
     const tick = async () => {
-      if (cancelled) return;
+      if (cancelled || pollsStopped.current) return;
       tries++;
       try {
         const res = await fetch(`/api/chords/advance/${song.id}`);
         if (res.ok) {
           const data = await res.json();
+          if (pollsStopped.current) return;
           if (!cancelled && data.chords && data.chords.length > 0) {
             setChords(data.chords);
             setChordsStatus(data.chordsStatus ?? "draft");
@@ -197,12 +269,13 @@ export default function SongPlayer({
     let cancelled = false;
     let tries = 0;
     const tick = async () => {
-      if (cancelled) return;
+      if (cancelled || pollsStopped.current) return;
       tries++;
       try {
         const res = await fetch(`/api/lyrics/advance/${song.id}`);
         if (res.ok) {
           const data = await res.json();
+          if (pollsStopped.current) return;
           if (!cancelled && data.lyrics && data.lyrics.length > 0) {
             setLyrics(data.lyrics);
             setLyricsStatus(data.lyricsStatus ?? "draft");
@@ -364,7 +437,7 @@ export default function SongPlayer({
             <button onClick={goBack} style={{ background: "none", border: "none", padding: 0, color: "var(--muted)", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 8, cursor: "pointer" }}>
               {t("back")}
             </button>
-            <h1 style={{ fontWeight: 900, fontSize: 26, margin: "0 0 5px", color: "var(--text)" }}>{song.title}</h1>
+            <h1 style={{ fontWeight: 900, fontSize: 26, margin: "0 0 5px", color: "var(--text)" }}>{tituloExibido}</h1>
             <p style={{ color: "var(--muted)", fontSize: 14, margin: 0 }}>
               {t("songMetaLine", { artist: song.artist, genre: song.genre })}<strong style={{ color: "var(--text)" }}>{song.key}</strong>{t("songMetaBpm", { bpm: song.bpm })}
             </p>
@@ -403,10 +476,10 @@ export default function SongPlayer({
         {/* ── Player WaveSurfer ── */}
         <WavePlayer
           audioUrl={song.audioUrl}
-          stems={stems}
+          stems={stemsDaVersao}
           isPro={isPro}
           soloInstrument={soloInstrument}
-          songTitle={song.title}
+          songTitle={tituloExibido}
           songArtist={song.artist}
           onTimeUpdate={handleTimeUpdate}
           onMixerTouch={() => track("mixer", { songId: song.id })}
@@ -418,7 +491,27 @@ export default function SongPlayer({
           loopStart={loopStart}
           loopEnd={loopEnd}
           initialMix={setlistMix}
+          takes={takes}
+          transportRef={transportRef}
         />
+        {canCopy && stems.length > 0 && (
+          <EstudioPanel
+            songId={song.id}
+            stems={stems}
+            version={versao}
+            onChange={setVersao}
+            labelDoStem={labelDoStem}
+          />
+        )}
+        {canRecord && (
+          <TakePanel
+            songId={song.id}
+            takes={takes}
+            onChange={setTakes}
+            transportRef={transportRef}
+            bpm={song.bpm}
+          />
+        )}
         <Metronome beats={beats} currentTime={currentTime} enabled={metronome} />
 
         {/* ── Content: cifra + sidebar (empilha em telas estreitas — .player-content) ── */}
@@ -462,7 +555,15 @@ export default function SongPlayer({
                       initialChords={chords ?? []}
                       currentTime={currentTime}
                       onCancel={() => setEditing(false)}
-                      onSaved={(ls, cs) => { setLyrics(ls); setLyricsStatus("validated"); setChords(cs); setChordsStatus("validated"); setEditing(false); }}
+                      onSaved={(ls, cs) => {
+                        pollsStopped.current = true;
+                        setLyrics(ls); setLyricsStatus("validated");
+                        setChords(cs); setChordsStatus("validated");
+                        setEditing(false);
+                        // Sem isto, sair e voltar à página traz o payload em cache
+                        // do App Router — com a versão de antes da correção.
+                        router.refresh();
+                      }}
                     />
                   : (hasChords || hasLyrics)
                     ? <CifraView sections={chords ?? []} lyrics={lyrics} currentTime={currentTime} fontSize={fontSize} />

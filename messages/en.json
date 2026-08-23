@@ -44,7 +44,8 @@
     "closeMenu": "Close menu",
     "account": "My account",
     "signOut": "Sign out",
-    "mySetlists": "My Setlists"
+    "mySetlists": "My Setlists",
+    "studio": "My Studio"
   },
   "footer": {
     "tagline": "Backing tracks with synced chord charts for hobby and working musicians. Practice, rehearse and take it to the stage.",
@@ -146,7 +147,12 @@
     "bandFeature4": "Auto-mute by instrument",
     "priceHidden": "Price not announced yet",
     "metaTitle": "Plans and pricing",
-    "metaDescription": "Compare BackingTrack.store plans: free, Pro and Band. Stem separation, synced chord charts, setlists and stage mode."
+    "metaDescription": "Compare BackingTrack.store plans: free, Pro and Band. Stem separation, synced chord charts, setlists and stage mode.",
+    "studio": "STUDIO",
+    "betaBadge": "BETA",
+    "studioFeature1": "80 songs per month",
+    "studioFeature2": "Automatic guitar tab (beta)",
+    "studioFeature3": "Record over the stems"
   },
   "pricing": {
     "title": "Choose your plan",
@@ -194,7 +200,16 @@
       "Auto-mute by instrument",
       "Rehearsals with band readiness"
     ],
-    "bandSoon": "Coming soon — subscriptions not available yet"
+    "bandSoon": "Coming soon — subscriptions not available yet",
+    "studioFeatures": [
+      "Everything in Band, plus:",
+      "80 songs per month",
+      "Automatic guitar tablature (beta)",
+      "Fretboard synced with the player",
+      "Record your part over the stems",
+      "Mix and download your take along with the song"
+    ],
+    "betaNote": "Automatic tablature is in beta: it gets most notes right, but still misses fretboard positions on heavily distorted guitar parts. You can fix them by hand — and every correction improves future results."
   },
   "howItWorks": {
     "metaTitle": "How it works",
@@ -437,7 +452,50 @@
     "songMetaBpm": " · {bpm} BPM",
     "back": "← Back",
     "speed": "Speed",
-    "errSaveRetry": "Couldn't save. Please try again."
+    "errSaveRetry": "Couldn't save. Please try again.",
+    "takes": {
+      "title": "Record my track",
+      "headphones": "Use headphones. On speakers the mic picks up the backing track too, and the song ends up doubled in your recording.",
+      "record": "Record",
+      "getReady": "Get ready…",
+      "recording": "Recording — the track is playing",
+      "stop": "Stop",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving…",
+      "discard": "Discard",
+      "defaultName": "My recording",
+      "nameLabel": "Recording name",
+      "delete": "Delete",
+      "confirmDelete": "Delete \"{name}\"? This cannot be undone.",
+      "nudgeHint": "Nudge the recording into place, in milliseconds",
+      "offsetHelp": "Early or late? Every browser adds a small delay between sound reaching the mic and being recorded. Use the millisecond buttons until it locks in — the player responds immediately.",
+      "micDenied": "We could not reach your microphone. Allow access in the browser and try again.",
+      "unsupported": "This browser cannot record audio. Try an up-to-date Chrome, Edge or Safari.",
+      "saveError": "We could not save the recording. Please try again.",
+      "micLabel": "Microphone:",
+      "micDefault": "System default",
+      "micUnnamed": "Audio input {n}",
+      "micReveal": "Show names",
+      "micRevealHelp": "Browsers only reveal microphone names after you allow access once — it is a privacy protection on their side. Click \"Show names\" to see the full list.",
+      "micGone": "The selected microphone is no longer available. Reconnect the device or pick another one.",
+      "gainLabel": "Microphone gain:",
+      "gainHelp": "The bar shows your level during the count-in and while recording — aim for it to dance around the middle and never hit red. If your voice is still quiet at maximum, raise the input level in your system settings: digital gain here amplifies noise too.",
+      "fxLabel": "Effect:",
+      "fxAmount": "Effect amount",
+      "fxHelp": "The effect applies to playback AND to downloads — your original recording stays saved clean, so you can change it as often as you like.",
+      "fx": {
+        "none": "No effect",
+        "hall": "Hall (vocals)",
+        "room": "Room (vocals)",
+        "vocal": "Vocal polish",
+        "comp": "Compressor (instrument)",
+        "drive": "Drive (guitar)",
+        "chorus": "Chorus (instrument)",
+        "delay": "Delay",
+        "studio": "Studio vocal (polish)"
+      }
+    }
   },
   "setlists": {
     "title": "My Setlists",
@@ -864,5 +922,25 @@
     "ctaSecondary": "Browse the catalog",
     "note": "Creating your account takes under a minute.",
     "trial": "Want to try the Pro features for a limited time? <link>Request a trial invite</link>."
+  },
+  "studio": {
+    "title": "My Studio",
+    "subtitle": "The songs you picked up from the catalog. Here they carry your name, the tracks you chose and your recordings — none of it changes the song for anyone else.",
+    "loading": "Loading…",
+    "empty": "You have not picked up any song yet. Open one from the catalog and hit Pick up to build your version.",
+    "goCatalog": "Go to the catalog",
+    "open": "Open",
+    "remove": "Put back",
+    "confirmRemove": "Put \"{name}\" back? Your version goes away, but your recordings stay saved.",
+    "nameLabel": "Name of your version",
+    "tracksOff": "{n} track off",
+    "tracksOffPlural": "{n} tracks off",
+    "signInFirst": "Sign in to see your studio.",
+    "studioOnly": "Picking up songs into your own area is part of the Studio plan, along with recording your track and automatic tablature.",
+    "seePlans": "See plans",
+    "take": "Pick up",
+    "taken": "In your area",
+    "tracksTitle": "Tracks in this version",
+    "tracksHelp": "Turn off what you do not want to hear in your version. The catalog song does not change for anyone."
   }
 }

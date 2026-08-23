@@ -4,6 +4,9 @@ import type * as React from "react";
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import { useTranslations } from "next-intl";
 import DownloadPanel from "./DownloadPanel";
+import { fxVazio, type TakeFx } from "@/src/lib/takeFx";
+// A mesma cadeia usada no download — ver o cabeçalho de takeFxNodes.ts.
+import { montarFx } from "./takeFxNodes";
 
 export type Stem = {
   id: number;
@@ -12,9 +15,47 @@ export type Stem = {
   audioUrl: string;
 };
 
+/** Gravação do próprio usuário sobre esta música (overdub). */
+export type Take = {
+  id: number;
+  name: string;
+  /**
+   * Caminho da NOSSA rota (`/api/takes/:id/audio`), não o link do R2. A rota
+   * confere a sessão e redireciona para um link assinado de uma hora — a URL
+   * pública do bucket nunca chega ao navegador.
+   */
+  audioUrl: string;
+  offsetMs: number;
+  /** Formato real do arquivo. O caminho acima termina em `/audio` e não diz. */
+  ext?: string;
+  /** Efeito de reprodução — ver src/lib/takeFx.ts. */
+  fx?: TakeFx | null;
+};
+
+/**
+ * Controle imperativo do transporte, para quem precisa comandar o player de
+ * fora — hoje só o painel de gravação, que tem de dar play na base no mesmo
+ * instante em que abre o microfone.
+ *
+ * É imperativo de propósito: "começar a tocar agora" é um evento no tempo, não
+ * um estado. Passar isso como prop booleana criaria um atraso de um render
+ * entre a decisão e o áudio — e num overdub esse atraso vira desalinhamento.
+ */
+export type Transport = {
+  play: () => Promise<void>;
+  pause: () => void;
+  seek: (t: number) => void;
+};
+
 type Props = {
   audioUrl: string | null;
   stems: Stem[];
+  // Takes do usuário logado NESTA música. Nunca de terceiros — a rota que os
+  // busca filtra por userId, e é isso que sustenta o modelo de camadas: a base
+  // é compartilhável, a gravação da pessoa não viaja com ela.
+  takes?: Take[];
+  /** Recebe o controle de transporte assim que o motor fica pronto. */
+  transportRef?: { current: Transport | null };
   isPro?: boolean;
   // Trilha-guia da banda: se definido e existir um stem com esse instrumento,
   // o player inicia com todas as outras trilhas mutadas (soft — o membro pode
@@ -53,6 +94,10 @@ type Props = {
 // "2 guitarras" — era o stem de harmonia sendo forçado a se passar por guitarra).
 const STEM_ICONS: Record<string, string> = {
   drums: "🥁", bass: "🎸", guitar: "🎸", harmony: "🎹", melody: "🎺", vocal: "🎤",
+  // Gravação do próprio usuário (overdub). Microfone de estúdio, diferente do
+  // 🎤 do stem de voz — na mesa as duas coisas aparecem lado a lado e precisam
+  // ser distinguíveis de relance.
+  take: "🎙️",
 };
 // Rótulo exibido por instrumento — por padrão usa o label do banco
 // (`s.label`); só sobrescreve aqui se precisar de um nome fixo diferente.
@@ -64,6 +109,7 @@ const STEM_LABEL_KEY: Record<string, string> = {
 const STEM_COLORS: Record<string, string> = {
   vocal: "#3aa3ff", drums: "#7c5cff", bass: "#22d3b0",
   harmony: "#8b5cf6", melody: "#ea580c", guitar: "#f59e0b",
+  take: "#ec4899",
 };
 const DEFAULT_COLOR = "#8a8a8c";
 
@@ -104,6 +150,51 @@ function computePeaks(buffer: AudioBuffer, samples: number): number[] {
   }
   if (max > 0) for (let i = 0; i < samples; i++) peaks[i] /= max;
   return peaks;
+}
+
+/**
+ * Peaks de uma faixa POSICIONADA na linha do tempo da música.
+ *
+ * `computePeaks` espalha o arquivo inteiro pela largura toda, o que está certo
+ * para stem (que tem a duração da música) e errado para gravação: um take de
+ * 20 segundos era esticado ao longo de uma música de 2 minutos e parecia haver
+ * áudio onde não há. Aqui cada barra corresponde a um instante da MÚSICA, e o
+ * que está fora do trecho gravado fica em zero.
+ *
+ * O offset entra com o mesmo sinal do resto do módulo (ver `startAll`):
+ * posição de leitura da faixa = posição da música + offset.
+ */
+function computePeaksInTimeline(
+  buffer: AudioBuffer,
+  samples: number,
+  songDuration: number,
+  offsetSec: number,
+): number[] {
+  const out = new Array<number>(samples).fill(0);
+  if (songDuration <= 0 || samples <= 0) return out;
+
+  const ch = buffer.getChannelData(0);
+  const secPorBarra = songDuration / samples;
+  const sr = buffer.sampleRate;
+  let max = 0;
+
+  for (let i = 0; i < samples; i++) {
+    const tTake = i * secPorBarra + offsetSec;
+    if (tTake < 0 || tTake >= buffer.duration) continue;
+
+    const ini = Math.floor(tTake * sr);
+    const fim = Math.min(ch.length, Math.floor((tTake + secPorBarra) * sr));
+    let m = 0;
+    for (let j = ini; j < fim; j++) {
+      const v = Math.abs(ch[j]);
+      if (v > m) m = v;
+    }
+    out[i] = m;
+    if (m > max) max = m;
+  }
+
+  if (max > 0) for (let i = 0; i < samples; i++) out[i] /= max;
+  return out;
 }
 
 // Combina vários arrays de peaks num só (média) — usado no modo mix.
@@ -149,7 +240,51 @@ const WaveCanvas = memo(function WaveCanvas({
 
 // ─── Tipos internos do motor ──────────────────────────────────────────────────
 type ToneMod = typeof import("tone");
-type Track = { key: string; instrument: string; label: string; audioUrl: string };
+type Track = {
+  key: string;
+  instrument: string;
+  label: string;
+  audioUrl: string;
+  // Só os takes preenchem. `takeId` marca a faixa como gravação do usuário —
+  // é o que dá a ela o controle de ajuste fino e a distingue visualmente dos
+  // stems, que são derivados da música.
+  takeId?: number;
+  offsetMs?: number;
+  fileExt?: string;
+  fx?: TakeFx | null;
+};
+
+/**
+ * Liga `player → [efeitos] → volume`, desmontando a cadeia anterior.
+ *
+ * Trocar de efeito NÃO recarrega o áudio: o player e o buffer continuam os
+ * mesmos, só o caminho entre eles muda. Sem essa separação, cada mudança de
+ * preset baixaria e decodificaria a gravação de novo — e este é um controle
+ * feito para experimentar.
+ */
+function aplicarFx(e: Engine, key: string, fx: TakeFx | null | undefined) {
+  const player = e.players[key];
+  const vol = e.vols[key];
+  if (!player || !vol) return;
+
+  e.fx[key]?.forEach(n => { try { n.dispose(); } catch {} });
+  delete e.fx[key];
+
+  try { player.disconnect(); } catch {}
+
+  if (fxVazio(fx)) {
+    player.connect(vol);
+    return;
+  }
+
+  const cadeia = montarFx(e.Tone, fx!);
+  if (cadeia.length === 0) { player.connect(vol); return; }
+
+  player.connect(cadeia[0]);
+  for (let i = 0; i < cadeia.length - 1; i++) cadeia[i].connect(cadeia[i + 1]);
+  cadeia[cadeia.length - 1].connect(vol);
+  e.fx[key] = cadeia;
+}
 
 type Engine = {
   Tone: ToneMod;
@@ -162,30 +297,101 @@ type Engine = {
   ctxStart: number;    // Tone.now() no último play
   playing: boolean;
   pitchActive: boolean;
+  // Deslocamento por faixa, em SEGUNDOS. Zero para stems — eles nascem
+  // alinhados com o mix. Só os takes do usuário usam isto, para compensar a
+  // latência do navegador na gravação. Ver `startAll`.
+  offsets: Record<string, number>;
+  // Nós de efeito ativos por faixa, na ordem da cadeia. Guardados para poder
+  // desmontar na troca de preset — nó de áudio não some sozinho, e deixar
+  // reverb antigo pendurado vaza memória e soma o efeito duas vezes.
+  fx: Record<string, import("tone").ToneAudioNode[]>;
+  // Assinatura do efeito já montado por faixa ("hall:0.40"). Existe porque o
+  // objeto `fx` chega novo a cada resposta da API mesmo quando nada mudou —
+  // comparar por referência remontaria a cadeia à toa e cortaria o áudio.
+  fxSig: Record<string, string>;
 };
 
+/**
+ * Dá start em TODAS as faixas na mesma âncora de tempo, respeitando o
+ * deslocamento de cada uma.
+ *
+ * Isto existia copiado em quatro lugares (play, seek e duas voltas de loop no
+ * laço de animação). Além da duplicação, era o motivo de o offset por faixa ser
+ * inviável: qualquer compensação teria que ser lembrada nos quatro.
+ *
+ * Convenção do offset — a mesma do banco e da UI de ajuste:
+ *   posição de leitura da faixa = posição da música + offset
+ * Positivo = a faixa foi gravada atrasada, então adianta a leitura dela.
+ *
+ * Quando a leitura cai antes do início do arquivo (offset negativo no começo
+ * da música), não dá para ler tempo negativo — então a faixa espera e entra
+ * mais tarde, que é o mesmo efeito no ouvido.
+ */
+function startAll(e: Engine, at: number, pos: number, rate: number) {
+  for (const [key, p] of Object.entries(e.players)) {
+    p.playbackRate = rate;
+    try { p.stop(); } catch {}
+
+    const local = pos + (e.offsets[key] ?? 0);
+    const buf = p.buffer?.duration ?? 0;
+
+    // Já passou do fim daquele arquivo: não dá start. Sem esta guarda o Tone
+    // reclama de offset além do buffer — acontece com take mais curto que a
+    // música, que é o caso comum (a pessoa grava só o refrão).
+    if (buf > 0 && local >= buf) continue;
+
+    if (local >= 0) p.start(at, local);
+    else p.start(at - local, 0);
+  }
+}
+
 export default function WavePlayer({
-  audioUrl, stems, isPro = false, soloInstrument = null, songTitle, songArtist, onTimeUpdate, onDurationReady, speed = 1, pitch = 0,
+  audioUrl, stems, takes = [], transportRef, isPro = false, soloInstrument = null, songTitle, songArtist, onTimeUpdate, onDurationReady, speed = 1, pitch = 0,
   loopStart = null, loopEnd = null, initialMix = null, onMixerTouch, onExport,
 }: Props) {
   // `tx` e não `t`: dentro do mixer `t` já é a faixa sendo mapeada.
   const tx = useTranslations("song");
 
   // Faixas de áudio a carregar. Com stems, cada stem é uma faixa; senão, o mix.
+  // Os takes do usuário entram DEPOIS, como faixas normais — é o que o motor
+  // Tone.js já faz de graça: mais um player no mesmo relógio, com sincronia de
+  // amostra. Era por isso que o overdub encaixava barato.
   const tracks: Track[] = useMemo(() => {
-    if (stems.length > 0) {
-      return stems.map(s => ({
-        key: s.instrument,
-        instrument: s.instrument,
-        // Rótulo traduzido quando o instrumento é conhecido; senão cai no que
-        // veio do banco. O VALOR (s.instrument) nunca muda de idioma.
-        label: STEM_LABEL_KEY[s.instrument] ? tx(STEM_LABEL_KEY[s.instrument]) : (s.label ?? s.instrument),
-        audioUrl: s.audioUrl,
-      }));
-    }
-    if (audioUrl) return [{ key: "mix", instrument: "mix", label: songTitle, audioUrl }];
-    return [];
-  }, [stems, audioUrl, songTitle, tx]);
+    const base: Track[] =
+      stems.length > 0
+        ? stems.map(s => ({
+            key: s.instrument,
+            instrument: s.instrument,
+            // Rótulo traduzido quando o instrumento é conhecido; senão cai no que
+            // veio do banco. O VALOR (s.instrument) nunca muda de idioma.
+            label: STEM_LABEL_KEY[s.instrument] ? tx(STEM_LABEL_KEY[s.instrument]) : (s.label ?? s.instrument),
+            audioUrl: s.audioUrl,
+          }))
+        : audioUrl
+          ? [{ key: "mix", instrument: "mix", label: songTitle, audioUrl }]
+          : [];
+
+    if (base.length === 0) return base;
+
+    // Prefixo "take:" evita colisão com nome de instrumento — sem ele, um take
+    // chamado "bass" derrubaria o stem de baixo do mapa de players.
+    return base.concat(
+      takes.map(t => ({
+        key: `take:${t.id}`,
+        instrument: "take",
+        label: t.name,
+        audioUrl: t.audioUrl,
+        takeId: t.id,
+        offsetMs: t.offsetMs,
+        fileExt: t.ext,
+        fx: t.fx ?? null,
+      })),
+      // A dependência é o CONTEÚDO do fx, não a referência: a API devolve
+      // objeto novo a cada resposta, e comparar por referência recriaria
+      // `tracks` — e com ele o `trackSig` — recarregando todo o áudio a cada
+      // clique no seletor de efeito.
+    );
+  }, [stems, takes, audioUrl, songTitle, tx]);
 
   // Multitrack aparece pra qualquer um com stems, inclusive visitante sem
   // cadastro (efeito de divulgação: vê a mesa, ouve o mix completo). O que
@@ -193,6 +399,20 @@ export default function WavePlayer({
   // dela — ver `canControlTrack` — não a visão em si.
   const showMultitrack = stems.length > 0;
   const hasAudio = tracks.length > 0;
+
+  /**
+   * Assinatura do CONJUNTO DE ÁUDIO carregado — só as URLs, não o resto.
+   *
+   * É o que dispara a recarga do motor. Sem isso, ajustar o offset de um take
+   * mudaria a identidade de `tracks` e faria o player baixar e decodificar
+   * tudo de novo a cada clique no ajuste fino — justamente o controle que a
+   * pessoa vai mexer dezenas de vezes até o take encaixar. Offset é aplicado
+   * quente, no efeito logo abaixo do carregamento.
+   */
+  const trackSig = useMemo(
+    () => tracks.map(t => `${t.key}|${t.audioUrl}`).join("\n"),
+    [tracks],
+  );
 
   const engineRef = useRef<Engine | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -268,16 +488,31 @@ export default function WavePlayer({
       if (destroyed) { Object.values(players).forEach(p => p.dispose()); return; }
       if (failed) { setLoadError(tx("loadError")); return; }
 
-      // Duração + peaks
+      // Duração + peaks.
+      // A duração vem SÓ das faixas da música. Um take não estica a linha do
+      // tempo: se a pessoa deixou o microfone aberto meio minuto a mais depois
+      // do fim, a música não passa a ter meio minuto de silêncio no fim.
       let dur = 0;
       const pk: Record<string, number[]> = {};
       const res = showMultitrack ? 240 : 500;
+
+      // Duas passadas: a duração da música precisa estar fechada ANTES de
+      // desenhar as gravações, porque elas são posicionadas nessa linha do
+      // tempo. Numa passada só, a primeira gravação seria desenhada contra uma
+      // duração ainda incompleta.
       for (const t of tracks) {
+        if (t.takeId != null) continue;
         const buf = players[t.key].buffer.get() as AudioBuffer | undefined;
         if (buf) {
           dur = Math.max(dur, buf.duration);
           pk[t.key] = computePeaks(buf, res);
         }
+      }
+
+      for (const t of tracks) {
+        if (t.takeId == null) continue;
+        const buf = players[t.key].buffer.get() as AudioBuffer | undefined;
+        if (buf) pk[t.key] = computePeaksInTimeline(buf, res, dur, (t.offsetMs ?? 0) / 1000);
       }
 
       // Com trecho a estudar, a agulha já nasce no início do pedaço.
@@ -287,10 +522,26 @@ export default function WavePlayer({
       engineRef.current = {
         Tone, players, vols, master, pitch: pitchNode,
         duration: dur, offset: startOffset, ctxStart: 0, playing: false, pitchActive: false,
+        offsets: Object.fromEntries(tracks.map(t => [t.key, (t.offsetMs ?? 0) / 1000])),
+        fx: {},
+        fxSig: {},
       };
+
+      // Efeitos gravados na configuração entram já no carregamento — quem
+      // salvou reverb na voz espera ouvir reverb ao abrir a música de novo.
+      for (const t of tracks) {
+        if (t.takeId == null) continue;
+        const assinatura = fxVazio(t.fx) ? "" : `${t.fx!.preset}:${t.fx!.mix.toFixed(2)}`;
+        if (assinatura) aplicarFx(engineRef.current, t.key, t.fx);
+        engineRef.current.fxSig[t.key] = assinatura;
+      }
       if (startOffset > 0) { setCurrent(startOffset); onTimeUpdate?.(startOffset); }
       setPeaks(pk);
-      setMixPeaks(mergePeaks(Object.values(pk)));
+      // A onda única do modo mix representa A MÚSICA — gravação do usuário não
+      // entra nela (e nem existe nesse modo, que só aparece sem stems).
+      setMixPeaks(
+        mergePeaks(tracks.filter(t => t.takeId == null).map(t => pk[t.key]).filter(Boolean)),
+      );
       setDuration(dur);
       setReady(true);
       onDurationReady?.(dur);
@@ -302,14 +553,51 @@ export default function WavePlayer({
       const e = engineRef.current;
       if (e) {
         Object.values(e.players).forEach(p => { try { p.stop(); } catch {} p.dispose(); });
+        Object.values(e.fx).forEach(cadeia => cadeia.forEach(n => { try { n.dispose(); } catch {} }));
         Object.values(e.vols).forEach(v => v.dispose());
         e.master.dispose();
         e.pitch.dispose();
       }
       engineRef.current = null;
     };
+    // `tracks` é lido dentro, mas quem dispara é `trackSig` — ver o comentário
+    // na definição dele. Os dois mudam juntos quando o áudio muda de verdade.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracks, retryKey]);
+  }, [trackSig, retryKey]);
+
+  // ── Offset por faixa, aplicado a quente ───────────────────────────────────
+  // Ajuste fino do take: atualiza o mapa do motor e, se estiver tocando,
+  // re-ancora as faixas na posição atual para o efeito ser ouvido na hora. Sem
+  // o re-ancoramento a pessoa mexeria no controle e não ouviria diferença até
+  // dar pause e play — e concluiria que o ajuste não funciona.
+  useEffect(() => {
+    const e = engineRef.current;
+    if (!e) return;
+
+    // Efeito é trocado sem tocar no áudio: só o caminho entre o player e o
+    // volume muda. Comparação por conteúdo porque `fx` chega como objeto novo
+    // a cada resposta da API, mesmo quando o preset é o mesmo.
+    for (const t of tracks) {
+      if (t.takeId == null) continue;
+      const assinatura = fxVazio(t.fx) ? "" : `${t.fx!.preset}:${t.fx!.mix.toFixed(2)}`;
+      if (e.fxSig[t.key] === assinatura) continue;
+      aplicarFx(e, t.key, t.fx);
+      e.fxSig[t.key] = assinatura;
+    }
+
+    let mudou = false;
+    for (const t of tracks) {
+      const v = (t.offsetMs ?? 0) / 1000;
+      if (e.offsets[t.key] !== v) { e.offsets[t.key] = v; mudou = true; }
+    }
+    if (!mudou || !e.playing) return;
+
+    const pos = posNow();
+    const at = e.Tone.now() + 0.05;
+    startAll(e, at, pos, speedRef.current);
+    e.offset = pos;
+    e.ctxStart = at;
+  }, [tracks, ready, posNow]);
 
   // ── Loop de posição ───────────────────────────────────────────────────────
   const startRaf = useCallback(() => {
@@ -323,7 +611,7 @@ export default function WavePlayer({
       if (reg && pos >= reg.end) {
         e.offset = reg.start;
         const at = e.Tone.now() + 0.02;
-        Object.values(e.players).forEach(p => { p.playbackRate = speedRef.current; try { p.stop(); } catch {} p.start(at, reg.start); });
+        startAll(e, at, reg.start, speedRef.current);
         e.ctxStart = at;
         setCurrent(reg.start); onTimeUpdate?.(reg.start);
         rafRef.current = requestAnimationFrame(tick);
@@ -335,7 +623,7 @@ export default function WavePlayer({
           // Repetir: reinicia do zero sem parar (o scroll Automático volta ao topo sozinho).
           e.offset = 0;
           const at = e.Tone.now() + 0.02;
-          Object.values(e.players).forEach(p => { p.playbackRate = speedRef.current; try { p.stop(); } catch {} p.start(at, 0); });
+          startAll(e, at, 0, speedRef.current);
           e.ctxStart = at;
           setCurrent(0); onTimeUpdate?.(0);
           rafRef.current = requestAnimationFrame(tick);
@@ -384,11 +672,7 @@ export default function WavePlayer({
     if (!e) return;
     await e.Tone.start();
     const at = e.Tone.now() + 0.05;
-    Object.values(e.players).forEach(p => {
-      p.playbackRate = speedRef.current;
-      try { p.stop(); } catch {}
-      p.start(at, e.offset);
-    });
+    startAll(e, at, e.offset, speedRef.current);
     e.ctxStart = at;
     e.playing = true;
     setPlaying(true);
@@ -421,7 +705,7 @@ export default function WavePlayer({
     onTimeUpdate?.(clamped);
     if (wasPlaying) {
       const at = e.Tone.now() + 0.05;
-      Object.values(e.players).forEach(p => p.start(at, clamped));
+      startAll(e, at, clamped, speedRef.current);
       e.ctxStart = at;
     }
   }, [onTimeUpdate]);
@@ -537,6 +821,14 @@ export default function WavePlayer({
     setSoloed(p => ({ ...p, [k]: !p[k] }));
     setMuted(p => (p[k] ? { ...p, [k]: false } : p));
   };
+
+  // Publica o transporte para quem comanda o player de fora (painel de
+  // gravação). Limpa na saída para o painel não segurar um motor já destruído.
+  useEffect(() => {
+    if (!transportRef) return;
+    transportRef.current = { play, pause, seek };
+    return () => { transportRef.current = null; };
+  }, [transportRef, play, pause, seek]);
 
   const pct = duration > 0 ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
   const anySolo = Object.values(soloed).some(Boolean);
@@ -751,6 +1043,7 @@ export default function WavePlayer({
               songArtist={songArtist}
               isPro={isPro}
               ready={ready}
+              songDuration={duration}
               onExport={onExport}
             />
           </>

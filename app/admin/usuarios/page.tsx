@@ -19,7 +19,7 @@ type AdminUser = {
   activeBands: number;
 };
 
-const ROLES = ["free", "pro", "proband", "admin"];
+const ROLES = ["free", "pro", "proband", "studio", "admin"];
 const statusColor: Record<string, string> = { active: "var(--accent)", blocked: "#f59e0b", banned: "var(--danger)" };
 
 function UsuariosContent() {

@@ -37,7 +37,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const [song] = await db.select().from(songs).where(eq(songs.id, songId)).limit(1);
     if (!song) return NextResponse.json({ error: "Música não encontrada" }, { status: 404 });
 
-    const newChords = body.chords !== undefined ? body.chords : song.chords;
+    // Ordena por tempo. A rota de letra sempre ordenou; esta não — bastava usar
+    // o "⏱ capturar" fora de ordem para as duas listas discordarem de quem vem
+    // antes, e a tela de leitura calculava a janela do acorde pelo elemento
+    // seguinte do ARRAY, não pelo seguinte no tempo: os acordes andavam pra trás.
+    const newChords = body.chords !== undefined
+      ? [...body.chords].sort((a, b) => Number(a?.timecode ?? 0) - Number(b?.timecode ?? 0))
+      : song.chords;
     const newCifraText = body.cifraText !== undefined ? (body.cifraText?.trim() || null) : song.cifraText;
 
     // Snapshot do estado anterior (para reverter na moderação).

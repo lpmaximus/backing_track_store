@@ -15,8 +15,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, songs, stems, processingJobs } from "@/src/db";
 import { eq } from "drizzle-orm";
 import { getSeparationProvider } from "@/src/lib/separation";
-import { deleteObject, keyFromPublicUrl, putObjectFromUrl } from "@/src/lib/r2";
+import { putObjectFromUrl } from "@/src/lib/r2";
 import { getChordProvider } from "@/src/lib/chords";
+import { pickChordAudio } from "@/src/lib/chords/source";
+import { purgeSourceMix } from "@/src/lib/retention";
 import { getLyricsProvider } from "@/src/lib/lyrics";
 import { createNotification } from "@/src/lib/notifications";
 
@@ -119,25 +121,13 @@ export async function POST(req: NextRequest) {
       .set({ status: "done", completedAt: new Date() })
       .where(eq(processingJobs.id, job.id));
 
-    // 4. Retenção: apaga o mix original do R2 e zera audioUrl (EVT 5.1).
-    //    O player reconstrói o "mix completo" tocando os stems juntos.
+    // 4. Estado da música: separada e pronta pra tocar.
+    //    A EXCLUSÃO DO MIX (retenção, EVT 5.1) mudou de lugar — ver passo 7.
+    //    Antes ela acontecia AQUI, milissegundos antes de a cifra ser submetida:
+    //    por isso a detecção nunca pôde usar o mix e era obrigada a rodar sobre
+    //    um stem residual, que é o que fazia a cifra sair vazia ou com 1 acorde.
     const [song] = await db.select().from(songs).where(eq(songs.id, job.songId)).limit(1);
-    if (song?.sourceType === "user_upload" && song.audioUrl) {
-      const key = keyFromPublicUrl(song.audioUrl);
-      if (key) {
-        try {
-          await deleteObject(key);
-        } catch (delErr) {
-          console.error("[webhook/separation] falha ao apagar mix original", delErr);
-        }
-      }
-      await db
-        .update(songs)
-        .set({ audioUrl: null, processingStatus: "ready" })
-        .where(eq(songs.id, job.songId));
-    } else {
-      await db.update(songs).set({ processingStatus: "ready" }).where(eq(songs.id, job.songId));
-    }
+    await db.update(songs).set({ processingStatus: "ready" }).where(eq(songs.id, job.songId));
 
     // 4b. Área do Usuário: avisa quem enviou que a música já pode ser tocada.
     //     Best-effort — não trava o pipeline se falhar (ver createNotification).
@@ -151,23 +141,22 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 5. Frente C: dispara detecção de cifra sobre o stem de HARMONIA (permanente).
-    //    Detectamos no stem, não no mix — assim a retenção acima (apagar o mix)
-    //    fica desacoplada da cifra. Só na 1ª vez por música (sem cifra ainda).
-    //    Music.ai é por polling: aqui só criamos o job e submetemos; quem finaliza
-    //    é /api/chords/advance/[songId] (chamado pelo poll do client ou por cron).
+    // 5. Frente C: detecção de cifra sobre o MIX (ver src/lib/chords/source.ts
+    //    para a ordem de preferência e o porquê). Só na 1ª vez por música.
+    //    O provider é por polling: aqui só criamos e submetemos o job; quem
+    //    finaliza é /api/chords/advance/[songId] ou o cron /api/jobs/finalize.
     try {
       const chordProvider = getChordProvider();
       const alreadyHasChords = Boolean(song?.chords && song.chords.length > 0);
       if (chordProvider.isConfigured() && song && !alreadyHasChords) {
-        const harmony = persistedStems.find((s) => s.instrument === "harmony") ?? persistedStems[0];
-        if (harmony) {
+        const source = pickChordAudio(song.audioUrl, persistedStems);
+        if (source) {
           const [chordJob] = await db
             .insert(processingJobs)
             .values({ songId: job.songId, provider: chordProvider.name, stage: "chord_detection", status: "pending" })
             .returning();
           try {
-            const { providerJobId } = await chordProvider.submit(harmony.audioUrl);
+            const { providerJobId } = await chordProvider.submit(source.url);
             await db
               .update(processingJobs)
               .set({ providerJobId, status: "running" })
@@ -179,15 +168,18 @@ export async function POST(req: NextRequest) {
               .set({ status: "failed", errorMessage: String(submitErr).slice(0, 500) })
               .where(eq(processingJobs.id, chordJob.id));
           }
+        } else {
+          console.warn("[webhook/separation] nenhum áudio elegível p/ cifra", job.songId);
         }
       }
     } catch (chordErr) {
       console.error("[webhook/separation] chord detection setup", chordErr);
     }
 
-    // 6. Caminho 3: dispara transcrição de LETRA sobre o stem de VOCAL (barato,
-    //    voz isolada). Também por polling — finalizada em /api/lyrics/advance.
-    //    Só na 1ª vez (sem letra ainda) e se o provider estiver configurado.
+    // 6. Caminho 3: transcrição de LETRA sobre o stem de VOCAL (voz isolada
+    //    transcreve muito melhor e é barata). Também por polling.
+    //    Faixa sem stem de vocal (backing track instrumental, ex. importada do
+    //    Suno) simplesmente não gera letra — é o correto, não é falha.
     try {
       const lyricsProvider = getLyricsProvider();
       const alreadyHasLyrics = Boolean(song?.lyrics && song.lyrics.length > 0);
@@ -214,6 +206,11 @@ export async function POST(req: NextRequest) {
     } catch (lyricsErr) {
       console.error("[webhook/separation] lyrics detection setup", lyricsErr);
     }
+
+    // 7. Retenção (EVT 5.1): agora que a cifra já foi submetida, o mix pode ir.
+    //    Se o job de cifra ainda estiver de pé, purgeSourceMix não faz nada e
+    //    quem apaga é o /api/chords/advance ou o cron finalize ao fechar o job.
+    await purgeSourceMix(job.songId);
 
     return NextResponse.json({ ok: true });
   } catch (err) {

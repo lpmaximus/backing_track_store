@@ -21,7 +21,7 @@ import { isAdminRequest } from "@/src/lib/adminAuth";
 import { getSubscriptionPaymentLink } from "@/src/lib/asaas";
 import { monthlyLimitForRole } from "@/src/lib/quota";
 
-const VALID_ROLES = ["free", "pro", "proband", "admin"];
+const VALID_ROLES = ["free", "pro", "proband", "studio", "admin"];
 const VALID_STATUS = ["active", "blocked", "banned"];
 const RETENTION_DAYS = 30;
 

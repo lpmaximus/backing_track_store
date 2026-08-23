@@ -22,7 +22,7 @@ import type {
   ChordPollResult,
   ChordMeta,
 } from "./types";
-import { toSections, type DetectedChord } from "./sections";
+import { toSections, distinctCount, type DetectedChord } from "./sections";
 
 const API = "https://api.replicate.com/v1/predictions";
 
@@ -179,9 +179,24 @@ export class BTCChordProvider implements ChordDetectionProvider {
 
     try {
       const resolved = await resolveOutput(job.output);
-      const sections = toSections(parseBtcChords(resolved));
-      if (sections.length === 0) return { status: "failed", error: "Nenhum acorde detectado" };
-      return { status: "done", sections, meta: extractMeta(resolved) };
+      // BPM, tom e batidas saem da MESMA execução (librosa, custo zero) e não
+      // dependem de a cifra ter saído. Extrai antes de qualquer return de falha:
+      // descartá-los junto com a cifra era o motivo de "Tom ?" e "BPM 0".
+      const meta = extractMeta(resolved);
+      const detected = parseBtcChords(resolved);
+      const sections = toSections(detected);
+
+      if (sections.length === 0) {
+        return { status: "failed", error: "Nenhum acorde detectado", meta };
+      }
+      // Guarda de qualidade: uma "cifra" de um acorde só cobrindo a música
+      // inteira é ruído do detector, não cifra. Falhar aqui deixa o backfill
+      // retentar em vez de publicar lixo como se fosse resultado bom.
+      const distinct = distinctCount(detected);
+      if (distinct < 2) {
+        return { status: "failed", error: `Cifra pobre demais (${distinct} acorde distinto)`, meta };
+      }
+      return { status: "done", sections, meta };
     } catch (err) {
       return { status: "failed", error: String(err).slice(0, 300) };
     }

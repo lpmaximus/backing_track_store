@@ -44,7 +44,8 @@
     "closeMenu": "Fechar menu",
     "account": "Área do Usuário",
     "signOut": "Sair",
-    "mySetlists": "Minhas Setlists"
+    "mySetlists": "Minhas Setlists",
+    "studio": "Meu Estúdio"
   },
   "footer": {
     "tagline": "Backing tracks com cifra sincronizada para músicos amadores e profissionais. Toque, ensaie e suba ao palco.",
@@ -146,7 +147,12 @@
     "bandFeature4": "Auto-mute por instrumento",
     "priceHidden": "Preço ainda não divulgado",
     "metaTitle": "Planos e preços",
-    "metaDescription": "Compare os planos do BackingTrack.store: gratuito, Pro e Banda. Separação de instrumentos, cifra sincronizada, setlists e modo palco."
+    "metaDescription": "Compare os planos do BackingTrack.store: gratuito, Pro e Banda. Separação de instrumentos, cifra sincronizada, setlists e modo palco.",
+    "studio": "STUDIO",
+    "betaBadge": "BETA",
+    "studioFeature1": "80 músicas por mês",
+    "studioFeature2": "Tablatura automática (beta)",
+    "studioFeature3": "Gravação por cima dos stems"
   },
   "pricing": {
     "title": "Escolha seu plano",
@@ -194,7 +200,16 @@
       "Auto-mute por instrumento",
       "Ensaios com prontidão da banda"
     ],
-    "bandSoon": "Em breve — assinaturas ainda não disponíveis"
+    "bandSoon": "Em breve — assinaturas ainda não disponíveis",
+    "studioFeatures": [
+      "Tudo do Band, mais:",
+      "80 músicas por mês",
+      "Tablatura automática de guitarra (beta)",
+      "Braço da guitarra sincronizado com o player",
+      "Gravar sua parte por cima dos stems",
+      "Mixar e baixar a sua gravação junto com a música"
+    ],
+    "betaNote": "A tablatura automática está em beta: ela acerta a maior parte das notas, mas ainda erra a posição no braço em trechos de guitarra distorcida. Dá para corrigir à mão — e toda correção melhora o resultado das próximas."
   },
   "howItWorks": {
     "metaTitle": "Como funciona",
@@ -437,7 +452,50 @@
     "songMetaBpm": " · {bpm} BPM",
     "back": "← Voltar",
     "speed": "Velocidade",
-    "errSaveRetry": "Erro ao salvar. Tente de novo."
+    "errSaveRetry": "Erro ao salvar. Tente de novo.",
+    "takes": {
+      "title": "Gravar minha faixa",
+      "headphones": "Use fone de ouvido. No alto-falante o microfone captura a base junto e a música sai dobrada na sua gravação.",
+      "record": "Gravar",
+      "getReady": "Prepare-se…",
+      "recording": "Gravando — a base está tocando",
+      "stop": "Parar",
+      "cancel": "Cancelar",
+      "save": "Salvar",
+      "saving": "Salvando…",
+      "discard": "Descartar",
+      "defaultName": "Minha gravação",
+      "nameLabel": "Nome da gravação",
+      "delete": "Apagar",
+      "confirmDelete": "Apagar \"{name}\"? Não dá para desfazer.",
+      "nudgeHint": "Ajustar o encaixe da gravação, em milissegundos",
+      "offsetHelp": "Ficou adiantado ou atrasado? Todo navegador atrasa um pouco entre o som entrar no microfone e ser gravado. Use os botões de milissegundos até encaixar — o player responde na hora.",
+      "micDenied": "Não conseguimos acessar o microfone. Libere a permissão no navegador e tente de novo.",
+      "unsupported": "Este navegador não grava áudio. Tente pelo Chrome, Edge ou Safari atualizado.",
+      "saveError": "Não foi possível salvar a gravação. Tente de novo.",
+      "micLabel": "Microfone:",
+      "micDefault": "Padrão do sistema",
+      "micUnnamed": "Entrada de áudio {n}",
+      "micReveal": "Mostrar nomes",
+      "micRevealHelp": "O navegador só revela o nome dos microfones depois que você permite o acesso uma vez — é uma proteção de privacidade dele. Clique em \"Mostrar nomes\" para ver a lista completa.",
+      "micGone": "O microfone escolhido não está mais disponível. Reconecte o aparelho ou escolha outro na lista.",
+      "gainLabel": "Ganho do microfone:",
+      "gainHelp": "A barra mostra o nível durante a contagem e a gravação — o ideal é que ela dance perto do meio e nunca encoste no vermelho. Se a voz sair baixa mesmo no máximo, aumente a entrada do microfone nas configurações do Windows: ganho digital aqui também amplifica o ruído.",
+      "fxLabel": "Efeito:",
+      "fxAmount": "Intensidade do efeito",
+      "fxHelp": "O efeito é aplicado na reprodução E no arquivo baixado — a gravação original fica guardada limpa, então dá para trocar quantas vezes quiser sem perder nada.",
+      "fx": {
+        "none": "Sem efeito",
+        "hall": "Hall (voz)",
+        "room": "Sala (voz)",
+        "vocal": "Voz encorpada",
+        "comp": "Compressor (instrumento)",
+        "drive": "Drive (guitarra)",
+        "chorus": "Chorus (instrumento)",
+        "delay": "Delay",
+        "studio": "Voz de estúdio (acabamento)"
+      }
+    }
   },
   "setlists": {
     "title": "Minhas Setlists",
@@ -864,5 +922,25 @@
     "ctaSecondary": "Ver o catálogo",
     "note": "Leva menos de 1 minuto para criar sua conta.",
     "trial": "Quer experimentar os recursos do Pro por tempo limitado? <link>Peça um convite de teste</link>."
+  },
+  "studio": {
+    "title": "Meu Estúdio",
+    "subtitle": "As músicas que você pegou do catálogo. Aqui elas têm o seu nome, as faixas que você escolheu e as suas gravações — nada disso muda a música para as outras pessoas.",
+    "loading": "Carregando…",
+    "empty": "Você ainda não pegou nenhuma música. Abra uma do catálogo e clique em Pegar para montar a sua versão.",
+    "goCatalog": "Ir para o catálogo",
+    "open": "Abrir",
+    "remove": "Devolver",
+    "confirmRemove": "Devolver \"{name}\"? A sua versão sai daqui, mas as gravações continuam guardadas.",
+    "nameLabel": "Nome da sua versão",
+    "tracksOff": "{n} faixa desligada",
+    "tracksOffPlural": "{n} faixas desligadas",
+    "signInFirst": "Entre na sua conta para ver o seu estúdio.",
+    "studioOnly": "Pegar músicas para a sua área faz parte do plano Studio, junto com a gravação da sua faixa e a tablatura automática.",
+    "seePlans": "Ver planos",
+    "take": "Pegar",
+    "taken": "Na sua área",
+    "tracksTitle": "Faixas desta versão",
+    "tracksHelp": "Desligue o que não quer ouvir na sua versão. A música do catálogo não muda para ninguém."
   }
 }

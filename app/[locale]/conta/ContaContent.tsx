@@ -10,6 +10,7 @@ import NextLink from "next/link";
 import { Link } from "@/src/i18n/navigation";
 import { localizePath } from "@/src/i18n/localizePath";
 import { htmlLang, type Locale } from "@/src/i18n/routing";
+import { isProRole } from "@/src/lib/roles";
 
 type Account = {
   name: string | null;
@@ -106,7 +107,7 @@ export default function ContaContent() {
     }
   }
 
-  const isPro = account ? account.role === "pro" || account.role === "proband" || account.role === "admin" : false;
+  const isPro = isProRole(account?.role);
 
   return (
     <div style={{ flex: 1, maxWidth: 760, margin: "0 auto", padding: "32px 24px 60px", width: "100%" }}>

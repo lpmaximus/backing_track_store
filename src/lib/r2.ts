@@ -6,6 +6,7 @@
 import {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -31,6 +32,25 @@ export async function presignPut(key: string, contentType: string, expiresIn = 9
   const uploadUrl = await getSignedUrl(R2, command, { expiresIn });
   const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
   return { uploadUrl, publicUrl };
+}
+
+/**
+ * Gera presigned GET URL — link temporário de LEITURA para um objeto.
+ *
+ * Existe por causa das gravações do usuário. O bucket é público, e para stem
+ * instrumental isso é aceitável: a URL é longa, o conteúdo é derivado da música
+ * e não identifica ninguém. Gravação de voz é outra coisa — é dado pessoal, e a
+ * própria política de privacidade a trata assim. Servir esse arquivo por link
+ * público permanente significa que quem obtiver a URL, de qualquer forma e a
+ * qualquer momento, ouve para sempre.
+ *
+ * Com link assinado, a URL morre em uma hora. Não é sigilo perfeito (quem
+ * receber o link dentro da validade ouve), mas troca "exposto para sempre" por
+ * "exposto por uma hora, e só para quem já tinha sessão".
+ */
+export async function presignGet(key: string, expiresIn = 3600) {
+  const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+  return getSignedUrl(R2, command, { expiresIn });
 }
 
 /** Deleta um objeto do R2 pela key. Usado para remover o mix original após o pipeline. */

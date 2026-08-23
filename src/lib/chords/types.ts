@@ -11,6 +11,15 @@ export interface ChordSection {
   timecode: number; // segundos a partir do início
   chords: string; // "Am G F E"
   times?: number[]; // tempo (s) de cada acorde em `chords` — p/ cifra sobre a sílaba
+  /**
+   * true = a string `chords` foi POSICIONADA por uma pessoa (o espaçamento é a
+   * posição sobre a letra) e deve ser renderizada literalmente naquela linha.
+   * Antes isso era adivinhado a partir do espaçamento da string, o que fazia
+   * "D C D7" (espaço simples, o exemplo do próprio editor) ser tratado como
+   * saída automática e ter os acordes redistribuídos por tempo — embaralhando
+   * a correção manual. Agora o editor marca explicitamente.
+   */
+  aligned?: boolean;
 }
 
 export interface ChordDetectionSubmitResult {
@@ -27,7 +36,10 @@ export interface ChordMeta {
 export type ChordPollResult =
   | { status: "running" }
   | { status: "done"; sections: ChordSection[]; meta?: ChordMeta }
-  | { status: "failed"; error: string };
+  // `meta` também na falha: bpm/tom/batidas são calculados na MESMA execução do
+  // detector e não dependem de a cifra ter saído. Descartá-los junto com a cifra
+  // era o motivo de "Tom ?" e "BPM 0" nas músicas em que a detecção falhava.
+  | { status: "failed"; error: string; meta?: ChordMeta };
 
 export interface ChordDetectionProvider {
   readonly name: string;

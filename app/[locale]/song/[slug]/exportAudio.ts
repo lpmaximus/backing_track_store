@@ -28,6 +28,14 @@ export type MixPart = {
   buffer: AudioBuffer;
   /** 0–1. Já é o produto de volume do canal × master; mute/solo entram como 0. */
   gain: number;
+  /**
+   * Deslocamento em SEGUNDOS, mesma convenção do player:
+   *   posição de leitura da faixa = posição da música + offset
+   * Zero para stems. Só as gravações do usuário usam, para compensar a latência
+   * do navegador. Se isto for ignorado, o take exportado sai desalinhado do
+   * resto — a pessoa ajusta no player, ouve encaixado, baixa e ouve torto.
+   */
+  offsetSec?: number;
 };
 
 /** Taxa de amostragem do arquivo exportado. 44,1kHz é o que o lamejs encoda
@@ -84,10 +92,21 @@ export async function downloadOriginal(url: string, filename: string): Promise<v
  * Faixas com ganho 0 (mutadas, ou fora do solo) devem ser filtradas ANTES de
  * chegar aqui — renderizar silêncio só gasta tempo.
  */
-export async function renderMixdown(parts: MixPart[]): Promise<AudioBuffer> {
+export async function renderMixdown(
+  parts: MixPart[],
+  /**
+   * Duração do arquivo final. Quando omitida, usa a faixa mais longa — o
+   * comportamento de sempre. Quem exporta com gravação do usuário deve passar
+   * a duração da MÚSICA: um take em que a pessoa esqueceu o microfone aberto
+   * não pode esticar o arquivo com meio minuto de silêncio no fim.
+   */
+  durationSec?: number,
+): Promise<AudioBuffer> {
   if (parts.length === 0) throw new Error("no-parts");
 
-  const seconds = Math.max(...parts.map((p) => p.buffer.duration));
+  const seconds = durationSec && durationSec > 0
+    ? durationSec
+    : Math.max(...parts.map((p) => p.buffer.duration));
   const frames = Math.ceil(seconds * EXPORT_SAMPLE_RATE);
 
   const OfflineCtx: typeof OfflineAudioContext =
@@ -104,7 +123,16 @@ export async function renderMixdown(parts: MixPart[]): Promise<AudioBuffer> {
     g.gain.value = part.gain;
     src.connect(g);
     g.connect(ctx.destination);
-    src.start(0);
+
+    // Mesma regra do player (ver startAll no WavePlayer): offset positivo
+    // adianta a leitura dentro do arquivo; negativo não tem como ler tempo
+    // negativo, então atrasa a entrada da faixa.
+    const off = part.offsetSec ?? 0;
+    if (off >= 0) {
+      if (off < part.buffer.duration) src.start(0, off);
+    } else {
+      src.start(-off, 0);
+    }
   }
 
   return ctx.startRendering();
@@ -203,8 +231,10 @@ function encodeWav(buffer: AudioBuffer): Blob {
 export async function exportMixdown(
   parts: MixPart[],
   onProgress?: (p: number) => void,
+  /** Duração da música — ver renderMixdown. Omitir mantém o comportamento antigo. */
+  durationSec?: number,
 ): Promise<{ blob: Blob; ext: "mp3" | "wav" }> {
-  const rendered = await renderMixdown(parts);
+  const rendered = await renderMixdown(parts, durationSec);
   try {
     return { blob: await encodeMp3(rendered, onProgress), ext: "mp3" };
   } catch (err) {

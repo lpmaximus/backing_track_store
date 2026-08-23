@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/src/i18n/navigation";
 import type { Locale } from "@/src/i18n/routing";
 import { getPrice, getYearlySavings, type PlanId } from "@/src/lib/pricingIntl";
+import { isProRole } from "@/src/lib/roles";
 import FaqSection, { type FaqItem } from "@/app/components/FaqSection";
 import BlurredPrice from "@/app/components/BlurredPrice";
 
@@ -17,7 +18,9 @@ export default function PlanosContent() {
 
   const [cycle, setCycle] = useState<"monthly" | "yearly">("monthly");
 
-  const isPro = session?.user?.role === "pro" || session?.user?.role === "admin";
+  // Vem de roles.ts em vez de comparar strings aqui: era essa duplicação que
+  // ia deixar o assinante Studio vendo "assine o Pro" na própria tela de planos.
+  const isPro = isProRole(session?.user?.role);
 
   const PLANOS_FAQ: FaqItem[] = [1, 2, 3, 4].map((n) => ({
     q: t(`faq.q${n}`),
@@ -36,19 +39,26 @@ export default function PlanosContent() {
     cycle === "yearly" ? t("savings", { amount: getYearlySavings(plan, locale).formatted }) : "";
 
   /**
-   * Os três planos vêm da landing (fonte de verdade acordada): o Free já tem
-   * stems no player; o que o Pro acrescenta é o EXPORT dos stems. Manter as
-   * duas telas com a mesma promessa é o ponto — ver CON-BTS-002.
+   * Os planos vêm da landing (fonte de verdade acordada): o Free já tem stems
+   * no player; o que o Pro acrescenta é o EXPORT dos stems. Manter as duas
+   * telas com a mesma promessa é o ponto — ver CON-BTS-002.
+   *
+   * O Studio (EVT-004) entra por último e carrega `beta: true` porque a
+   * tablatura automática ainda não passou nos portões de qualidade do EVT-003.
+   * O selo não é enfeite: é o que separa "vendemos algo experimental com o
+   * nome certo" de "prometemos precisão que não medimos".
    */
   const CARDS: {
     id: PlanId;
     tier: string;
     features: string[];
     highlight: boolean;
+    beta?: boolean;
   }[] = [
     { id: "free", tier: tp("free"), features: t.raw("freeFeatures") as string[], highlight: false },
     { id: "pro", tier: tp("pro"), features: t.raw("proFeatures") as string[], highlight: true },
     { id: "band", tier: tp("band"), features: t.raw("bandFeatures") as string[], highlight: false },
+    { id: "studio", tier: tp("studio"), features: t.raw("studioFeatures") as string[], highlight: false, beta: true },
   ];
 
   return (
@@ -84,8 +94,8 @@ export default function PlanosContent() {
       </div>
 
       {/* Cards */}
-      <div className="planos-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, marginBottom: 40, alignItems: "start" }}>
-        {CARDS.map(({ id, tier, features, highlight }) => {
+      <div className="planos-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginBottom: 40, alignItems: "start" }}>
+        {CARDS.map(({ id, tier, features, highlight, beta }) => {
           const isFree = id === "free";
           // "Tudo do Free/Pro, mais:" é cabeçalho da lista, não um item.
           const headerLine = isFree ? null : features[0];
@@ -104,6 +114,14 @@ export default function PlanosContent() {
                 <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)" }}>
                   <span style={{ background: "var(--accent)", color: "#000", fontSize: 11, fontWeight: 800, padding: "4px 14px", borderRadius: 500, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
                     {t("mostPopular")}
+                  </span>
+                </div>
+              )}
+
+              {beta && (
+                <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)" }}>
+                  <span style={{ background: "var(--text)", color: "var(--surface)", fontSize: 11, fontWeight: 800, padding: "4px 14px", borderRadius: 500, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+                    {tp("betaBadge")}
                   </span>
                 </div>
               )}
@@ -175,6 +193,25 @@ export default function PlanosContent() {
             </div>
           );
         })}
+      </div>
+
+      {/* Ressalva do beta da tablatura. Fica fora do card de propósito: dentro
+          dele viraria mais um item de lista com ✓ e leria como benefício. Aqui
+          lê como o que é — um aviso de limite conhecido. */}
+      <div style={{
+        display: "flex", gap: 12, alignItems: "flex-start",
+        background: "var(--surface)", border: "1px solid var(--border2)",
+        borderRadius: 12, padding: "16px 18px", marginBottom: 8,
+      }}>
+        <span style={{
+          background: "var(--text)", color: "var(--surface)", fontSize: 10, fontWeight: 800,
+          padding: "3px 9px", borderRadius: 500, letterSpacing: "0.08em", flexShrink: 0, marginTop: 1,
+        }}>
+          {tp("betaBadge")}
+        </span>
+        <p style={{ margin: 0, color: "var(--muted)", fontSize: 13, lineHeight: 1.6 }}>
+          {t("betaNote")}
+        </p>
       </div>
 
       {/* FAQ — mesmo componente da home (app/components/FaqSection.tsx),

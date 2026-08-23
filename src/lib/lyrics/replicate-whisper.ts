@@ -17,6 +17,7 @@
  * teste real, ajuste se os campos vierem diferentes.
  */
 import type { LyricsProvider, LyricsSubmitResult, LyricsPollResult, LyricsLine } from "./types";
+import { sanitizeLyrics } from "./sanitize";
 
 const API = "https://api.replicate.com/v1/predictions";
 
@@ -53,7 +54,22 @@ export class ReplicateWhisperProvider implements LyricsProvider {
 
   async submit(vocalUrl: string): Promise<LyricsSubmitResult> {
     if (!this.isConfigured()) throw new Error("Whisper (Replicate) não configurado");
-    const input: Record<string, unknown> = { audio: vocalUrl };
+    const input: Record<string, unknown> = {
+      audio: vocalUrl,
+      // A trava que faltava. Com o padrão (true) o modelo realimenta a própria
+      // saída e entra em loop — era a origem de "I want a piece." quatro vezes
+      // seguidas e da linha repetida três vezes no fim da faixa.
+      condition_on_previous_text: false,
+      // Determinístico: sem fallback de temperatura, menos margem p/ inventar.
+      temperature: 0,
+      // Trecho instrumental do stem de vocal (artefato do Demucs) deixa de ser
+      // transcrito como se fosse canto.
+      no_speech_threshold: 0.6,
+      compression_ratio_threshold: 2.4,
+    };
+    // Idioma fixo elimina a deriva do large-v3, que redetecta ao longo da faixa
+    // e escorrega de alfabeto no meio da música. Sem a env, segue automático — e
+    // aí quem segura a deriva é o sanitizeLyrics no poll.
     if (process.env.WHISPER_LANGUAGE) input.language = process.env.WHISPER_LANGUAGE;
 
     const res = await fetch(API, {
@@ -85,7 +101,7 @@ export class ReplicateWhisperProvider implements LyricsProvider {
     }
     if (job.status !== "succeeded") return { status: "running" };
 
-    const lines = parseSegments(job.output);
+    const lines = sanitizeLyrics(parseSegments(job.output));
     if (lines.length === 0) return { status: "failed", error: "Nenhuma linha transcrita" };
     return { status: "done", lines };
   }

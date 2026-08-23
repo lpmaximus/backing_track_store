@@ -12,6 +12,17 @@ import { auth } from "@/auth";
 import { db, songs, processingJobs } from "@/src/db";
 import { and, eq, desc } from "drizzle-orm";
 import { getChordProvider } from "@/src/lib/chords";
+import { purgeSourceMix } from "@/src/lib/retention";
+import type { ChordMeta } from "@/src/lib/chords/types";
+
+/** Campos de bpm/tom/batidas a gravar, quando o detector devolveu algum. */
+function metaPatch(m: ChordMeta | undefined) {
+  return {
+    ...(m?.bpm ? { bpm: m.bpm } : {}),
+    ...(m?.key ? { key: m.key } : {}),
+    ...(m?.beats?.length ? { beats: m.beats } : {}),
+  };
+}
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ songId: string }> }) {
   const session = await auth();
@@ -57,28 +68,37 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ song
     }
 
     if (result.status === "failed") {
+      // BPM, tom e batidas vêm da MESMA execução do detector e não dependem de a
+      // cifra ter saído. Descartá-los junto com a cifra era o motivo de "Tom ?" e
+      // "BPM 0" justamente nas músicas em que a detecção falhava.
+      const patch = metaPatch(result.meta);
+      if (Object.keys(patch).length > 0) {
+        await db.update(songs).set(patch).where(eq(songs.id, songId));
+      }
       await db
         .update(processingJobs)
         .set({ status: "failed", errorMessage: result.error.slice(0, 500), completedAt: new Date() })
         .where(eq(processingJobs.id, job.id));
+      // O mix só era guardado por causa deste job — pode ir embora (EVT 5.1).
+      await purgeSourceMix(songId);
       return NextResponse.json({ chordsStatus: song.chordsStatus, chords: song.chords ?? null, jobStatus: "failed" });
     }
 
     // Sucesso: salva a cifra automática (draft), a menos que já exista cifra da comunidade.
     const setChords = !(song.chords && song.chords.length > 0);
-    const m = result.meta;
-    if (setChords || m?.bpm || m?.key || m?.beats) {
+    const patch = metaPatch(result.meta);
+    if (setChords || Object.keys(patch).length > 0) {
       await db.update(songs).set({
         ...(setChords ? { chords: result.sections, chordsSource: "auto" as const, chordsStatus: "draft" as const } : {}),
-        ...(m?.bpm ? { bpm: m.bpm } : {}),
-        ...(m?.key ? { key: m.key } : {}),
-        ...(m?.beats ? { beats: m.beats } : {}),
+        ...patch,
       }).where(eq(songs.id, songId));
     }
     await db
       .update(processingJobs)
       .set({ status: "done", completedAt: new Date() })
       .where(eq(processingJobs.id, job.id));
+    // Retenção adiada (EVT 5.1): a cifra já leu o mix, ele pode ser apagado.
+    await purgeSourceMix(songId);
 
     return NextResponse.json({ chordsStatus: "draft", chords: result.sections, jobStatus: "done" });
   } catch (err) {

@@ -26,6 +26,18 @@ import { and, eq, gte, ne, sql, desc } from "drizzle-orm";
 export const FREE_MONTHLY_UPLOAD_LIMIT = 3; // ADR-BTS-001: isca de conversão, export completo
 export const PRO_MONTHLY_UPLOAD_LIMIT = 20; // ADR-BTS-001: pacote Pro visível e aplicado
 export const PROBAND_MONTHLY_UPLOAD_LIMIT = 40; // ADR-BTS-001: pacote ProBand visível e aplicado
+/**
+ * BTS-Studio (EVT-004). O número saiu da margem, não do chute: a separação
+ * custa ~R$0,40 por música (medido, ver project_backingtrack_admin_mvp), então
+ * 80 separações = ~R$32 de custo contra R$89,90 de receita. A receita por
+ * separação fica em R$1,12 — dentro da faixa dos planos que já existem
+ * (Pro R$1,00, Band R$1,50), o que mantém a régua coerente.
+ *
+ * ATENÇÃO: este teto ainda NÃO cobre o custo da tablatura automática, que é
+ * uma chamada de GPU à parte. Enquanto o Guitar Tab estiver em beta o volume é
+ * baixo e não muda a conta; antes de tirar o rótulo de beta, revisar aqui.
+ */
+export const STUDIO_MONTHLY_UPLOAD_LIMIT = 80;
 export const ADMIN_MONTHLY_UPLOAD_LIMIT = 5000; // teto anti-abuso; admin não trava na prática
 
 // Status de assinatura que definem "ciclo ativo" para a janela de cota.
@@ -33,6 +45,7 @@ const ACTIVE_SUB_STATUSES = new Set(["active", "trialing"]);
 
 export function monthlyLimitForRole(role?: string): number {
   if (role === "admin") return ADMIN_MONTHLY_UPLOAD_LIMIT;
+  if (role === "studio") return STUDIO_MONTHLY_UPLOAD_LIMIT;
   if (role === "proband") return PROBAND_MONTHLY_UPLOAD_LIMIT;
   if (role === "pro") return PRO_MONTHLY_UPLOAD_LIMIT;
   return FREE_MONTHLY_UPLOAD_LIMIT;

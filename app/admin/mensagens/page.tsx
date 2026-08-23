@@ -113,6 +113,7 @@ function MensagensContent() {
               <option value="free">Free</option>
               <option value="pro">Pro</option>
               <option value="proband">Pro Band</option>
+              <option value="studio">Studio</option>
             </select>
           </div>
         )}

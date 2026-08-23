@@ -16,6 +16,7 @@
  *   WHISPER_LANGUAGE          — (opcional) idioma, ex. "pt" (default: auto)
  */
 import type { LyricsProvider, LyricsSubmitResult, LyricsPollResult, LyricsLine, LyricsWord } from "./types";
+import { sanitizeLyrics } from "./sanitize";
 
 const API = "https://api.replicate.com/v1/predictions";
 
@@ -74,7 +75,15 @@ export class WhisperXProvider implements LyricsProvider {
 
   async submit(vocalUrl: string): Promise<LyricsSubmitResult> {
     if (!this.isConfigured()) throw new Error("WhisperX (Replicate) não configurado");
-    const input: Record<string, unknown> = { audio_file: vocalUrl, align_output: true };
+    const input: Record<string, unknown> = {
+      audio_file: vocalUrl,
+      align_output: true,
+      temperature: 0,
+      // VAD: o WhisperX recorta os trechos SEM VOZ antes de transcrever. É o que
+      // corta a alucinação sobre instrumental na raiz — o Whisper comum não tem.
+      vad_onset: 0.5,
+      vad_offset: 0.363,
+    };
     if (process.env.WHISPER_LANGUAGE) input.language = process.env.WHISPER_LANGUAGE;
 
     const res = await fetch(API, {
@@ -105,7 +114,7 @@ export class WhisperXProvider implements LyricsProvider {
     }
     if (job.status !== "succeeded") return { status: "running" };
 
-    const lines = parseSegments(job.output);
+    const lines = sanitizeLyrics(parseSegments(job.output));
     if (lines.length === 0) return { status: "failed", error: "Nenhuma linha transcrita" };
     return { status: "done", lines };
   }

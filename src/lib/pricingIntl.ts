@@ -13,7 +13,7 @@
 import type { Locale } from "@/src/i18n/routing";
 
 export type Currency = "BRL" | "USD";
-export type PlanId = "free" | "pro" | "band";
+export type PlanId = "free" | "pro" | "band" | "studio";
 export type Cycle = "monthly" | "yearly";
 
 /**
@@ -37,13 +37,30 @@ export const PRICE_TABLE: Record<Currency, Record<PlanId, Record<Cycle, number>>
     free: { monthly: 0, yearly: 0 },
     pro: { monthly: 19.9, yearly: 149 },
     band: { monthly: 59.9, yearly: 449 },
+    studio: { monthly: 89.9, yearly: 669 },
   },
   USD: {
     free: { monthly: 0, yearly: 0 },
     pro: { monthly: 7.9, yearly: 59 },
     band: { monthly: 19.9, yearly: 149 },
+    studio: { monthly: 29.9, yearly: 225 },
   },
 };
+
+/**
+ * De onde veio o preço do studio (EVT-004 §5.3) — e o que ainda não foi testado.
+ *
+ * Faixa recomendada no estudo: R$79,90-89,90 para o v1. Ficou no topo porque o
+ * v1 já entra com Guitar Tab, que nenhum concorrente combina com separação de
+ * stems. Referência de sanidade: assinar Moises + Songsterr + BandLab Pro
+ * separado dá ~R$150-200/mês, então R$89,90 continua sendo desconto real.
+ *
+ * O anual segue os mesmos ~38% dos outros planos (89,90 × 12 = 1.078,80 → 669).
+ *
+ * RESSALVA: é benchmark de concorrente, não teste com cliente. O EVT-004 pede
+ * validar com as primeiras bandas antes de publicar — e `PRICES_BLURRED` acima
+ * ainda está ligado, então nada disso aparece na tela hoje.
+ */
 
 const LOCALE_TAG: Record<Currency, string> = {
   BRL: "pt-BR",

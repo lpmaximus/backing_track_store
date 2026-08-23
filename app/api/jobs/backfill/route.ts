@@ -21,6 +21,7 @@ import { db, songs, stems, processingJobs } from "@/src/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { isAdminRequest } from "@/src/lib/adminAuth";
 import { getChordProvider } from "@/src/lib/chords";
+import { pickChordAudio } from "@/src/lib/chords/source";
 import { getLyricsProvider } from "@/src/lib/lyrics";
 
 function isCron(req: NextRequest): boolean {
@@ -134,10 +135,13 @@ async function runBackfill(req: NextRequest) {
       // Roda se: falta cifra (fluxo normal) OU falta o meta (reanálise) — nesse
       // caso mesmo com cifra/job existente, pois só o meta será atualizado.
       if (chordsOn && submitted < MAX_SUBMITS && (needsMeta || (!alreadyHasChords && !hasChordJob.has(song.id)))) {
-        const harmony = songStems.find((s) => s.instrument === "harmony") ?? songStems[0];
-        if (harmony) {
+        // Fonte da cifra: o MIX quando ainda existe, senão guitar/harmony/melody.
+        // NUNCA songStems[0] (podia ser a bateria) e nunca o resíduo "harmony"
+        // por padrão — ver src/lib/chords/source.ts.
+        const source = pickChordAudio(song.audioUrl, songStems);
+        if (source) {
           submitted++;
-          if (await createJob(song.id, "chord_detection", chordProvider.name, () => chordProvider.submit(harmony.audioUrl))) {
+          if (await createJob(song.id, "chord_detection", chordProvider.name, () => chordProvider.submit(source.url))) {
             summary.chordJobsCreated++; touched = true;
           }
         }

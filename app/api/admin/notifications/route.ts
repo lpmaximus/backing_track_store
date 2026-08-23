@@ -15,7 +15,7 @@ import { db, users, notifications } from "@/src/db";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 type Audience = "all" | "role" | "user";
-const VALID_ROLES = new Set(["free", "pro", "proband", "admin"]);
+const VALID_ROLES = new Set(["free", "pro", "proband", "studio", "admin"]);
 const VALID_TYPES = new Set(["system", "promo", "band"]);
 
 export async function GET(req: NextRequest) {

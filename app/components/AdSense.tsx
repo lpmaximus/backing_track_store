@@ -39,6 +39,7 @@
 import Script from "next/script";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { isProRole } from "@/src/lib/roles";
 
 const PUBLISHER_ID = "ca-pub-2626036835425131";
 
@@ -93,9 +94,9 @@ export default function AdSense() {
   if (!ENABLED || !IS_LIVE) return null;
   if (status === "loading") return null;
 
-  const role = session?.user?.role;
-  const pagante = role === "pro" || role === "proband" || role === "admin";
-  if (pagante) return null;
+  // isProRole em vez de comparar strings aqui: quando entrou o tier Studio,
+  // esta lista teria ficado para trás e o assinante mais caro veria anúncio.
+  if (isProRole(session?.user?.role)) return null;
 
   const caminho = semLocale(pathname ?? "/").replace(/\/$/, "") || "/";
   if (!ROTAS_COM_ANUNCIO.has(caminho)) return null;

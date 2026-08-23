@@ -8,7 +8,10 @@
  */
 export function isProRole(role?: string | null): boolean {
   // proband (líder de banda, plano pago) tem o mesmo acesso Pro individual.
-  return role === "pro" || role === "proband" || role === "admin";
+  // studio (BTS-Studio, EVT-004) é supraconjunto do proband — tudo que o
+  // ProBand faz, mais Guitar Tab e gravação própria. Precisa estar aqui, senão
+  // quem paga o tier mais caro perderia o acesso Pro básico.
+  return role === "pro" || role === "proband" || role === "studio" || role === "admin";
 }
 
 /**
@@ -36,6 +39,7 @@ export function roleLabel(
 ): string {
   switch (role) {
     case "admin":   return "ADMIN";
+    case "studio":  return "STUDIO";
     case "proband": return "PRO BAND";
     case "pro":     return "PRO";
     default:        return isActiveBandMember ? "BANDA" : "FREE";

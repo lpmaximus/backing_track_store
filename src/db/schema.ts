@@ -9,6 +9,7 @@ import {
   jsonb,
   numeric,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // ─── Songs ────────────────────────────────────────────────────────────────────
@@ -85,7 +86,11 @@ export const users = pgTable("users", {
   providerId: text("provider_id"),
   passwordHash: text("password_hash"), // null para OAuth
   asaasCustomerId: text("asaas_customer_id"),
-  role: varchar("role", { length: 20 }).notNull().default("free"), // free | pro | proband | admin
+  // free | pro | proband | studio | admin — 'studio' é o BTS-Studio (EVT-004),
+  // supraconjunto do proband. A coluna é varchar livre (sem enum no Postgres),
+  // então adicionar um role NÃO exige migração; o que exige atenção é a lista
+  // de roles aceitos nas rotas de admin e a matriz em src/lib/permissions.ts.
+  role: varchar("role", { length: 20 }).notNull().default("free"),
   // ─── Admin MVP (R3 / ADR-BTS-003) ───────────────────────────────────────
   // Estado da conta para moderação: active (normal), blocked (suspenso,
   // reversível), banned (permanente). Bloqueio nega login (ver auth.ts).
@@ -163,6 +168,118 @@ export const subscriptions = pgTable("subscriptions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// ─── "Minha versão" de uma música do catálogo (BTS-Studio) ───────────────────
+//
+// Pegar uma música para a sua área NÃO copia áudio. O R2 continua com um
+// arquivo só por stem; isto aqui é uma folha de configuração pessoal por cima
+// da mesma base. Copiar de verdade multiplicaria o storage por usuário para
+// entregar exatamente o mesmo som — e o storage já é o gargalo de custo do
+// produto (ver o estudo de capacidade: WAV cru quase estoura o free tier do R2
+// só com o catálogo atual).
+//
+// Consequência importante: a cópia é NÃO DESTRUTIVA por construção. "Tirar uma
+// faixa" desliga aquele stem na SUA versão; a música do catálogo não muda para
+// mais ninguém. Não existe caminho, nesta tabela, que escreva na música
+// original — e é assim que tem de continuar.
+//
+// UMA versão por pessoa por música (índice único). Duas versões da mesma
+// música criariam a pergunta "a qual delas pertence esta gravação?", já que
+// `user_takes` é chaveado por (userId, songId). Uma só elimina a ambiguidade
+// em vez de responder a ela.
+export const userSongs = pgTable(
+  "user_songs",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    songId: integer("song_id")
+      .notNull()
+      .references(() => songs.id, { onDelete: "cascade" }),
+    // Nome que a pessoa deu à SUA versão. Null = usa o título original. Guardar
+    // null em vez de duplicar o título faz a versão acompanhar correções de
+    // metadado no catálogo enquanto ela não renomeou nada.
+    title: varchar("title", { length: 255 }),
+    // Stems desligados nesta versão, por `instrument` (o mesmo valor de
+    // stems.instrument). Lista de exclusão, não de inclusão: assim um stem novo
+    // que apareça depois na música entra ligado por padrão, em vez de sumir da
+    // versão de quem pegou antes.
+    disabledStems: jsonb("disabled_stems").$type<string[]>().notNull().default([]),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    umaPorPessoa: uniqueIndex("user_songs_user_song_uq").on(t.userId, t.songId),
+  }),
+);
+
+// ─── Takes do usuário (overdub — BTS-Studio / CONCEITO-FASE-2) ────────────────
+//
+// A SEGUNDA CAMADA do modelo de conteúdo. A primeira é a base (stems, cifra,
+// metadados), governada por `songs.shared` e compartilhável entre Pros. Esta é
+// a gravação pessoal, e as duas NUNCA viajam juntas: compartilhar a base não
+// arrasta take nenhum. Quem abre a mesma base vê os stems dela + os PRÓPRIOS
+// takes, jamais os de terceiros. É o modelo karaokê — todo mundo divide o
+// instrumental, cada um guarda o próprio vocal.
+//
+// Consequência prática que justifica o desenho: nunca vai ser preciso tirar uma
+// música do catálogo só porque alguém gravou por cima dela.
+//
+// Por que tabela própria e não uma linha em `stems`: stem é derivado da música
+// e viaja com ela; take é performance de uma PESSOA. Misturar os dois faria a
+// gravação de voz de alguém vazar junto com o compartilhamento da base — que é
+// exatamente o acidente que este desenho existe para impedir.
+export const userTakes = pgTable(
+  "user_takes",
+  {
+    id: serial("id").primaryKey(),
+    songId: integer("song_id")
+      .notNull()
+      .references(() => songs.id, { onDelete: "cascade" }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Nome dado pelo usuário ("Minha voz", "Guitarra base 2"). Nunca nulo: a
+    // rota preenche com um padrão, porque faixa sem nome no mixer é inútil.
+    name: varchar("name", { length: 120 }).notNull(),
+    audioUrl: text("audio_url").notNull(),
+    // Duração medida no navegador ANTES de subir. Guardada para a lista de
+    // takes não precisar baixar o áudio só para mostrar "2:14".
+    durationSec: numeric("duration_sec", { precision: 8, scale: 2 }),
+    // Compensação de latência, em milissegundos. O navegador sempre atrasa
+    // entre o som entrar no microfone e ser gravado, então o take nasce
+    // deslocado. Convenção (a mesma no player e na UI de ajuste):
+    //   posição de leitura do take = posição da música + offsetMs/1000
+    // Positivo = o take foi gravado ATRASADO e precisa adiantar. Negativo =
+    // adiantado, precisa atrasar. Zero = sem compensação.
+    // Na v1 quem ajusta é o usuário, no olho; a calibração automática é v2.
+    offsetMs: integer("offset_ms").notNull().default(0),
+    // private (padrão) | band | public.
+    //
+    // Nasce privado DE PROPÓSITO, e não por conservadorismo: gravação de voz é
+    // dado pessoal sensível. 'band' libera para os membros da banda (ensaio à
+    // distância — cada um grava a sua parte). 'public' é a vitrine de covers,
+    // fase futura, e vai exigir consentimento próprio e separado porque a
+    // gravação carrega a composição de terceiro junto (mesma família de risco
+    // do catálogo compartilhado).
+    visibility: varchar("visibility", { length: 20 }).notNull().default("private"),
+    // Efeito aplicado na REPRODUÇÃO — `{ preset, mix }`, ver src/lib/takeFx.ts.
+    // O arquivo gravado continua limpo: isto é configuração, não processamento
+    // embutido. É o que permite trocar de ideia depois sem perder a captação
+    // original, e o oposto de gravar já com reverb e descobrir tarde que
+    // exagerou.
+    fx: jsonb("fx").$type<{ preset: string; mix: number }>(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    // O acesso é sempre "os takes DESTE usuário NESTA música" — nunca por
+    // música sozinha. O índice composto espelha a consulta e é a mesma forma
+    // do isolamento: quem esquece o userId não acha nada por acidente.
+    byUserSong: index("user_takes_user_song_idx").on(t.userId, t.songId),
+  }),
+);
 
 // ─── Comments ─────────────────────────────────────────────────────────────────
 // Free pode ler; apenas Pro/admin podem escrever (checagem feita na API).
@@ -560,6 +677,11 @@ export interface ChordSection {
   timecode: number;   // segundos a partir do início
   chords: string;     // "Am G F E"
   times?: number[];   // tempo (s) de cada acorde em `chords` — cifra sobre a sílaba
+  // true = string POSICIONADA por uma pessoa no editor (o espaçamento É a
+  // posição sobre a letra). Renderiza literalmente na linha daquele timecode,
+  // sem redistribuir os acordes por tempo. Campo novo em jsonb: retrocompatível,
+  // cifras antigas simplesmente não têm.
+  aligned?: boolean;
 }
 
 export interface LyricsWord {

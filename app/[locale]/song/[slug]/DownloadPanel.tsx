@@ -28,12 +28,26 @@ import {
   extFromUrl,
   type MixPart,
 } from "./exportAudio";
+import { fxVazio, type TakeFx } from "@/src/lib/takeFx";
+import { renderTakeComFx } from "./takeFxNodes";
 
 export type DownloadTrack = {
   key: string;
   instrument: string;
   label: string;
   audioUrl: string;
+  /** Só as gravações do usuário preenchem — ver MixPart.offsetSec. */
+  offsetMs?: number;
+  /**
+   * Formato real do arquivo, quando a URL não revela. É o caso das gravações:
+   * elas são servidas por `/api/takes/:id/audio`, que não tem extensão. Sem
+   * isto o download salvaria um `.webm` com nome `.mp3`.
+   */
+  fileExt?: string;
+  /** Efeito da gravação — renderizado no arquivo, não só ouvido no player. */
+  fx?: TakeFx | null;
+  /** Marca a faixa como gravação do usuário (só elas têm efeito e offset). */
+  takeId?: number;
 };
 
 type Props = {
@@ -49,6 +63,11 @@ type Props = {
   isPro: boolean;
   /** O motor terminou de carregar; sem isso não há buffer pra mixar. */
   ready: boolean;
+  /**
+   * Duração da MÚSICA. Sem ela, uma gravação em que a pessoa esqueceu o
+   * microfone aberto esticaria o arquivo exportado com silêncio no fim.
+   */
+  songDuration?: number;
   /** Avisa o pai que houve export (analytics — evento "export"). */
   onExport?: (kind: "mix" | "stems", count: number) => void;
 };
@@ -56,7 +75,7 @@ type Props = {
 type Busy = null | { phase: "render" | "encode" | "stems"; pct: number };
 
 export default function DownloadPanel({
-  tracks, audible, trackVol, getBuffer, songTitle, songArtist, isPro, ready, onExport,
+  tracks, audible, trackVol, getBuffer, songTitle, songArtist, isPro, ready, songDuration, onExport,
 }: Props) {
   const tx = useTranslations("song");
   const [open, setOpen] = useState(false);
@@ -92,12 +111,41 @@ export default function DownloadPanel({
       for (const t of selected) {
         const buffer = getBuffer(t.key);
         if (!buffer) continue;
-        parts.push({ buffer, gain: trackVol[t.key] ?? 1 });
+
+        // Gravação com efeito é renderizada ANTES de entrar na mixagem, com a
+        // mesma cadeia que o player usa (ver takeFxNodes.ts). Sem isso o
+        // arquivo sairia seco: soaria certo na tela e diferente no download —
+        // a mesma armadilha do offset, e a pessoa só descobriria depois de
+        // mandar o arquivo para a banda.
+        //
+        // A renderização já posiciona o take na linha do tempo, então o
+        // `offsetSec` aqui vai zerado — aplicá-lo duas vezes dobraria o
+        // deslocamento.
+        if (t.takeId != null && !fxVazio(t.fx)) {
+          const comFx = await renderTakeComFx(
+            buffer,
+            t.fx,
+            (t.offsetMs ?? 0) / 1000,
+            songDuration && songDuration > 0 ? songDuration : buffer.duration,
+          );
+          parts.push({ buffer: comFx, gain: trackVol[t.key] ?? 1, offsetSec: 0 });
+          continue;
+        }
+
+        // O offset da gravação do usuário viaja junto: sem ele a pessoa
+        // encaixa o take no player, baixa, e ouve o arquivo torto.
+        parts.push({
+          buffer,
+          gain: trackVol[t.key] ?? 1,
+          offsetSec: (t.offsetMs ?? 0) / 1000,
+        });
       }
       if (parts.length === 0) throw new Error("no-buffer");
 
-      const { blob, ext } = await exportMixdown(parts, (p) =>
-        setBusy({ phase: "encode", pct: p }),
+      const { blob, ext } = await exportMixdown(
+        parts,
+        (p) => setBusy({ phase: "encode", pct: p }),
+        songDuration,
       );
       // Sufixo com o nº de faixas: o músico costuma exportar várias versões da
       // mesma música (sem vocal, só base…) e um nome repetido vira "(1)", "(2)".
@@ -110,7 +158,7 @@ export default function DownloadPanel({
     } finally {
       setBusy(null);
     }
-  }, [busy, selected, getBuffer, trackVol, baseName, tracks.length, tx, onExport]);
+  }, [busy, selected, getBuffer, trackVol, baseName, tracks.length, tx, onExport, songDuration]);
 
   // ── Faixas separadas: baixa o arquivo original de cada uma ─────────────────
   const downloadStems = useCallback(async () => {
@@ -122,7 +170,28 @@ export default function DownloadPanel({
     try {
       for (const t of selected) {
         try {
-          const name = `${baseName} - ${safeFileName(t.label)}.${extFromUrl(t.audioUrl)}`;
+          // Gravação COM efeito não pode sair pelo arquivo original: ele é a
+          // captação seca. Renderiza a cadeia e encoda, para a faixa avulsa
+          // soar igual ao que se ouve no player e igual à mixagem.
+          if (t.takeId != null && !fxVazio(t.fx)) {
+            const buffer = getBuffer(t.key);
+            if (!buffer) throw new Error("no-buffer");
+            const comFx = await renderTakeComFx(
+              buffer,
+              t.fx,
+              (t.offsetMs ?? 0) / 1000,
+              songDuration && songDuration > 0 ? songDuration : buffer.duration,
+            );
+            const { blob, ext: e2 } = await exportMixdown([{ buffer: comFx, gain: 1 }]);
+            downloadBlob(blob, `${baseName} - ${safeFileName(t.label)}.${e2}`);
+            done++;
+            setBusy({ phase: "stems", pct: (done + failed) / selected.length });
+            await new Promise((r) => setTimeout(r, 350));
+            continue;
+          }
+
+          const ext = t.fileExt ?? extFromUrl(t.audioUrl);
+          const name = `${baseName} - ${safeFileName(t.label)}.${ext}`;
           await downloadOriginal(t.audioUrl, name);
           done++;
         } catch (err) {
@@ -138,7 +207,7 @@ export default function DownloadPanel({
     } finally {
       setBusy(null);
     }
-  }, [busy, selected, baseName, tx, onExport]);
+  }, [busy, selected, baseName, tx, onExport, getBuffer, songDuration]);
 
   // ── Sem Pro: botão vira porta de entrada do plano ───────────────────────────
   if (!isPro) {
