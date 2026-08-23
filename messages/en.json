@@ -730,10 +730,10 @@
     "sortRecent": "Recent",
     "sortTitle": "Title",
     "sortArtist": "Artist",
-    "allGenres": "All",
     "showing": "{shown} of {total} tracks",
     "noResults": "No tracks match these filters.",
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "sortGenre": "Genre"
   },
   "shared": {
     "title": "Shared Songs",

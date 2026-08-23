@@ -35,7 +35,7 @@ function fold(s: string) {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
-type SortKey = "recent" | "title" | "artist";
+type SortKey = "recent" | "title" | "artist" | "genre";
 
 const controlSelect: React.CSSProperties = {
   background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 8,
@@ -103,34 +103,34 @@ export default function PerfilContent() {
   // Padrao "artist": a lista abre agrupada por artista/banda, que e como o
   // usuario procura a faixa. "recent" continua disponivel no seletor.
   const [sortBy, setSortBy] = useState<SortKey>("artist");
-  const [genreFilter, setGenreFilter] = useState("Todos");
-
-  // O seletor de gênero lista só os gêneros que existem nas músicas DESTE
-  // usuário — nunca a lista canônica inteira, que viraria uma parede de
-  // opções vazias.
-  const availableGenres = Array.from(new Set(readySongs.map(s => normalizeGenre(s.genre))))
-    .sort((a, b) => a.localeCompare(b, "pt-BR"));
 
   const q = fold(query);
   const visible = readySongs
-    .filter(s => genreFilter === "Todos" || normalizeGenre(s.genre) === genreFilter)
     .filter(s => !q || fold(s.title).includes(q) || fold(s.artist).includes(q))
     .sort((a, b) => {
       switch (sortBy) {
         case "title":  return a.title.localeCompare(b.title, "pt-BR");
         case "artist": return a.artist.localeCompare(b.artist, "pt-BR")
           || a.title.localeCompare(b.title, "pt-BR");
+        case "genre":  return normalizeGenre(a.genre).localeCompare(normalizeGenre(b.genre), "pt-BR")
+          || a.artist.localeCompare(b.artist, "pt-BR")
+          || a.title.localeCompare(b.title, "pt-BR");
         default:       return +new Date(b.createdAt) - +new Date(a.createdAt);
       }
     });
 
-  // Ordenar por artista já agrupa: entra um cabeçalho a cada troca de nome.
-  const groupByArtist = sortBy === "artist";
-  const filtering = query.trim() !== "" || genreFilter !== "Todos";
+  // Ordenar por artista ou por gênero também agrupa: entra um cabeçalho a cada
+  // troca de valor. É o "filtro" sem precisar de um segundo controle — a lista
+  // inteira continua visível, só reorganizada.
+  const groupKey = (s: MySong) =>
+    sortBy === "artist" ? s.artist
+    : sortBy === "genre" ? `${genreEmoji(s.genre)} ${normalizeGenre(s.genre)}`
+    : null;
+
+  const filtering = query.trim() !== "";
 
   function clearFilters() {
     setQuery("");
-    setGenreFilter("Todos");
   }
 
   // ── Ações ────────────────────────────────────────────────────────────────
@@ -269,20 +269,9 @@ export default function PerfilContent() {
                   <option value="recent">{t("sortRecent")}</option>
                   <option value="title">{t("sortTitle")}</option>
                   <option value="artist">{t("sortArtist")}</option>
+                  <option value="genre">{t("sortGenre")}</option>
                 </select>
               </label>
-
-              {availableGenres.length > 1 && (
-                <label style={controlLabel}>
-                  {t("fieldGenre")}
-                  <select value={genreFilter} onChange={e => setGenreFilter(e.target.value)} style={controlSelect}>
-                    <option value="Todos">{t("allGenres")}</option>
-                    {availableGenres.map(g => (
-                      <option key={g} value={g}>{`${genreEmoji(g)} ${g}`}</option>
-                    ))}
-                  </select>
-                </label>
-              )}
 
               <span style={{ color: "var(--muted2)", fontSize: 12, marginLeft: "auto" }}>
                 {t("showing", { shown: visible.length, total: readySongs.length })}
@@ -322,12 +311,12 @@ export default function PerfilContent() {
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {visible.map((s, i) => (
                 <div key={s.id} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {groupByArtist && (i === 0 || visible[i - 1].artist !== s.artist) && (
+                  {groupKey(s) && (i === 0 || groupKey(visible[i - 1]) !== groupKey(s)) && (
                     <p style={{
                       color: "var(--muted)", fontSize: 11, fontWeight: 800, letterSpacing: "0.08em",
                       textTransform: "uppercase", margin: i === 0 ? "4px 0 0" : "14px 0 0",
                     }}>
-                      {s.artist}
+                      {groupKey(s)}
                     </p>
                   )}
                   <SongCard

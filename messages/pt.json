@@ -730,10 +730,10 @@
     "sortRecent": "Recentes",
     "sortTitle": "Título",
     "sortArtist": "Artista",
-    "allGenres": "Todos",
     "showing": "{shown} de {total} faixas",
     "noResults": "Nenhuma faixa encontrada com esses filtros.",
-    "clearFilters": "Limpar filtros"
+    "clearFilters": "Limpar filtros",
+    "sortGenre": "Gênero"
   },
   "shared": {
     "title": "Músicas Compartilhadas",
