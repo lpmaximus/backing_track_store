@@ -100,7 +100,9 @@ export default function PerfilContent() {
   // do usuário (dezenas de itens, não milhares), então filtrar aqui evita um
   // round-trip por tecla digitada.
   const [query, setQuery] = useState("");
-  const [sortBy, setSortBy] = useState<SortKey>("recent");
+  // Padrao "artist": a lista abre agrupada por artista/banda, que e como o
+  // usuario procura a faixa. "recent" continua disponivel no seletor.
+  const [sortBy, setSortBy] = useState<SortKey>("artist");
   const [genreFilter, setGenreFilter] = useState("Todos");
 
   // O seletor de gênero lista só os gêneros que existem nas músicas DESTE
