@@ -8,10 +8,12 @@ const SHARP_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#",
 const SEMITONE: Record<string, number> = Object.fromEntries(SHARP_NAMES.map((n, i) => [n, i]));
 const FLAT_TO_SHARP: Record<string, string> = { Db: "C#", Eb: "D#", Gb: "F#", Ab: "G#", Bb: "A#" };
 
-type CoreQuality = "maj" | "min" | "7" | "maj7" | "m7";
+// "5" = power chord (fundamental + quinta + oitava, sem terça)
+type CoreQuality = "maj" | "min" | "7" | "maj7" | "m7" | "5";
+type TriadQuality = Exclude<CoreQuality, "5">;
 
 const QUALITY_SUFFIX: Record<CoreQuality, string> = {
-  maj: "", min: "m", "7": "7", maj7: "maj7", m7: "m7",
+  maj: "", min: "m", "7": "7", maj7: "maj7", m7: "m7", "5": "5",
 };
 
 function parseChord(symbol: string): { root: string; quality: CoreQuality; approx: boolean } | null {
@@ -27,7 +29,11 @@ function parseChord(symbol: string): { root: string; quality: CoreQuality; appro
   let quality: CoreQuality;
   let approx = false;
 
-  if (/^(maj7|M7|7M|Δ)/i.test(q))                       quality = "maj7";
+  // Power chord: "E5", "A5/E". Já "E5+" / "E5#" / "E5-" são a notação BR de
+  // quinta alterada (aumentada/diminuta) — não são power chord.
+  if (/^5(?![+\-#b\d])/.test(q))                        quality = "5";
+  else if (/^5[+\-#b]/.test(q))                          { quality = "maj"; approx = true; }
+  else if (/^(maj7|M7|7M|Δ)/i.test(q))                   quality = "maj7";
   else if (/^(m7|min7|-7)/i.test(q))                     quality = "m7";
   else if (/^(m6|min6|m9|min9|m11|m13)/i.test(q))        { quality = "m7";  approx = true; }
   else if (/^(dim|°)/i.test(q))                          { quality = "min"; approx = true; }
@@ -50,8 +56,10 @@ type ChordShape = {
   barre?: { from: number; to: number; fret: number };
 };
 
+type Family = "E" | "A" | "D";
+
 // Formas "E" (pestana com a 6ª corda como referência da fundamental)
-const E_TEMPLATES: Record<CoreQuality, number[]> = {
+const E_TEMPLATES: Record<TriadQuality, number[]> = {
   maj:  [0, 2, 2, 1, 0, 0],
   min:  [0, 2, 2, 0, 0, 0],
   "7":  [0, 2, 0, 1, 0, 0],
@@ -60,12 +68,22 @@ const E_TEMPLATES: Record<CoreQuality, number[]> = {
 };
 
 // Formas "A" (pestana com a 5ª corda como referência da fundamental, 6ª corda presa)
-const A_TEMPLATES: Record<CoreQuality, number[]> = {
+const A_TEMPLATES: Record<TriadQuality, number[]> = {
   maj:  [-1, 0, 2, 2, 2, 0],
   min:  [-1, 0, 2, 2, 1, 0],
   "7":  [-1, 0, 2, 0, 2, 0],
   maj7: [-1, 0, 2, 1, 2, 0],
   m7:   [-1, 0, 2, 0, 1, 0],
+};
+
+// Power chords (X5): fundamental + quinta + oitava, sem terça e sem pestana.
+// Uma forma por corda de fundamental — 6ª (E), 5ª (A) e 4ª (D). O intervalo
+// entre a 3ª e a 2ª corda é de terça maior, por isso a oitava da forma "D"
+// cai em +3 e não em +2.
+const POWER_TEMPLATES: Record<Family, number[]> = {
+  E: [0, 2, 2, -1, -1, -1],   // ex.: E5 = 0 2 2 x x x
+  A: [-1, 0, 2, 2, -1, -1],   // ex.: A5 = x 0 2 2 x x
+  D: [-1, -1, 0, 2, 3, -1],   // ex.: D5 = x x 0 2 3 x
 };
 
 // Formas abertas "famosas" — sobrepõem a forma algorítmica quando existem
@@ -84,15 +102,24 @@ const OPEN_OVERRIDES: Record<string, ChordShape> = {
   "Gmaj7": { baseFret: 1, frets: [3, 2, 0, 0, 0, 2] },
 };
 
-function buildFromTemplate(root: string, quality: CoreQuality, family: "E" | "A"): ChordShape {
-  const template = family === "E" ? E_TEMPLATES[quality] : A_TEMPLATES[quality];
+function templateFor(quality: CoreQuality, family: Family): number[] | null {
+  if (quality === "5") return POWER_TEMPLATES[family];
+  if (family === "E") return E_TEMPLATES[quality];
+  if (family === "A") return A_TEMPLATES[quality];
+  return null; // família "D" só existe para power chord
+}
+
+function buildFromTemplate(root: string, quality: CoreQuality, family: Family): ChordShape | null {
+  const template = templateFor(quality, family);
+  if (!template) return null;
   const offset = (SEMITONE[root] - SEMITONE[family] + 12) % 12;
 
   const absFrets = template.map(t => (t === -1 ? -1 : t === 0 ? offset : offset + t));
   const baseFret = offset <= 1 ? 1 : offset;
   const frets = absFrets.map(f => (f === -1 ? -1 : f === 0 ? 0 : f - baseFret + 1));
 
-  const barre = offset >= 1
+  // Power chord não leva pestana: são só dois ou três dedos.
+  const barre = quality !== "5" && offset >= 1
     ? (family === "E" ? { from: 0, to: 5, fret: 1 } : { from: 1, to: 5, fret: 1 })
     : undefined;
 
@@ -112,7 +139,10 @@ function getChordVariations(symbol: string): { shapes: ChordShape[]; approx: boo
   const overrideKey = root + QUALITY_SUFFIX[quality];
   if (OPEN_OVERRIDES[overrideKey]) shapes.push(OPEN_OVERRIDES[overrideKey]);
 
-  const candidates = [buildFromTemplate(root, quality, "E"), buildFromTemplate(root, quality, "A")]
+  const families: Family[] = quality === "5" ? ["E", "A", "D"] : ["E", "A"];
+  const candidates = families
+    .map(f => buildFromTemplate(root, quality, f))
+    .filter((s): s is ChordShape => s !== null)
     .sort((a, b) => a.baseFret - b.baseFret);
 
   for (const s of candidates) {
