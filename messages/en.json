@@ -713,7 +713,6 @@
     "sortRecent": "Recent",
     "sortTitle": "Title",
     "sortArtist": "Artist",
-    "sortBpm": "BPM",
     "allGenres": "All",
     "showing": "{shown} of {total} tracks",
     "noResults": "No tracks match these filters.",

@@ -35,7 +35,7 @@ function fold(s: string) {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
-type SortKey = "recent" | "title" | "artist" | "bpm";
+type SortKey = "recent" | "title" | "artist";
 
 const controlSelect: React.CSSProperties = {
   background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 8,
@@ -120,7 +120,6 @@ export default function PerfilContent() {
         case "title":  return a.title.localeCompare(b.title, "pt-BR");
         case "artist": return a.artist.localeCompare(b.artist, "pt-BR")
           || a.title.localeCompare(b.title, "pt-BR");
-        case "bpm":    return (b.bpm ?? 0) - (a.bpm ?? 0);
         default:       return +new Date(b.createdAt) - +new Date(a.createdAt);
       }
     });
@@ -270,7 +269,6 @@ export default function PerfilContent() {
                   <option value="recent">{t("sortRecent")}</option>
                   <option value="title">{t("sortTitle")}</option>
                   <option value="artist">{t("sortArtist")}</option>
-                  <option value="bpm">{t("sortBpm")}</option>
                 </select>
               </label>
 
