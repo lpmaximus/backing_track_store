@@ -75,7 +75,7 @@ export default async function SiteHeader() {
           <UserMenu user={{ name: user.name ?? null, email: user.email ?? "", image: user.image ?? null, role: user.role }} />
         ) : (
           <div className="auth-buttons" style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <Link href="/entrar" style={{
+            <Link href="/entrar" className="auth-signin" style={{
               padding: "10px 22px", fontSize: 13, fontWeight: 600, borderRadius: 8,
               border: "1px solid var(--border2)", color: "var(--text)", background: "var(--surface)",
             }}>
@@ -93,7 +93,9 @@ export default async function SiteHeader() {
 
         {/* Hamburguer — só visível abaixo de 880px */}
         <MobileNav
-          nav={nav}
+          // Visitante sem conta: "Entrar" também no menu, porque abaixo de
+          // 400px o botão some do cabeçalho (ver .auth-signin em globals.css).
+          nav={user ? nav : [...nav, { label: t("signIn"), href: "/entrar" }]}
           labels={{ open: t("openMenu"), close: t("closeMenu") }}
         />
       </div>

@@ -2,12 +2,13 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { db, users } from "@/src/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { authConfig } from "./auth.config";
 import { expireTrialIfDue } from "@/src/lib/trials";
 import { track } from "@/src/lib/activity";
 import { isInternalTestEmail } from "@/src/lib/internalTest";
+import { verifyMagicToken } from "@/src/lib/authTokens";
 
 // Conta impedida de logar: suspensa, banida ou em processo de exclusão (R3).
 function isLoginBlocked(u: { status?: string | null; deletionScheduledAt?: Date | null }): boolean {
@@ -40,6 +41,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!valid) return null;
         // Conta suspensa/banida ou marcada para exclusão não loga (R3).
         if (isLoginBlocked(user)) return null;
+        return { id: String(user.id), email: user.email, name: user.name, role: user.role };
+      },
+    }),
+    // Link de acesso por e-mail (sem senha). O token é assinado e vence em
+    // 20 min (src/lib/authTokens.ts). Primeiro acesso cria a conta Free — é a
+    // porta para quem chega pelo navegador do Instagram/TikTok, onde o Google
+    // bloqueia o login.
+    Credentials({
+      id: "magic-link",
+      name: "Link por e-mail",
+      credentials: { token: { label: "Token", type: "text" } },
+      async authorize(credentials) {
+        const email = verifyMagicToken(String(credentials?.token ?? ""));
+        if (!email) return null;
+        let [user] = await db.select().from(users).where(sql`lower(${users.email}) = ${email}`).limit(1);
+        if (!user) {
+          [user] = await db.insert(users).values({
+            email,
+            name: email.split("@")[0],
+            provider: "email",
+            role: "free",
+          }).returning();
+        }
+        if (!user || isLoginBlocked(user)) return null;
         return { id: String(user.id), email: user.email, name: user.name, role: user.role };
       },
     }),

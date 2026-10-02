@@ -1271,7 +1271,7 @@ export default function WavePlayer({
           /* ─── Modo multitrack (Moises) ─── */
           <>
             {/* Barra de transporte */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, rowGap: 10, flexWrap: "wrap", padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
               {skipBtn(-10, "«", tx("skipBack"))}
               {PlayButton}
               {skipBtn(10, "»", tx("skipForward"))}
@@ -1320,7 +1320,7 @@ export default function WavePlayer({
                   <div key={t.key} style={{ minWidth: "fit-content" }}>
                   <div className="mixer-track-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 16px", borderBottom: cortes.length || selDaFaixa ? "none" : "1px solid var(--border)" }}>
                     {/* M / S — travado (bloqueado) mostra cadeado no lugar dos botões */}
-                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    <div className="mixer-ms" style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                       {locked ? (
                         <div title={tx("proOnlyChannel")} aria-label={tx("lockedAria", { label: t.label })}
                           style={{ width: 56, height: 26, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center",
@@ -1343,7 +1343,7 @@ export default function WavePlayer({
                       )}
                     </div>
                     {/* ícone + nome */}
-                    <div style={{ width: 118, display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+                    <div className="mixer-name" style={{ width: 118, display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
                       <span style={{ fontSize: 17, opacity: on ? 1 : 0.4 }}>{iconFor(t.instrument)}</span>
                       <span style={{ fontSize: 13, fontWeight: 600, color: on ? "var(--text)" : "var(--muted2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</span>
                     </div>
@@ -1360,6 +1360,7 @@ export default function WavePlayer({
                     )}
                     {/* onda — clique dá seek; arrasto (com corte liberado) marca o trecho */}
                     <div
+                      className="mixer-wave"
                       style={{ flex: 1, minWidth: 0, cursor: "pointer", position: "relative", touchAction: canCut ? "pan-y" : undefined }}
                       onClick={canCut ? undefined : onWaveClick}
                       onPointerDown={canCut ? (ev) => onWavePointerDown(ev, t.key) : undefined}
@@ -1493,7 +1494,7 @@ export default function WavePlayer({
               {/* Playhead alinhado ao início real da coluna de ondas:
                   pad 16 + M/S 56 + gap 10 + nome 118 + gap 10 + vol 64 + gap 10 = 284px;
                   o percurso vai de 284px até (100% - 16px de pad direito). */}
-              <div style={{ position: "absolute", top: 0, bottom: 0, left: `calc(284px + (100% - 300px) * ${pct} / 100)`, width: 2, background: "var(--accent)", pointerEvents: "none", opacity: ready ? 1 : 0 }} />
+              <div style={{ position: "absolute", top: 0, bottom: 0, left: `calc(var(--ph-off, 284px) + (100% - var(--ph-sub, 300px)) * ${pct} / 100)`, width: 2, background: "var(--accent)", pointerEvents: "none", opacity: ready ? 1 : 0 }} />
             </div>
 
             {/* Como cortar — a única pista de que arrastar na onda faz algo. */}

@@ -20,6 +20,7 @@ import SongPlayer from "./SongPlayer";
 import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
 import { alternatesFor } from "@/src/lib/seo";
+import { localizeSongTitle } from "@/src/lib/catalogTitles";
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +40,9 @@ export async function generateMetadata({
   return {
     // Sem "| BackingTrack.store" aqui: o template do layout já acrescenta
     // "· BackingTrack.store" e o título saía com a marca duplicada.
-    title: song.title,
+    title: localizeSongTitle(song.title, locale),
     description: t("metaDescription", {
-      title: song.title,
+      title: localizeSongTitle(song.title, locale),
       artist: song.artist,
       key: song.key,
       bpm: song.bpm,
@@ -54,10 +55,10 @@ export default async function SongPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string; locale: Locale }>;
   searchParams: Promise<{ solo?: string; loop?: string; sl?: string }>;
 }) {
-  const { slug } = await params;
+  const { slug, locale } = await params;
   const { solo, loop, sl } = await searchParams;
   const [song] = await db.select().from(songsTable).where(eq(songsTable.slug, slug)).limit(1);
   if (!song) notFound();
@@ -168,7 +169,9 @@ export default async function SongPage({
 
   return (
     <SongPlayer
-      song={song}
+      // Só a exibição muda no /en (título do catálogo traduzido); o título
+      // salvo no banco continua o mesmo.
+      song={{ ...song, title: localizeSongTitle(song.title, locale) }}
       stems={stems}
       isPro={isPro}
       soloInstrument={soloInstrument}

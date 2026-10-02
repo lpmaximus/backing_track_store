@@ -90,6 +90,9 @@ export default auth((req: NextRequest & { auth: Session | null }) => {
   if (isProtected && !req.auth) {
     const loginUrl = new URL(getPathname({ href: "/entrar", locale }), req.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
+    // Quem tenta enviar música sem conta quase sempre é visitante novo:
+    // abre direto na aba de cadastro (a tela mostra o contexto do upload).
+    if (bare === "/upload") loginUrl.searchParams.set("tab", "cadastro");
     return NextResponse.redirect(loginUrl);
   }
 

@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "BackingTrack.store — Backing tracks with synced chords",
-    "description": "Professional backing tracks with real-time synced chord charts and AI stem separation, for hobby and working musicians."
+    "title": "BackingTrack.store — Turn any song into your backing band",
+    "description": "Upload a song and get drums, bass, guitar, keys and vocals on separate tracks, with synced chords. Plus a free catalog of backing tracks to play along."
   },
   "common": {
     "loading": "Loading…",
@@ -74,12 +74,12 @@
     "notice": "We're in testing — <b>plans aren't on sale yet</b>. Explore freely while we build the platform with you."
   },
   "home": {
-    "heroTitle": "Play with the band",
-    "heroTitleAccent": "you always wanted.",
-    "heroSubtitle": "Professional backing tracks with synced chord charts. Mute your instrument, dial in the mix and play along — right in your browser.",
-    "ctaExplore": "Browse songs",
+    "heroTitle": "Any song.",
+    "heroTitleAccent": "Your backing band.",
+    "heroSubtitle": "Upload a song and we split it into drums, bass, guitar, keys and vocals — with synced chords. Mute your part and play along, right in your browser.",
+    "ctaExplore": "Browse the backing-track catalog",
     "ctaDemo": "▶ Watch the demo",
-    "heroNote": "Free to start · full catalog during beta · no credit card",
+    "heroNote": "Free: 3 of your songs split per month · catalog included · no credit card",
     "strip": "BACKING TRACKS • STEMS • LOOPS • PRACTICE",
     "featuresKicker": "FEATURES",
     "featuresTitle": "Tools built for the way you play",
@@ -121,7 +121,9 @@
       "a5": "Create the band, invite the members and each one picks the instrument they play. When you open the same song, each person hears everything but their own instrument — and rehearsal and show setlists are shared across the group.",
       "q6": "How much does it cost?",
       "a6": "We're in beta and not selling plans yet: the catalog is free to explore, no credit card. The prices above are our launch estimate and may still change."
-    }
+    },
+    "ctaUpload": "Upload a song",
+    "ctaTry": "Try the mixer — no account"
   },
   "plans": {
     "free": "FREE",
@@ -134,7 +136,7 @@
     "start": "Get started",
     "soon": "Coming soon",
     "soonTitle": "Coming soon — plans aren't on sale during the beta",
-    "freeFeature1": "3 songs per month",
+    "freeFeature1": "3 of your songs split per month",
     "freeFeature2": "Player with stems",
     "freeFeature3": "Synced chord charts",
     "proFeature1": "20 songs per month",
@@ -166,8 +168,8 @@
     "alreadyPro": "✓ You're already Pro",
     "notAvailable": "Coming soon — subscriptions not available yet",
     "freeFeatures": [
-      "3 songs per month",
-      "Full catalog",
+      "3 of your songs split per month",
+      "Unlimited backing-track catalog",
       "Player with stems (mute and solo per instrument)",
       "Synced chords and lyrics",
       "Basic speed control",
@@ -248,7 +250,7 @@
   "catalog": {
     "title": "Catalog",
     "subtitle": "Backing tracks with synced chord charts, ready to play.",
-    "searchPlaceholder": "Search song or artist...",
+    "searchPlaceholder": "Search by style (rock, blues, jazz…)",
     "allGenres": "All",
     "empty": "No songs found.",
     "emptyHint": "Try another term or clear the filters.",
@@ -259,7 +261,10 @@
     "resultsFor": "Results for \"{q}\"",
     "trending": "🔥 Trending now",
     "seeAll": "See all →",
-    "hasTrack": "▶ Track"
+    "hasTrack": "▶ Track",
+    "emptyUploadTitle": "We don't have that one in the catalog.",
+    "emptyUploadText": "Upload the audio and we split it into separate instruments, with synced chords, in a few minutes.",
+    "emptyUploadCta": "Split this song"
   },
   "signIn": {
     "title": "Sign in",
@@ -274,7 +279,31 @@
     "withGoogle": "Continue with Google",
     "or": "or",
     "invalidCredentials": "Invalid email or password.",
-    "blocked": "This account is blocked. Please contact support."
+    "blocked": "This account is blocked. Please contact support.",
+    "forgot": "Forgot your password?",
+    "forgotTitle": "Reset password",
+    "forgotHint": "Enter your account email and we'll send you a link to set a new password.",
+    "sendResetLink": "Send link",
+    "resetSent": "If there's an account with this email, the link is on its way. Check your inbox and spam folder.",
+    "resetTitle": "Set a new password",
+    "newPassword": "New password (min. 8 characters)",
+    "saveNewPassword": "Save and sign in",
+    "resetInvalid": "This link has expired or was already used. Request a new one.",
+    "magicLink": "Email me a sign-in link",
+    "magicTitle": "Sign in with a link",
+    "magicHint": "No password needed. We'll email you a link — if you don't have an account yet, a Free one is created.",
+    "sendMagic": "Send sign-in link",
+    "magicSent": "Done! Open the email we just sent to {email} and tap the link. It's valid for 20 minutes.",
+    "magicInvalid": "This sign-in link has expired. Request a new one.",
+    "signingIn": "Signing you in…",
+    "backToSignIn": "Back to sign in",
+    "inAppTitle": "Google sign-in doesn't work inside this app",
+    "inAppText": "You're in {app}'s built-in browser, and Google blocks sign-in here. Open this page in Safari or Chrome, or use your email below.",
+    "copyLink": "Copy page link",
+    "linkCopied": "Link copied — paste it in Safari or Chrome",
+    "openInChrome": "Open in Chrome",
+    "uploadContext": "Create a free account to split your song — 3 songs a month on the Free plan.",
+    "mailUnavailable": "Email sending is temporarily unavailable. Try Google or email and password."
   },
   "upload": {
     "title": "Upload a track",

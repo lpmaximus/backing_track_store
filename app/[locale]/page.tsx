@@ -10,6 +10,7 @@ import HeroCarousel from "@/app/components/HeroCarousel";
 import FaqSection, { type FaqItem } from "@/app/components/FaqSection";
 import FreePromoBanner from "@/app/components/FreePromoBanner";
 import BlurredPrice from "@/app/components/BlurredPrice";
+import TrackedLink from "@/app/components/TrackedLink";
 
 // Título e descrição vêm do layout (são os da marca). Aqui só o canonical:
 // sem isto a home ficaria sem canonical depois de removermos o do layout.
@@ -98,7 +99,7 @@ export default async function HomePage({
       {/* BETA BANNER */}
       <div style={{ background: "var(--text)", borderBottom: "1px solid var(--border)" }}>
         <div style={{
-          maxWidth: 1200, margin: "0 auto", padding: "10px 24px",
+          maxWidth: 1200, margin: "0 auto", padding: "8px 16px",
           display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
           flexWrap: "wrap", textAlign: "center",
         }}>
@@ -108,14 +109,12 @@ export default async function HomePage({
           }}>
             {tb("badge")}
           </span>
-          <p style={{ color: "#fff", fontSize: 13, margin: 0, lineHeight: 1.5 }}>
+          <p className="beta-notice" style={{ color: "#fff", fontSize: 13, margin: 0, lineHeight: 1.5 }}>
             {tb.rich("notice", { b: (chunks) => <strong>{chunks}</strong> })}
           </p>
         </div>
       </div>
 
-      {/* PROMO DO PLANO FREE — só aparece para visitante deslogado */}
-      <FreePromoBanner />
 
       <main style={{ minHeight: "100vh", background: "var(--bg)" }}>
 
@@ -131,11 +130,26 @@ export default async function HomePage({
               {t("heroSubtitle")}
             </p>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center" }}>
-              <Link href="/catalogo" className="btn-primary" style={{ fontSize: 15, padding: "16px 34px" }}>
+              {/* Out/2026: o CTA principal era "Explorar músicas" (catálogo) e o
+                  visitante fazia exatamente isso — quase ninguém chegava na
+                  separação, que é o produto. Agora o principal é enviar uma
+                  música; o secundário abre o mixer de uma base do catálogo,
+                  que toca sem conta, para a pessoa sentir o produto antes do
+                  cadastro. Visitante sem conta que clica em "Enviar" cai na aba
+                  de cadastro (proxy.ts). */}
+              <TrackedLink href="/upload" className="btn-primary" event="upload_cta_click" eventParams={{ from: "home_hero" }}
+                style={{ fontSize: 15, padding: "16px 34px" }}>
+                {t("ctaUpload")}
+              </TrackedLink>
+              <TrackedLink href={{ pathname: "/song/[slug]", params: { slug: "classic-rock-a-120" } }} className="btn-ghost"
+                event="demo_mixer_open" eventParams={{ from: "home_hero" }}
+                style={{ fontSize: 15, padding: "16px 34px" }}>
+                {t("ctaTry")}
+              </TrackedLink>
+            </div>
+            <div style={{ marginTop: 18 }}>
+              <Link href="/catalogo" style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", textDecoration: "underline", textUnderlineOffset: 3 }}>
                 {t("ctaExplore")}
-              </Link>
-              <Link href="/como-funciona" className="btn-ghost" style={{ fontSize: 15, padding: "16px 34px" }}>
-                {t("ctaDemo")}
               </Link>
             </div>
             <div style={{ fontSize: 12, color: "var(--muted2)", marginTop: 16 }}>
@@ -148,6 +162,11 @@ export default async function HomePage({
             {/* Carrossel de destaques */}
             <HeroCarousel />
           </section>
+
+        {/* PROMO DO PLANO FREE — só para visitante deslogado. Saiu do topo:
+            no celular ele + o aviso de beta ocupavam a primeira tela inteira
+            e a proposta do produto só aparecia depois de rolar. */}
+        <FreePromoBanner />
 
         {/* VÍDEO EM LOOP — seção escura (padrão layout-6) */}
         <section className="videosec">

@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "BackingTrack.store — Cifras e bases para músicos",
-    "description": "Bases musicais profissionais com cifra sincronizada e separação de instrumentos por IA, para músicos amadores e profissionais."
+    "title": "BackingTrack.store — Qualquer música vira sua banda de apoio",
+    "description": "Envie uma música e receba bateria, baixo, guitarra, teclado e voz em faixas separadas, com cifra sincronizada. E um catálogo grátis de bases para tocar junto."
   },
   "common": {
     "loading": "Carregando…",
@@ -74,12 +74,12 @@
     "notice": "Estamos em fase de testes — <b>ainda não vendemos planos</b>. Explore o site livremente enquanto evoluímos a plataforma com você."
   },
   "home": {
-    "heroTitle": "Toque com a banda",
-    "heroTitleAccent": "que você sempre quis.",
-    "heroSubtitle": "Backing tracks profissionais com cifra sincronizada. Silencie o seu instrumento, ajuste a mix e toque junto — direto no navegador.",
-    "ctaExplore": "Explorar músicas",
+    "heroTitle": "Qualquer música.",
+    "heroTitleAccent": "Sua banda de apoio.",
+    "heroSubtitle": "Envie uma música e separamos bateria, baixo, guitarra, teclado e voz — com a cifra sincronizada. Tire o seu instrumento e toque junto, direto no navegador.",
+    "ctaExplore": "Ver o catálogo de bases",
     "ctaDemo": "▶ Ver demonstração",
-    "heroNote": "Grátis para começar · catálogo livre no beta · sem cartão de crédito",
+    "heroNote": "Grátis: 3 músicas suas separadas por mês · catálogo incluso · sem cartão de crédito",
     "strip": "BACKING TRACKS • STEMS • LOOPS • PRACTICE",
     "featuresKicker": "RECURSOS",
     "featuresTitle": "Ferramentas feitas para a sua música",
@@ -121,7 +121,9 @@
       "a5": "Você cria a banda, convida os integrantes e cada um marca o instrumento que toca. Ao abrir a mesma música, cada pessoa ouve tudo menos o próprio instrumento — e as setlists de ensaio e de show ficam compartilhadas entre todos.",
       "q6": "Quanto custa?",
       "a6": "Estamos em beta e ainda não vendemos planos: o catálogo está livre para explorar, sem cartão de crédito. Os valores acima são a nossa previsão para o lançamento e ainda podem mudar."
-    }
+    },
+    "ctaUpload": "Enviar uma música",
+    "ctaTry": "Testar o mixer — sem conta"
   },
   "plans": {
     "free": "FREE",
@@ -134,7 +136,7 @@
     "start": "Começar",
     "soon": "Em breve",
     "soonTitle": "Em breve — ainda não vendemos planos durante o beta",
-    "freeFeature1": "3 músicas por mês",
+    "freeFeature1": "3 músicas suas separadas por mês",
     "freeFeature2": "Player com stems",
     "freeFeature3": "Cifra sincronizada",
     "proFeature1": "20 músicas por mês",
@@ -166,8 +168,8 @@
     "alreadyPro": "✓ Você já é Pro",
     "notAvailable": "Em breve — assinaturas ainda não disponíveis",
     "freeFeatures": [
-      "3 músicas por mês",
-      "Catálogo completo",
+      "3 músicas suas separadas por mês",
+      "Catálogo de bases ilimitado",
       "Player com stems (mute e solo por instrumento)",
       "Cifra e letra sincronizadas",
       "Controle de velocidade básico",
@@ -248,7 +250,7 @@
   "catalog": {
     "title": "Catálogo",
     "subtitle": "Backing tracks com cifra sincronizada, prontos para tocar.",
-    "searchPlaceholder": "Buscar música ou artista...",
+    "searchPlaceholder": "Buscar por estilo (rock, blues, sertanejo…)",
     "allGenres": "Todos",
     "empty": "Nenhuma música encontrada.",
     "emptyHint": "Tente outro termo ou remova os filtros.",
@@ -259,7 +261,10 @@
     "resultsFor": "Resultados para \"{q}\"",
     "trending": "🔥 Em alta agora",
     "seeAll": "Ver todas →",
-    "hasTrack": "▶ Base"
+    "hasTrack": "▶ Base",
+    "emptyUploadTitle": "Essa música não está no catálogo.",
+    "emptyUploadText": "Envie o áudio e separamos os instrumentos, com a cifra sincronizada, em poucos minutos.",
+    "emptyUploadCta": "Separar essa música"
   },
   "signIn": {
     "title": "Entrar",
@@ -274,7 +279,31 @@
     "withGoogle": "Continuar com Google",
     "or": "ou",
     "invalidCredentials": "E-mail ou senha inválidos.",
-    "blocked": "Esta conta está bloqueada. Fale com o suporte."
+    "blocked": "Esta conta está bloqueada. Fale com o suporte.",
+    "forgot": "Esqueci minha senha",
+    "forgotTitle": "Redefinir senha",
+    "forgotHint": "Informe o e-mail da conta e enviaremos um link para criar uma senha nova.",
+    "sendResetLink": "Enviar link",
+    "resetSent": "Se houver uma conta com este e-mail, o link está a caminho. Confira a caixa de entrada e o spam.",
+    "resetTitle": "Criar nova senha",
+    "newPassword": "Nova senha (mín. 8 caracteres)",
+    "saveNewPassword": "Salvar e entrar",
+    "resetInvalid": "Este link venceu ou já foi usado. Peça um novo.",
+    "magicLink": "Receber link de acesso por e-mail",
+    "magicTitle": "Entrar com link",
+    "magicHint": "Sem senha. Enviamos um link para o seu e-mail — se você ainda não tem conta, criamos uma no plano Free.",
+    "sendMagic": "Enviar link de acesso",
+    "magicSent": "Pronto! Abra o e-mail que enviamos para {email} e toque no link. Ele vale por 20 minutos.",
+    "magicInvalid": "Este link de acesso venceu. Peça um novo.",
+    "signingIn": "Entrando…",
+    "backToSignIn": "Voltar para entrar",
+    "inAppTitle": "O login com Google não funciona dentro deste app",
+    "inAppText": "Você está no navegador interno do {app}, e o Google bloqueia o login aqui. Abra esta página no Safari ou no Chrome, ou use o seu e-mail abaixo.",
+    "copyLink": "Copiar link da página",
+    "linkCopied": "Link copiado — cole no Safari ou no Chrome",
+    "openInChrome": "Abrir no Chrome",
+    "uploadContext": "Crie sua conta grátis para separar a sua música — 3 músicas por mês no plano Free.",
+    "mailUnavailable": "O envio de e-mail está indisponível no momento. Use o Google ou e-mail e senha."
   },
   "upload": {
     "title": "Enviar faixa",

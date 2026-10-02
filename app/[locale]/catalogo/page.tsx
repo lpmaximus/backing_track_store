@@ -3,7 +3,8 @@ import { getTranslations } from "next-intl/server";
 import type { Locale } from "@/src/i18n/routing";
 import { alternatesFor } from "@/src/lib/seo";
 import { db, songs as songsTable } from "@/src/db";
-import { eq, ilike, or, and } from "drizzle-orm";
+import { eq, ilike, or, and, inArray } from "drizzle-orm";
+import { ptTitlesMatchingEn } from "@/src/lib/catalogTitles";
 import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
 import CatalogSection from "@/app/components/CatalogSection";
@@ -24,10 +25,13 @@ export async function generateMetadata({
 
 /** Rota dedicada do catálogo (BUY-002: antes vivia embutido na landing page). */
 export default async function CatalogoPage({
+  params: routeParams,
   searchParams,
 }: {
+  params: Promise<{ locale: Locale }>;
   searchParams?: Promise<{ q?: string; genre?: string }>;
 }) {
+  const { locale } = await routeParams;
   const params = await searchParams;
   const q     = params?.q     ?? "";
   const genre = params?.genre ?? "Todos";
@@ -35,7 +39,14 @@ export default async function CatalogoPage({
   const conditions = [eq(songsTable.published, true)];
   if (genre && genre !== "Todos") conditions.push(eq(songsTable.genre, genre));
   if (q) {
-    const cond = or(ilike(songsTable.title, `%${q}%`), ilike(songsTable.artist, `%${q}%`));
+    // No /en os títulos aparecem traduzidos (src/lib/catalogTitles.ts), então
+    // a busca também precisa achar pelo nome em inglês ("ballad" → "Balada…").
+    const enMatches = locale === "en" ? ptTitlesMatchingEn(q) : [];
+    const cond = or(
+      ilike(songsTable.title, `%${q}%`),
+      ilike(songsTable.artist, `%${q}%`),
+      ...(enMatches.length ? [inArray(songsTable.title, enMatches)] : []),
+    );
     if (cond) conditions.push(cond);
   }
 

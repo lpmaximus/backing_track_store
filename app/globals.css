@@ -224,8 +224,13 @@ input[type="range"]::-webkit-slider-thumb:hover {
   .mobile-nav-toggle { display: flex !important; }
 }
 @media (max-width: 480px) {
-  .auth-buttons a { padding: 8px 12px !important; font-size: 12px !important; }
+  .auth-buttons a { padding: 8px 12px !important; font-size: 12px !important; white-space: nowrap; }
   .auth-buttons { gap: 6px !important; }
+}
+/* Abaixo de 400px os dois botões quebravam em duas linhas ("Sign / in"):
+   fica só "Começar grátis"; o Entrar continua no menu (MobileNav). */
+@media (max-width: 400px) {
+  .auth-signin { display: none !important; }
 }
 
 /* Cifra + sidebar do player — empilha em telas estreitas (tablet/celular) */
@@ -234,10 +239,29 @@ input[type="range"]::-webkit-slider-thumb:hover {
   .player-sidebar { width: 100% !important; }
 }
 
-/* Mixer multitrack — rolagem horizontal em vez de espremer os controles */
+/* Mixer multitrack no celular (out/2026).
+   Antes: cada linha tinha 480px de mínimo dentro de ~325px visíveis, e a mesa
+   rolava de lado — o volume ficava fora da tela. Agora a linha quebra em duas:
+   controles (M/S + nome + volume) em cima, onda na largura toda embaixo. O
+   playhead acompanha via --ph-off/--ph-sub (ver WavePlayer: início da coluna
+   de ondas = 16px de padding, largura = 100% - 32px). */
 @media (max-width: 640px) {
-  .mixer-tracks { overflow-x: auto; }
-  .mixer-track-row { min-width: 480px; }
+  .mixer-tracks { --ph-off: 16px; --ph-sub: 32px; }
+  .mixer-track-row { flex-wrap: wrap; row-gap: 6px !important; }
+  .mixer-name { flex: 1 1 auto !important; width: auto !important; min-width: 0; }
+  .mixer-wave { flex: 1 1 100% !important; }
+}
+/* M/S com área de toque de 40px no celular (eram 26px; o mínimo recomendado
+   é 44px no iOS e 48dp no Android — 40px + o gap entre eles fica perto). */
+@media (max-width: 640px), (pointer: coarse) {
+  .mixer-ms button { width: 40px !important; height: 40px !important; font-size: 13px !important; }
+  .mixer-ms > div { height: 40px !important; width: 84px !important; }
+}
+
+/* Tela de entrar — menos padding lateral no celular */
+@media (max-width: 480px) {
+  .signin-card { padding: 28px 20px !important; }
+  .beta-notice { font-size: 12px !important; }
 }
 
 /* Página /planos — 4 cards (Free/Pro/Band/Studio). Quatro colunas só cabem no

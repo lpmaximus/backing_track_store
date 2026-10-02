@@ -1,8 +1,10 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/src/i18n/navigation";
 import Image from "next/image";
 import type { songs as songsTable } from "@/src/db";
 import AdBanner from "./AdBanner";
+import TrackedLink, { GaOnMount } from "./TrackedLink";
+import { localizeSongTitle } from "@/src/lib/catalogTitles";
 
 // Emoji por gênero — cobre os valores de `Família` usados na carga em lote
 // (ver 3-SUNO/Levantamento-BackingTracks-Suno.xlsx) e os nomes legados do
@@ -32,6 +34,7 @@ export default async function CatalogSection({
   songs, q, genre, availableGenres,
 }: { songs: SongRow[]; q: string; genre: string; availableGenres: string[] }) {
   const t = await getTranslations("catalog");
+  const locale = await getLocale();
 
   // "Todos" sempre aparece primeiro; os demais, na ordem em que vieram do
   // banco (já ordenados alfabeticamente pelo caller).
@@ -55,7 +58,8 @@ export default async function CatalogSection({
           <span style={{ color: "var(--muted)", fontSize: 16 }}>🔍</span>
           <input
             name="q" defaultValue={q} placeholder={t("searchPlaceholder")}
-            style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 14, padding: "12px 0" }}
+            type="search" enterKeyHint="search"
+            style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 16, padding: "12px 0" }}
           />
           {q && <Link href="/catalogo" style={{ color: "var(--muted)", fontSize: 13 }}>✕</Link>}
         </div>
@@ -92,10 +96,31 @@ export default async function CatalogSection({
 
       {/* Song grid */}
       {songs.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "80px 0", color: "var(--muted)" }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-          <p style={{ fontSize: 16, marginBottom: 12 }}>{t("empty")}</p>
-          <Link href="/catalogo" style={{ color: "var(--accent)", fontWeight: 600 }}>{t("seeAll")}</Link>
+        // Busca sem resultado era o ponto exato de saída: o visitante procurava
+        // uma música de verdade ("Wonderwall"), o catálogo é de bases por
+        // estilo, e a tela só dizia "nenhuma música". Agora oferece a separação
+        // — que é justamente o que resolve o pedido dele.
+        <div style={{ textAlign: "center", padding: "56px 16px", color: "var(--muted)", maxWidth: 520, margin: "0 auto" }}>
+          {q && <GaOnMount event="search_no_results" eventParams={{ search_term: q }} />}
+          <div style={{ fontSize: 44, marginBottom: 14 }}>🎛️</div>
+          {q ? (
+            <>
+              <p style={{ fontSize: 18, fontWeight: 800, color: "var(--text)", margin: "0 0 8px" }}>{t("emptyUploadTitle")}</p>
+              <p style={{ fontSize: 15, lineHeight: 1.6, margin: "0 0 22px" }}>{t("emptyUploadText")}</p>
+              <TrackedLink href="/upload" className="btn-primary" event="upload_cta_click" eventParams={{ from: "catalog_empty", search_term: q }}
+                style={{ fontSize: 15, padding: "14px 28px", display: "inline-flex" }}>
+                {t("emptyUploadCta")}
+              </TrackedLink>
+              <div style={{ marginTop: 18 }}>
+                <Link href="/catalogo" style={{ color: "var(--accent)", fontWeight: 600 }}>{t("seeAll")}</Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: 16, marginBottom: 12 }}>{t("empty")}</p>
+              <Link href="/catalogo" style={{ color: "var(--accent)", fontWeight: 600 }}>{t("seeAll")}</Link>
+            </>
+          )}
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
@@ -109,7 +134,7 @@ export default async function CatalogSection({
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {song.title}
+                  {localizeSongTitle(song.title, locale)}
                 </div>
                 <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {song.artist}
