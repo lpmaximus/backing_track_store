@@ -18,6 +18,7 @@
 import type { LyricsProvider, LyricsSubmitResult, LyricsPollResult, LyricsLine, LyricsWord } from "./types";
 import { sanitizeLyrics } from "./sanitize";
 
+import { replicateCreatePrediction } from "../replicateSubmit";
 const API = "https://api.replicate.com/v1/predictions";
 
 /** Extrai palavras [{text,start,end}] de um segmento do WhisperX. */
@@ -73,7 +74,7 @@ export class WhisperXProvider implements LyricsProvider {
     return Boolean(process.env.REPLICATE_API_TOKEN && process.env.REPLICATE_WHISPERX_VERSION);
   }
 
-  async submit(vocalUrl: string): Promise<LyricsSubmitResult> {
+  async submit(vocalUrl: string, opts?: { fast?: boolean }): Promise<LyricsSubmitResult> {
     if (!this.isConfigured()) throw new Error("WhisperX (Replicate) não configurado");
     const input: Record<string, unknown> = {
       audio_file: vocalUrl,
@@ -86,19 +87,7 @@ export class WhisperXProvider implements LyricsProvider {
     };
     if (process.env.WHISPER_LANGUAGE) input.language = process.env.WHISPER_LANGUAGE;
 
-    const res = await fetch(API, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ version: process.env.REPLICATE_WHISPERX_VERSION, input }),
-    });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      throw new Error(`WhisperX submit falhou (${res.status}): ${detail}`);
-    }
-    const data = (await res.json()) as { id: string };
+    const data = await replicateCreatePrediction(process.env.REPLICATE_WHISPERX_VERSION as string, input, "WhisperX", opts);
     return { providerJobId: data.id };
   }
 

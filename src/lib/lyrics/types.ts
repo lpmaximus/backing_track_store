@@ -33,7 +33,7 @@ export interface LyricsProvider {
   /** true se as env vars necessárias estão presentes. */
   isConfigured(): boolean;
   /** Cria o job de transcrição sobre a URL do stem de vocal. */
-  submit(vocalUrl: string): Promise<LyricsSubmitResult>;
+  submit(vocalUrl: string, opts?: { fast?: boolean }): Promise<LyricsSubmitResult>;
   /** Consulta o job; devolve running/done(linhas)/failed. */
   poll(providerJobId: string): Promise<LyricsPollResult>;
 }

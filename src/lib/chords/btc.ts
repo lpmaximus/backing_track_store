@@ -23,7 +23,9 @@ import type {
   ChordMeta,
 } from "./types";
 import { toSections, distinctCount, type DetectedChord } from "./sections";
+import { keyFromChords, keyUsesFlats, respell } from "./spelling";
 
+import { replicateCreatePrediction } from "../replicateSubmit";
 const API = "https://api.replicate.com/v1/predictions";
 
 /** Converte um label do BTC ("C:maj", "A:min7", "G:maj/3") p/ cifra ("C", "Am7", "G"). */
@@ -145,23 +147,7 @@ export class BTCChordProvider implements ChordDetectionProvider {
 
   async submit(audioUrl: string): Promise<ChordDetectionSubmitResult> {
     if (!this.isConfigured()) throw new Error("BTC (Replicate) não configurado");
-    const res = await fetch(API, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      // Sem webhook — consultado por polling em /api/chords/advance.
-      body: JSON.stringify({
-        version: process.env.REPLICATE_BTC_VERSION,
-        input: { audio: audioUrl },
-      }),
-    });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      throw new Error(`BTC submit falhou (${res.status}): ${detail}`);
-    }
-    const data = (await res.json()) as { id: string };
+    const data = await replicateCreatePrediction(process.env.REPLICATE_BTC_VERSION as string, { audio: audioUrl }, "BTC");
     return { providerJobId: data.id };
   }
 
@@ -183,20 +169,32 @@ export class BTCChordProvider implements ChordDetectionProvider {
       // dependem de a cifra ter saído. Extrai antes de qualquer return de falha:
       // descartá-los junto com a cifra era o motivo de "Tom ?" e "BPM 0".
       const meta = extractMeta(resolved);
-      const detected = parseBtcChords(resolved);
+      let detected = parseBtcChords(resolved);
+
+      // Tom pela HARMONIA detectada, não pelo chroma do mix (que confundia Cm
+      // com Gm). E grafia na armadura do tom: o BTC só fala sustenido, então
+      // "G# D# A#" em Dó menor vira "Ab Eb Bb". Ver spelling.ts.
+      const chordKey = keyFromChords(detected);
+      if (chordKey) {
+        if (meta) meta.key = chordKey;
+      }
+      const flats = keyUsesFlats(chordKey || meta?.key);
+      if (flats !== null) detected = detected.map((c) => ({ ...c, label: respell(c.label, flats) }));
+      const metaOut = meta ?? (chordKey ? { key: chordKey } : undefined);
+
       const sections = toSections(detected);
 
       if (sections.length === 0) {
-        return { status: "failed", error: "Nenhum acorde detectado", meta };
+        return { status: "failed", error: "Nenhum acorde detectado", meta: metaOut };
       }
       // Guarda de qualidade: uma "cifra" de um acorde só cobrindo a música
       // inteira é ruído do detector, não cifra. Falhar aqui deixa o backfill
       // retentar em vez de publicar lixo como se fosse resultado bom.
       const distinct = distinctCount(detected);
       if (distinct < 2) {
-        return { status: "failed", error: `Cifra pobre demais (${distinct} acorde distinto)`, meta };
+        return { status: "failed", error: `Cifra pobre demais (${distinct} acorde distinto)`, meta: metaOut };
       }
-      return { status: "done", sections, meta };
+      return { status: "done", sections, meta: metaOut };
     } catch (err) {
       return { status: "failed", error: String(err).slice(0, 300) };
     }

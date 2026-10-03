@@ -185,23 +185,13 @@ export async function POST(req: NextRequest) {
       const alreadyHasLyrics = Boolean(song?.lyrics && song.lyrics.length > 0);
       const vocal = persistedStems.find((s) => s.instrument === "vocal");
       if (lyricsProvider.isConfigured() && song && !alreadyHasLyrics && vocal) {
-        const [lyricsJob] = await db
+        // FILA: só registra o job (pending, sem providerJobId). Quem submete é o
+        // /api/lyrics/advance (poll da página) ou o backfill, respeitando o rate
+        // limit do Replicate (6/min, burst 1 com saldo < US$5). Submeter aqui,
+        // 350 ms depois da cifra, era o que tomava 429 e deixava a música sem letra.
+        await db
           .insert(processingJobs)
-          .values({ songId: job.songId, provider: lyricsProvider.name, stage: "lyrics_detection", status: "pending" })
-          .returning();
-        try {
-          const { providerJobId } = await lyricsProvider.submit(vocal.audioUrl);
-          await db
-            .update(processingJobs)
-            .set({ providerJobId, status: "running" })
-            .where(eq(processingJobs.id, lyricsJob.id));
-        } catch (submitErr) {
-          console.error("[webhook/separation] lyrics submit", submitErr);
-          await db
-            .update(processingJobs)
-            .set({ status: "failed", errorMessage: String(submitErr).slice(0, 500) })
-            .where(eq(processingJobs.id, lyricsJob.id));
-        }
+          .values({ songId: job.songId, provider: lyricsProvider.name, stage: "lyrics_detection", status: "pending" });
       }
     } catch (lyricsErr) {
       console.error("[webhook/separation] lyrics detection setup", lyricsErr);

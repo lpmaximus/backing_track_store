@@ -21,6 +21,7 @@
  */
 
 import ChordToken from "./ChordDiagram";
+import { respellSections } from "@/src/lib/chords/spelling";
 
 export type ChordSection = {
   section: string;
@@ -116,7 +117,9 @@ export function CifraText({ text, fontSize }: { text: string; fontSize: number }
 }
 
 // ─── Cifra sincronizada (sem letra: acordes por trecho) ───────────────────────
-export function ChordDisplay({ sections, currentTime, fontSize }: { sections: ChordSection[]; currentTime: number; fontSize: number }) {
+export function ChordDisplay({ sections: rawSections, currentTime, fontSize }: { sections: ChordSection[]; currentTime: number; fontSize: number }) {
+  // Grafia na armadura do tom (Ab em vez de G# em Dó menor) — ver spelling.ts.
+  const sections = respellSections(rawSections);
   const ordered = [...sections].sort((a, b) => a.timecode - b.timecode);
   const activeIdx = ordered.reduce((best, sec, i) => sec.timecode <= currentTime ? i : best, 0);
 
@@ -245,9 +248,10 @@ function SectionLabel({ label, fontSize }: { label: string; fontSize: number }) 
   );
 }
 
-export function CifraView({ sections, lyrics, currentTime, fontSize }: {
+export function CifraView({ sections: rawSections, lyrics, currentTime, fontSize }: {
   sections: ChordSection[]; lyrics: LyricsLine[] | null; currentTime: number; fontSize: number;
 }) {
+  const sections = respellSections(rawSections);
   // Sem letra → visão de acordes por trecho (a de sempre).
   if (!lyrics || lyrics.length === 0) {
     return <ChordDisplay sections={sections} currentTime={currentTime} fontSize={fontSize} />;

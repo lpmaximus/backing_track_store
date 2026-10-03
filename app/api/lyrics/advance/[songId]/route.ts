@@ -9,9 +9,10 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { db, songs, processingJobs } from "@/src/db";
+import { db, songs, stems, processingJobs } from "@/src/db";
 import { and, eq, desc } from "drizzle-orm";
 import { getLyricsProvider } from "@/src/lib/lyrics";
+import { isThrottled } from "@/src/lib/replicateSubmit";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ songId: string }> }) {
   const session = await auth();
@@ -39,6 +40,41 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ song
       .where(and(eq(processingJobs.songId, songId), eq(processingJobs.stage, "lyrics_detection")))
       .orderBy(desc(processingJobs.id))
       .limit(1);
+
+    // FILA DE SUBMISSÃO. Com saldo < US$5 o Replicate deixa criar 6 predições/min
+    // (burst 1). O webhook só registra o job 'pending'; quem submete é este poll,
+    // que roda a cada ~5s enquanto a página está aberta. Num 429 o job continua
+    // 'pending' e a próxima rodada tenta de novo (sem segurar a função). Também
+    // reaproveita job 'failed' que nunca chegou ao provider, se ainda sem letra.
+    const noLyrics = !(song.lyrics && song.lyrics.length > 0);
+    const neverSubmitted = job && !job.providerJobId && (job.status === "pending" || job.status === "failed");
+    if (job && neverSubmitted && noLyrics) {
+      const provider = getLyricsProvider();
+      const [vocal] = await db.select().from(stems)
+        .where(and(eq(stems.songId, songId), eq(stems.instrument, "vocal"))).limit(1);
+      if (provider.isConfigured() && vocal) {
+        try {
+          const { providerJobId } = await provider.submit(vocal.audioUrl, { fast: true });
+          await db.update(processingJobs)
+            .set({ providerJobId, status: "running", errorMessage: null, completedAt: null })
+            .where(eq(processingJobs.id, job.id));
+          return NextResponse.json({ lyricsStatus: "generating", lyrics: null, jobStatus: "running" });
+        } catch (submitErr) {
+          if (isThrottled(submitErr)) {
+            // Na fila: espera o Replicate liberar. Renova o createdAt p/ a faxina
+            // de órfãos do cron não derrubar quem está legitimamente esperando.
+            await db.update(processingJobs)
+              .set({ status: "pending", errorMessage: null, completedAt: null, createdAt: new Date() })
+              .where(eq(processingJobs.id, job.id));
+            return NextResponse.json({ lyricsStatus: "generating", lyrics: null, jobStatus: "running" });
+          }
+          console.error("[GET /api/lyrics/advance] submit falhou", submitErr);
+          await db.update(processingJobs)
+            .set({ status: "failed", errorMessage: String(submitErr).slice(0, 500), completedAt: new Date() })
+            .where(eq(processingJobs.id, job.id));
+        }
+      }
+    }
 
     if (!job || !job.providerJobId || job.status === "done" || job.status === "failed") {
       return NextResponse.json({
