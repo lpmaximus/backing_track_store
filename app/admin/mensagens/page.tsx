@@ -42,6 +42,8 @@ function MensagensContent() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [link, setLink] = useState("");
+  // Caixa interna só é lida por quem VOLTA ao site — o e-mail é o que traz a pessoa de volta.
+  const [alsoEmail, setAlsoEmail] = useState(true);
   const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState("");
   const [history, setHistory] = useState<Broadcast[]>([]);
@@ -71,11 +73,16 @@ function MensagensContent() {
           title: title.trim(),
           body: body.trim() || undefined,
           link: link.trim() || undefined,
+          alsoEmail,
         }),
       });
       const data = await res.json();
       if (!res.ok) { setMsg(`❌ ${data.error}`); return; }
-      setMsg(`✅ Enviado para ${data.recipients} usuário(s).`);
+      setMsg(
+        `✅ Enviado para ${data.recipients} usuário(s)` +
+          (data.emailed != null ? ` · ${data.emailed} e-mail(s) enviados${data.emailFailed ? `, ${data.emailFailed} falharam` : ""}` : "") +
+          ".",
+      );
       setTitle(""); setBody(""); setLink(""); setEmail("");
       loadHistory();
     } finally {
@@ -147,6 +154,11 @@ function MensagensContent() {
           <label style={labelStyle}>Link (opcional)</label>
           <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="/planos" style={inputStyle} />
         </div>
+
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text)", cursor: "pointer" }}>
+          <input type="checkbox" checked={alsoEmail} onChange={(e) => setAlsoEmail(e.target.checked)} />
+          Também enviar por e-mail (respeita quem se descadastrou)
+        </label>
 
         {msg && <p style={{ fontSize: 13, color: msg.startsWith("❌") ? "var(--danger)" : "var(--accent)", margin: 0 }}>{msg}</p>}
 

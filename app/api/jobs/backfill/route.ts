@@ -18,11 +18,14 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db, songs, stems, processingJobs } from "@/src/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { isAdminRequest } from "@/src/lib/adminAuth";
 import { getChordProvider } from "@/src/lib/chords";
 import { pickChordAudio } from "@/src/lib/chords/source";
 import { getLyricsProvider } from "@/src/lib/lyrics";
+
+// Até 20 submits com pausa de 1,2 s — folga além do limite padrão do Hobby.
+export const maxDuration = 60;
 
 function isCron(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
@@ -62,11 +65,24 @@ async function runBackfill(req: NextRequest) {
   }
 
   try {
-    // Músicas já separadas.
+    // Músicas já separadas que AINDA precisam de algo. Antes a query trazia as
+    // `limit` primeiras músicas prontas sem filtro nem ordem — com o acervo
+    // crescendo, as que já tinham cifra ocupavam a janela e as do catálogo
+    // (importadas pelo scripts/import-batch.mjs, que não cria job) nunca eram
+    // alcançadas. Diagnóstico de 09/10/2026: 55 de 55 bases sem cifra e sem job.
+    const missingChords = sql`(${songs.chords} IS NULL OR jsonb_array_length(${songs.chords}) = 0)`;
+    const missingLyrics = sql`(${songs.lyrics} IS NULL OR jsonb_array_length(${songs.lyrics}) = 0)`;
+    const missingBpm = sql`(${songs.bpm} IS NULL OR ${songs.bpm} <= 0)`;
     const ready = await db
       .select()
       .from(songs)
-      .where(eq(songs.processingStatus, "ready"))
+      .where(
+        and(
+          eq(songs.processingStatus, "ready"),
+          refreshMeta ? sql`(${missingChords} OR ${missingLyrics} OR ${missingBpm})` : sql`(${missingChords} OR ${missingLyrics})`,
+        ),
+      )
+      .orderBy(asc(songs.id))
       .limit(limit);
     if (ready.length === 0) return NextResponse.json({ ok: true, ...summary });
 
@@ -91,8 +107,16 @@ async function runBackfill(req: NextRequest) {
 
     // Teto de submissões por chamada: respeita o "burst" do Replicate e evita
     // timeout da função serverless. Se sobrar, é só chamar o backfill de novo.
-    const MAX_SUBMITS = 5;
+    // ?max= sobe o teto (até 20) para o cron diário, com pausa entre submits.
+    const MAX_SUBMITS = Math.min(Math.max(Number(url.searchParams.get("max")) || 5, 1), 20);
     let submitted = 0;
+    const pause = () => new Promise((r) => setTimeout(r, MAX_SUBMITS > 5 ? 1200 : 0));
+
+    // Quem nunca teve job vai na frente de quem já falhou: uma música que
+    // falha sempre (ex.: "Nenhum acorde detectado") não pode tomar a vaga das
+    // que nunca foram tentadas a cada chamada.
+    const failedChord = new Set(existingJobs.filter((j) => j.stage === "chord_detection" && j.status === "failed").map((j) => j.songId));
+    ready.sort((a, b) => Number(failedChord.has(a.id)) - Number(failedChord.has(b.id)));
 
     // Cria o job e submete; apaga jobs 'failed' antigos do mesmo estágio (não acumula).
     async function createJob(
@@ -141,6 +165,7 @@ async function runBackfill(req: NextRequest) {
         const source = pickChordAudio(song.audioUrl, songStems);
         if (source) {
           submitted++;
+          await pause();
           if (await createJob(song.id, "chord_detection", chordProvider.name, () => chordProvider.submit(source.url))) {
             summary.chordJobsCreated++; touched = true;
           }
@@ -152,6 +177,7 @@ async function runBackfill(req: NextRequest) {
       const vocal = songStems.find((s) => s.instrument === "vocal");
       if (lyricsOn && !alreadyHasLyrics && !hasLyricsJob.has(song.id) && vocal && submitted < MAX_SUBMITS) {
         submitted++;
+        await pause();
         if (await createJob(song.id, "lyrics_detection", lyricsProvider.name, () => lyricsProvider.submit(vocal.audioUrl))) {
           summary.lyricsJobsCreated++; touched = true;
         }

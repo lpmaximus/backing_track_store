@@ -135,7 +135,7 @@ function EntrarForm() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name, eventId }),
+        body: JSON.stringify({ email, password, name, eventId, locale }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -160,7 +160,15 @@ function EntrarForm() {
       setLoading(false);
     } else {
       if (mode === "login") gaEvent("login", { method: "email" });
-      router.push(callbackUrl);
+      // Conta nova sem destino definido vai direto para a 1ª separação — é o
+      // momento em que o produto faz sentido. Em 09/10/2026, 12 de 13 contas
+      // Free nunca tinham separado nada: caíam na home e não achavam o caminho.
+      const isDefaultDestination = callbackUrl === "/" || callbackUrl === `/${locale}`;
+      if (mode === "cadastro" && isDefaultDestination) {
+        router.push(locale === "en" ? "/en/upload?welcome=1" : "/upload?welcome=1");
+      } else {
+        router.push(callbackUrl);
+      }
     }
   }
 

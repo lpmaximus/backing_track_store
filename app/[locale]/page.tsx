@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/src/i18n/navigation";
 import type { Locale } from "@/src/i18n/routing";
 import { alternatesFor } from "@/src/lib/seo";
+import { siteUrl } from "@/src/lib/siteUrl";
 import { getPrice } from "@/src/lib/pricingIntl";
 import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
@@ -37,7 +38,10 @@ export default async function HomePage({
 
   // FAQ da landing — perguntas de quem ainda NÃO conhece o produto.
   // (O FAQ de /planos é outro: trata de cobrança, trial e cancelamento.)
-  const HOME_FAQ: FaqItem[] = [1, 2, 3, 4, 5, 6].map((n) => ({
+  // 7 e 8 respondem as perguntas que as pessoas fazem a assistentes de IA
+  // ("remover guitarra de uma música", "backing track vs YouTube") — o
+  // ChatGPT já é a maior fonte de visitas (GA, out/2026).
+  const HOME_FAQ: FaqItem[] = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({
     q: t(`faq.q${n}`),
     a: t(`faq.a${n}`),
   }));
@@ -92,8 +96,34 @@ export default async function HomePage({
     { nm: t("mixOther"), w: 44, muted: false },
   ];
 
+  // Dado estruturado do produto: ajuda buscadores e assistentes de IA a
+  // descrever o site corretamente (o que é, quanto custa, em que idiomas).
+  const appJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: "BackingTrack.store",
+    url: siteUrl() + (locale === "en" ? "/en" : ""),
+    applicationCategory: "MultimediaApplication",
+    operatingSystem: "Any (web browser)",
+    inLanguage: ["pt-BR", "en"],
+    description: t("faq.a3"),
+    featureList: [
+      "AI stem separation (drums, bass, guitar, keys, vocals)",
+      "Mute any instrument and play along",
+      "Chord charts synced to the audio",
+      "Tempo and key change, section loop",
+      "Band setlists for rehearsal and live shows",
+    ],
+    offers: { "@type": "Offer", price: "0", priceCurrency: locale === "en" ? "USD" : "BRL", description: "Free plan" },
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        // Conteúdo nosso, sem input de usuário.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(appJsonLd) }}
+      />
       <SiteHeader />
 
       {/* BETA BANNER */}

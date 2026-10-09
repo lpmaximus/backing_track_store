@@ -3,6 +3,7 @@ import { db, users } from "@/src/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { onUserCreated } from "@/src/lib/lifecycle";
 
 // Mesmo pixel de app/components/TikTokPixel.tsx (conta L2techs_adv, criado
 // 2026-08-15). Duplicado aqui de propósito — client component não pode
@@ -78,7 +79,7 @@ async function trackTikTokCompleteRegistration(opts: {
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, name, eventId } = await req.json();
+    const { email, password, name, eventId, locale } = await req.json();
     if (!email || !password) return NextResponse.json({ error: "Campos obrigatorios" }, { status: 400 });
     if (password.length < 8)  return NextResponse.json({ error: "Senha minima: 8 caracteres" }, { status: 400 });
 
@@ -86,7 +87,13 @@ export async function POST(req: NextRequest) {
     if (existing) return NextResponse.json({ error: "Email ja cadastrado" }, { status: 409 });
 
     const passwordHash = await bcrypt.hash(password, 12);
-    await db.insert(users).values({ email, name: name ?? null, passwordHash, provider: "credentials", role: "free" });
+    const [created] = await db
+      .insert(users)
+      .values({ email, name: name ?? null, passwordHash, provider: "credentials", role: "free" })
+      .returning({ id: users.id });
+
+    // Boas-vindas por e-mail (sai depois da resposta — cadastro não espera SMTP).
+    if (created) onUserCreated(created.id, locale);
 
     if (eventId) {
       const ip =

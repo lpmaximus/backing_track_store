@@ -50,8 +50,16 @@ export function newToken(): string {
   return randomBytes(24).toString("hex"); // 48 chars
 }
 
-export function inviteUrl(token: string): string {
-  return `${siteUrl()}/convite/${token}`;
+/**
+ * Link do convite. Com `channel`, leva UTM — sem isso o GA joga o clique de
+ * e-mail e de WhatsApp em "Direto" e não dá para saber qual canal funciona.
+ * Sem `channel` (ex.: o botão "copiar" de convites antigos) sai o link limpo.
+ */
+export function inviteUrl(token: string, channel?: "email" | "link" | null): string {
+  const url = `${siteUrl()}/convite/${token}`;
+  if (!channel) return url;
+  const medium = channel === "email" ? "email" : "messaging";
+  return `${url}?utm_source=invite&utm_medium=${medium}&utm_campaign=beta_invite`;
 }
 
 export function unsubscribeUrl(token: string): string {
@@ -153,7 +161,7 @@ export async function createAndSendInvite(input: CreateInviteInput) {
     plan: input.plan,
     days,
     separations: resolveSeparations(input.plan, separations),
-    link: inviteUrl(token),
+    link: inviteUrl(token, "email"),
     expiresAt,
     sender,
   };
@@ -255,7 +263,7 @@ export async function createInviteLink(input: CreateLinkInviteInput) {
     plan: input.plan,
     days,
     separations: resolveSeparations(input.plan, separations),
-    link: inviteUrl(token),
+    link: inviteUrl(token, "link"),
     expiresAt,
     sender,
   };
@@ -279,14 +287,14 @@ export async function createInviteLink(input: CreateLinkInviteInput) {
     })
     .returning();
 
-  return { invite, message, url: inviteUrl(token) };
+  return { invite, message, url: inviteUrl(token, "link") };
 }
 
 /** Recupera o texto de um convite por link, para o botão "copiar" da tabela. */
 export async function getInviteMessage(id: number) {
   const [invite] = await db.select().from(invites).where(eq(invites.id, id)).limit(1);
   if (!invite) return null;
-  return { message: invite.body, url: inviteUrl(invite.token), channel: invite.channel };
+  return { message: invite.body, url: inviteUrl(invite.token, invite.channel === "link" ? "link" : "email"), channel: invite.channel };
 }
 
 /** Reenvia um convite existente (mesmo token, para não invalidar o 1º e-mail). */
@@ -307,7 +315,7 @@ export async function resendInvite(id: number) {
     plan: invite.plan as InvitePlan,
     days: invite.trialDays,
     separations: resolveSeparations(invite.plan as InvitePlan, invite.trialSeparations),
-    link: inviteUrl(invite.token),
+    link: inviteUrl(invite.token, "email"),
     expiresAt,
     sender: process.env.INVITE_SENDER_NAME || "Luiz Paulo",
   };

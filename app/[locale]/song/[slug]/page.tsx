@@ -17,6 +17,7 @@ import { resolveSetlistRole } from "@/src/lib/events";
 import { resolveMix, parseSpeed, clampTranspose, type ResolvedStem } from "@/src/lib/mix";
 import { markFirstUse } from "@/src/lib/invites";
 import SongPlayer from "./SongPlayer";
+import OwnSongCta from "./OwnSongCta";
 import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
 import { alternatesFor } from "@/src/lib/seo";
@@ -182,7 +183,13 @@ export default async function SongPage({
       setlistTranspose={mixTranspose}
       setlistSpeed={mixSpeed}
       header={<SiteHeader />}
-      footer={<SiteFooter />}
+      footer={
+        <>
+          {/* Base do catálogo → convite para separar a música da própria pessoa. */}
+          {song.sourceType === "admin" && <OwnSongCta locale={locale} />}
+          <SiteFooter />
+        </>
+      }
     />
   );
 }

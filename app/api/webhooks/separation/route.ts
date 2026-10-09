@@ -21,6 +21,7 @@ import { pickChordAudio } from "@/src/lib/chords/source";
 import { purgeSourceMix } from "@/src/lib/retention";
 import { getLyricsProvider } from "@/src/lib/lyrics";
 import { createNotification } from "@/src/lib/notifications";
+import { sendSongReadyEmail } from "@/src/lib/lifecycle";
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -139,6 +140,9 @@ export async function POST(req: NextRequest) {
         body: `"${song.title}" já foi separada em stems e pode ser tocada.`,
         link: `/song/${song.slug}`,
       });
+      // E por e-mail: a separação leva minutos e a pessoa costuma fechar a aba.
+      // Sem isto ela só descobriria que a música ficou pronta se voltasse sozinha.
+      await sendSongReadyEmail(song.uploadedByUserId, song.title, song.slug);
     }
 
     // 5. Frente C: detecção de cifra sobre o MIX (ver src/lib/chords/source.ts

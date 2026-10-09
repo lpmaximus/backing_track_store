@@ -13,6 +13,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/src/lib/adminAuth";
 import { db, users, notifications } from "@/src/db";
 import { and, desc, eq, sql } from "drizzle-orm";
+import { sendBroadcastEmail } from "@/src/lib/lifecycle";
+
+export const runtime = "nodejs";
+// Envio de e-mail é sequencial (SMTP do Zoho): dá folga para a base inteira.
+export const maxDuration = 60;
 
 type Audience = "all" | "role" | "user";
 const VALID_ROLES = new Set(["free", "pro", "proband", "studio", "admin"]);
@@ -57,6 +62,7 @@ export async function POST(req: NextRequest) {
       title?: string;
       body?: string;
       link?: string;
+      alsoEmail?: boolean;
     };
 
     const title = (data.title ?? "").trim();
@@ -107,7 +113,23 @@ export async function POST(req: NextRequest) {
       })),
     );
 
-    return NextResponse.json({ ok: true, recipients: targetIds.length });
+    // Cópia por e-mail (opcional). Sequencial de propósito: o Zoho limita
+    // conexões simultâneas, e a base ainda é pequena.
+    let emailed: number | undefined;
+    let emailFailed = 0;
+    if (data.alsoEmail) {
+      emailed = 0;
+      for (const userId of targetIds) {
+        try {
+          if (await sendBroadcastEmail(userId, { title, body: data.body?.trim(), link: data.link?.trim() })) emailed++;
+        } catch (err) {
+          emailFailed++;
+          console.error("[POST /api/admin/notifications] e-mail", userId, err);
+        }
+      }
+    }
+
+    return NextResponse.json({ ok: true, recipients: targetIds.length, emailed, emailFailed });
   } catch (err) {
     console.error("[POST /api/admin/notifications]", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

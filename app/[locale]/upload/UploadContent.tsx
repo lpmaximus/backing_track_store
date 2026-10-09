@@ -52,6 +52,13 @@ export default function UploadContent() {
   const [fileName, setFileName] = useState("");
   const [elapsed, setElapsed] = useState(0);
 
+  // Recém-cadastrado chega aqui com ?welcome=1 (ver entrar/page.tsx). Lido do
+  // window e não de useSearchParams para não exigir Suspense na página.
+  const [welcome, setWelcome] = useState(false);
+  useEffect(() => {
+    setWelcome(new URLSearchParams(window.location.search).get("welcome") === "1");
+  }, []);
+
   // Quota de separações (quantas usadas / quantas restam no pacote).
   // trialPack = o limite é o total de um teste por convite, sem reset mensal.
   const [quota, setQuota] = useState<{ used: number; limit: number; remaining: number; unlimited: boolean; trialPack?: boolean } | null>(null);
@@ -196,6 +203,20 @@ export default function UploadContent() {
         </div>
       ) : (
         <>
+          {welcome && phase === "idle" && (
+            <div style={{
+              background: "var(--surface)", border: "1px solid var(--accent)", borderRadius: 12,
+              padding: "16px 18px", marginBottom: 16,
+            }}>
+              <p style={{ fontSize: 15, fontWeight: 800, color: "var(--text)", margin: "0 0 4px" }}>{t("welcomeTitle")}</p>
+              <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 8px" }}>{t("welcomeBody")}</p>
+              <p style={{ fontSize: 12, color: "var(--muted2)", margin: 0 }}>
+                {t("welcomeTip")}{" "}
+                <Link href="/catalogo" style={{ color: "var(--accent)", fontWeight: 600 }}>{t("welcomeCatalog")}</Link>
+              </p>
+            </div>
+          )}
+
           {quota && (
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
@@ -348,6 +369,9 @@ export default function UploadContent() {
               {phase === "processing" ? t("waitLong") : t("waitShort")}
               {" "}({formatElapsed(elapsed)})
             </p>
+            {phase === "processing" && (
+              <p style={{ color: "var(--muted)", fontSize: 12, margin: "10px 0 0" }}>{t("canLeave")}</p>
+            )}
           </div>
 
           <style>{`

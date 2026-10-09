@@ -526,6 +526,39 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ─── E-mails de ciclo de vida (retenção) ─────────────────────────────────────
+// Por que tabelas próprias em vez de colunas em `users`: se a migração 0015
+// ainda não tiver rodado, nada que lê `users` (login, sessão, admin) quebra —
+// só os e-mails de ciclo de vida falham, e eles são best-effort.
+//
+// Preferências de e-mail: idioma em que a pessoa se cadastrou (o e-mail sai no
+// mesmo idioma do site) e descadastro dos e-mails NÃO transacionais.
+export const userEmailPrefs = pgTable("user_email_prefs", {
+  userId: integer("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  locale: varchar("locale", { length: 5 }).notNull().default("pt"), // pt | en
+  optOutAt: timestamp("opt_out_at"), // != null = não quer e-mail de engajamento
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Um registro por (usuário, tipo de e-mail). O índice único é a trava de
+// idempotência: o cron pode rodar duas vezes e o e-mail sai uma só.
+export const lifecycleEmails = pgTable(
+  "lifecycle_emails",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: varchar("kind", { length: 30 }).notNull(), // welcome | nudge_upload | week_one
+    sentAt: timestamp("sent_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    umPorTipo: uniqueIndex("lifecycle_emails_user_kind_uq").on(t.userId, t.kind),
+  }),
+);
+
 // ─── Cifra colaborativa (Fase 1.5) ────────────────────────────────────────────
 export const cifraEditHistory = pgTable("cifra_edit_history", {
   id: serial("id").primaryKey(),

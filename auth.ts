@@ -9,6 +9,7 @@ import { expireTrialIfDue } from "@/src/lib/trials";
 import { track } from "@/src/lib/activity";
 import { isInternalTestEmail } from "@/src/lib/internalTest";
 import { verifyMagicToken } from "@/src/lib/authTokens";
+import { onUserCreated } from "@/src/lib/lifecycle";
 
 // Conta impedida de logar: suspensa, banida ou em processo de exclusão (R3).
 function isLoginBlocked(u: { status?: string | null; deletionScheduledAt?: Date | null }): boolean {
@@ -63,6 +64,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             provider: "email",
             role: "free",
           }).returning();
+          // Conta nova → boas-vindas por e-mail (idioma vem do cookie/país).
+          if (user) onUserCreated(user.id);
         }
         if (!user || isLoginBlocked(user)) return null;
         return { id: String(user.id), email: user.email, name: user.name, role: user.role };
@@ -83,14 +86,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .limit(1);
 
         if (!existing) {
-          await db.insert(users).values({
+          const [created] = await db.insert(users).values({
             email:      user.email!,
             name:       user.name ?? null,
             image:      user.image ?? null,
             provider:   "google",
             providerId: user.id,
             role:       "free",
-          });
+          }).returning({ id: users.id });
+          // Conta nova → boas-vindas por e-mail (idioma vem do cookie/país).
+          if (created) onUserCreated(created.id);
         } else if (isLoginBlocked(existing)) {
           // Conta suspensa/banida ou em exclusão não entra via Google (R3).
           return false;

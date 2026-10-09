@@ -17,7 +17,7 @@ import {
   cifraReports,
   cifraEditHistory,
 } from "@/src/db";
-import { and, eq, gte, ne, sql, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, gte, ne, sql, inArray } from "drizzle-orm";
 import { isAdminRequest } from "@/src/lib/adminAuth";
 import { SEPARATION_COST, FIXED_INFRA_COST, computeMrr } from "@/src/lib/pricing";
 
@@ -82,7 +82,12 @@ export async function GET(req: NextRequest) {
     const [songsWithCifra] = await db
       .select({ n: sql<number>`count(*)::int` })
       .from(songs)
-      .where(isNotNull(songs.cifraText));
+      // A cifra de verdade mora em `chords` (jsonb, pipeline automático e
+      // editor). `cifraText` é o campo de texto legado do cadastro manual —
+      // contar só ele fazia o dashboard mostrar "Com cifra: 0" (corrigido 09/10/2026).
+      .where(
+        sql`(${songs.chords} IS NOT NULL AND jsonb_typeof(${songs.chords}) = 'array' AND jsonb_array_length(${songs.chords}) > 0) OR ${songs.cifraText} IS NOT NULL`,
+      );
 
     const [openReports] = await db
       .select({ n: sql<number>`count(*)::int` })

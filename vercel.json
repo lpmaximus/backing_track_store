@@ -5,6 +5,10 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/jobs/backfill?limit=200&max=20",
+      "schedule": "30 4 * * *"
+    },
+    {
       "path": "/api/jobs/finalize",
       "schedule": "0 5 * * *"
     },
@@ -15,6 +19,10 @@
     {
       "path": "/api/jobs/report",
       "schedule": "0 10 * * 3,6"
+    },
+    {
+      "path": "/api/jobs/lifecycle",
+      "schedule": "0 13 * * *"
     }
   ]
 }
