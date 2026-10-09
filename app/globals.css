@@ -414,3 +414,152 @@ input[type="range"]::-webkit-slider-thumb:hover {
   white-space: nowrap;
   border: 0;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   App nativo (Capacitor) — área /app
+   Dark-first, como no protótipo "backingtrack.store — App": fundo #0D0D0F,
+   cards #1A1A1F, laranja #FF9A00 só em destaque. Redefine as MESMAS variáveis
+   do site, então componentes reaproveitados (player, cifra) escurecem sozinhos.
+   O :has() cobre <html>/<body> e overlays em portal fora do wrapper.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root:has(.bts-app), .bts-app {
+  --bg:       #0d0d0f;
+  --surface:  #1a1a1f;
+  --surface2: #141418;
+  --surface3: #2a2a31;
+  --border:   #1f1f25;
+  --border2:  #2a2a31;
+  --text:     #f2f2f2;
+  --muted:    #9a9aa2;
+  --muted2:   #6b6b70;
+  --chord:    #ff9a00;
+  --accent:   #ff9a00;
+  --accent2:  #ffb43d;
+  --primary:  #ff9a00;
+  --tabbar:   #121216;
+  color-scheme: dark;
+}
+html:has(.bts-app), body:has(.bts-app) { background: #0d0d0f; }
+body:has(.bts-app) { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+body:has(.bts-app) ::-webkit-scrollbar-thumb { background: #2a2a31; }
+
+.bts-app {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+.bts-app a { color: inherit; }
+.bts-app :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Tela com barra inferior: conteúdo rola, barra fica presa embaixo. */
+.app-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: calc(16px + env(safe-area-inset-top)) 20px calc(100px + env(safe-area-inset-bottom));
+}
+.app-screen--bare { padding-bottom: calc(28px + env(safe-area-inset-bottom)); }
+
+.app-tabbar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 50;
+  background: var(--tabbar);
+  border-top: 1px solid var(--border);
+  padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
+}
+.app-tabbar ul {
+  list-style: none; margin: 0 auto; padding: 0; max-width: 640px;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.app-tabbar a {
+  min-height: 52px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  color: #8a8a92; font-size: 11px; font-weight: 600;
+}
+.app-tabbar a[aria-current="page"] { color: var(--accent); }
+
+.app-card {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 18px;
+  padding: 18px;
+}
+.app-btn {
+  height: 52px;
+  border-radius: 14px;
+  border: 0;
+  padding: 0 18px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  font: inherit; font-size: 15px; font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+}
+.app-btn:disabled { opacity: .6; cursor: default; }
+.bts-app .app-btn--primary { background: var(--accent); color: #0d0d0f; font-weight: 800; }
+.bts-app .app-btn--light   { background: #f2f2f2; color: #0d0d0f; }
+.bts-app .app-btn--ghost   { background: transparent; color: var(--text); border: 1px solid #3a3a42; }
+.bts-app .app-btn--surface { background: var(--surface); color: var(--text); border: 1px solid var(--border2); }
+
+.app-icon-btn {
+  width: 44px; height: 44px; flex-shrink: 0;
+  border-radius: 22px;
+  background: var(--surface); border: 1px solid var(--border2); color: var(--text);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0; position: relative;
+}
+.app-section-title {
+  margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .08em; color: var(--muted);
+}
+.app-segmented {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px;
+  background: var(--surface); border-radius: 12px; padding: 4px;
+}
+.app-segmented button, .app-segmented a {
+  height: 40px; border-radius: 9px; border: 0; background: transparent;
+  color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.app-segmented [aria-selected="true"] { background: #2e2e35; color: var(--text); font-weight: 700; }
+
+.app-input {
+  height: 50px; width: 100%;
+  border-radius: 12px; border: 1px solid var(--border2);
+  background: var(--surface2); color: var(--text);
+  padding: 0 14px; font: inherit; font-size: 16px; /* ≥16px: iOS não dá zoom */
+  outline: none;
+}
+.app-input::placeholder { color: var(--muted2); }
+.app-input:focus { border-color: var(--accent); }
+.app-label { font-size: 13px; font-weight: 600; color: #c8c8ce; }
+
+.app-tag {
+  font-size: 11px; font-weight: 600; color: #c8c8ce;
+  border: 1px solid var(--border2); border-radius: 6px; padding: 4px 8px; white-space: nowrap;
+}
+.app-keybadge {
+  width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0;
+  background: var(--bg); border: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace; font-size: 13px; font-weight: 700; color: var(--accent);
+}
+.app-row-link {
+  display: flex; align-items: center; gap: 12px; padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.app-skeleton {
+  border-radius: 14px; background: linear-gradient(90deg, #16161b, #1d1d23, #16161b);
+  background-size: 200% 100%; animation: app-shimmer 1.4s linear infinite;
+}
+@keyframes app-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .app-skeleton { animation: none; } }
+
+/* Player dentro do app: o motor (WavePlayer) é o mesmo do site. Aqui só
+   ajustamos o que fica apertado a 390px. */
+.app-player .player-sidebar { width: 100% !important; }

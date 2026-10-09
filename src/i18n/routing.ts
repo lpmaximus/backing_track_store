@@ -58,6 +58,16 @@ export const pathnames = {
   "/convite/[token]": { pt: "/convite/[token]", en: "/invite/[token]" },
   "/convite/[token]/sair": { pt: "/convite/[token]/sair", en: "/invite/[token]/leave" },
 
+  // App nativo (Capacitor) — área mobile carregada pelo WebView do app.
+  // Mesmo slug nos dois idiomas: não é página de SEO (noindex no layout) e o
+  // app/AndroidManifest/Universal Links apontam para estes caminhos fixos.
+  "/app": "/app",
+  "/app/boas-vindas": "/app/boas-vindas",
+  "/app/entrar": "/app/entrar",
+  "/app/handoff": "/app/handoff",
+  "/app/estudio": "/app/estudio",
+  "/app/song/[slug]": "/app/song/[slug]",
+
   // Legal
   "/termos": { pt: "/termos", en: "/terms" },
   "/privacidade": { pt: "/privacidade", en: "/privacy" },

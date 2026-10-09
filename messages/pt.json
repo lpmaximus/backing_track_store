@@ -1082,5 +1082,127 @@
     "fromCatalogTitle": "Pegas do catálogo",
     "deleteProject": "Apagar",
     "confirmDeleteProject": "Apagar \"{name}\"? A música e todas as faixas gravadas nela vão junto, e não dá para desfazer."
+  },
+  "app": {
+    "tabs": {
+      "aria": "Navegação principal",
+      "home": "Início",
+      "studio": "Estúdio",
+      "setlists": "Setlists",
+      "band": "Banda",
+      "account": "Conta"
+    },
+    "home": {
+      "messages": "Mensagens",
+      "messagesUnread": "Mensagens ({n} não lidas)",
+      "account": "Sua conta",
+      "greeting": {
+        "morning": "Bom dia, {name}",
+        "afternoon": "Boa tarde, {name}",
+        "evening": "Boa noite, {name}"
+      },
+      "greetingNoName": {
+        "morning": "Bom dia",
+        "afternoon": "Boa tarde",
+        "evening": "Boa noite"
+      },
+      "title": "O que vamos tocar hoje?",
+      "uploadTitle": "Enviar uma faixa",
+      "uploadText": "Separamos bateria, baixo, guitarra, piano e voz — e geramos a cifra sincronizada.",
+      "uploadCta": "Escolher áudio",
+      "nextRehearsal": "PRÓXIMO ENSAIO",
+      "nextShow": "PRÓXIMO SHOW",
+      "seeSetlist": "Ver setlist",
+      "eventMeta": "{setlist} · {n, plural, one {# música} other {# músicas}} · {time}",
+      "keepPracticing": "CONTINUAR PRATICANDO",
+      "emptyRecent": "As músicas que você tocar aparecem aqui. Comece pelo catálogo ou envie a sua.",
+      "browseCatalog": "Ver catálogo",
+      "songMeta": "{artist} · Tom {key} · {bpm} BPM",
+      "stems": "{n, plural, one {# faixa} other {# faixas}}",
+      "chordsOnly": "Cifra"
+    },
+    "welcome": {
+      "title": "Separe, pratique, ensaie e toque ao vivo.",
+      "text": "Envie qualquer faixa: a gente separa os instrumentos, gera a cifra sincronizada e leva o repertório da sua banda para o palco.",
+      "chips": {
+        "stems": "STEMS",
+        "chords": "CIFRA",
+        "loops": "LOOPS",
+        "band": "BANDA",
+        "stage": "PALCO"
+      },
+      "signUp": "Criar conta grátis",
+      "signIn": "Já tenho conta"
+    },
+    "signIn": {
+      "handoffFailed": "Não deu para concluir o login com o Google. Tente de novo.",
+      "signUpTitle": "Criar conta",
+      "signInText": "Use a mesma conta do site. Suas músicas, cifras e setlists vêm junto.",
+      "signUpText": "Grátis, sem cartão. Separe até 3 músicas por mês no plano Free.",
+      "back": "Voltar",
+      "orEmail": "ou com e-mail",
+      "emailPlaceholder": "voce@email.com",
+      "forgotShort": "Esqueci a senha",
+      "legal": "Ao continuar você aceita os <terms>Termos de Uso</terms> e a <privacy>Política de Privacidade</privacy>."
+    },
+    "handoff": {
+      "invalidTitle": "Link de login inválido",
+      "invalidText": "Volte para o app BackingTrack e toque de novo em “Continuar com Google”.",
+      "readyTitle": "Pronto para entrar no app",
+      "readyText": "Você vai entrar no app BackingTrack como {email}.",
+      "backToApp": "Voltar para o app",
+      "otherAccount": "Usar outra conta",
+      "googleTitle": "Entrar com Google",
+      "continueGoogle": "Continuar com Google"
+    },
+    "studio": {
+      "title": "Meu Estúdio",
+      "tabMine": "Minhas músicas",
+      "tabCatalog": "Catálogo",
+      "search": "Buscar",
+      "searchMine": "Buscar nas suas músicas",
+      "searchCatalog": "Buscar bases no catálogo",
+      "noResults": "Nada encontrado.",
+      "emptyMine": "Você ainda não enviou nenhuma música. Envie uma faixa e a gente separa os instrumentos e gera a cifra.",
+      "uploadCta": "Enviar uma faixa",
+      "meta": "{artist} · {bpm} BPM",
+      "processing": "Processando",
+      "failed": "Falhou",
+      "sharedBadge": "Compartilhada",
+      "versionsTitle": "MINHAS VERSÕES",
+      "myVersion": "Minha versão",
+      "catalogHintStudio": "Toque em + para pegar a base para o seu estúdio: você recebe os stems e a cifra — seus takes continuam só seus.",
+      "catalogHint": "Bases prontas para praticar, com cifra sincronizada.",
+      "communityTitle": "DA COMUNIDADE",
+      "catalogTitle": "CATÁLOGO",
+      "added": "No seu estúdio",
+      "add": "Adicionar ao meu estúdio"
+    },
+    "player": {
+      "back": "Voltar",
+      "meta": "Tom {key} · {bpm} BPM",
+      "fullPlayer": "Abrir player completo (gravar, pedal de loop, download)",
+      "tabTracks": "Faixas",
+      "tabChords": "Cifra",
+      "key": "Tom",
+      "keyOriginal": "{key}",
+      "keyShift": "{key} ({n})",
+      "keyDown": "Baixar meio tom",
+      "keyUp": "Subir meio tom",
+      "speed": "Velocidade",
+      "slower": "Mais devagar",
+      "faster": "Mais rápido",
+      "seePlans": "Ver planos",
+      "noChords": "A cifra desta música ainda não está pronta. No player completo você pode gerar ou escrever a cifra.",
+      "openFull": "Abrir player completo",
+      "play": "Tocar",
+      "scrollAuto": "Rolagem: automática",
+      "scrollManual": "Rolagem: manual",
+      "fontDown": "Diminuir fonte",
+      "fontUp": "Aumentar fonte",
+      "back10": "−10 s",
+      "fwd10": "+10 s",
+      "fixChart": "Corrigir cifra"
+    }
   }
 }

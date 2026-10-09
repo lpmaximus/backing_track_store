@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BackingTrack</string>
+    <string name="title_activity_main">BackingTrack</string>
+    <string name="package_name">store.backingtrack.app</string>
+    <string name="custom_url_scheme">store.backingtrack.app</string>
+</resources>

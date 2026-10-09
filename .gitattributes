@@ -14,3 +14,7 @@
 *.mp3 binary
 *.wav binary
 *.pdf binary
+
+# Projetos nativos (Capacitor): .bat precisa de CRLF no Windows; wrapper do Gradle é binário
+*.bat text eol=crlf
+*.jar binary

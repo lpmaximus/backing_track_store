@@ -82,3 +82,45 @@ export function verifyMagicToken(token: string): string | null {
   try { email = unb64url(e64); } catch { return null; }
   return safeEqual(sig, sign("magic", `${email}.${expN}`)) ? email : null;
 }
+
+// ── Login do app nativo (Google pelo navegador do sistema) ───────────────────
+//
+// O Google recusa OAuth dentro de WebView ("disallowed_useragent") — e o app
+// Capacitor É um WebView. Então o app abre o login no navegador do sistema
+// (Custom Tabs / SFSafariViewController), e o site devolve a pessoa ao app por
+// store.backingtrack.app://auth?code=… com um código de uso curto.
+//
+// Esquema de URL customizado pode ser registrado por outro app no Android, e aí
+// o código vazaria. Por isso o desenho é o do PKCE: o app gera um segredo
+// (`verifier`) que NUNCA sai dele, manda só o hash (`challenge`) para o
+// navegador, e o código só vale junto com o verifier. Quem interceptar o
+// código não tem o verifier.
+
+const HANDOFF_TTL_MS = 5 * 60 * 1000; // 5 min
+
+/** sha256(verifier) em base64url — mesma conta que o app faz com WebCrypto. */
+export function handoffChallengeFor(verifier: string): string {
+  return crypto.createHash("sha256").update(verifier, "utf8").digest("base64url");
+}
+
+export function isValidChallenge(challenge: string): boolean {
+  return /^[A-Za-z0-9_-]{43}$/.test(challenge);
+}
+
+export function createHandoffCode(email: string, challenge: string): string {
+  const e = email.trim().toLowerCase();
+  const exp = Date.now() + HANDOFF_TTL_MS;
+  return `${b64url(e)}.${exp}.${sign("handoff", `${e}.${exp}.${challenge}`)}`;
+}
+
+/** Devolve o e-mail se o código for válido, não venceu e o verifier confere. */
+export function verifyHandoffCode(code: string, verifier: string): string | null {
+  const [e64, exp, sig] = code.split(".");
+  if (!e64 || !exp || !sig || !verifier || verifier.length < 43 || verifier.length > 128) return null;
+  const expN = Number(exp);
+  if (!Number.isFinite(expN) || expN < Date.now()) return null;
+  let email: string;
+  try { email = unb64url(e64); } catch { return null; }
+  const challenge = handoffChallengeFor(verifier);
+  return safeEqual(sig, sign("handoff", `${email}.${expN}.${challenge}`)) ? email : null;
+}

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sem conexão — BackingTrack</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #0D0D0F; color: #F2F2F2;
+    font-family: Montserrat, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { min-height: 100%; box-sizing: border-box; display: flex; flex-direction: column;
+    justify-content: center; gap: 18px; padding: calc(32px + env(safe-area-inset-top)) 24px calc(32px + env(safe-area-inset-bottom)); }
+  h1 { margin: 0; font-size: 26px; line-height: 1.2; font-weight: 800; }
+  p { margin: 0; font-size: 15px; line-height: 1.55; color: #A6A6AE; }
+  button { height: 54px; border: 0; border-radius: 14px; background: #FF9A00; color: #0D0D0F;
+    font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; letter-spacing: .08em; }
+  .brand span { color: #FF9A00; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2C7 2 3 3.5 3 6.5c0 4 4.5 10 7.6 14 .7.9 2.1.9 2.8 0C16.5 16.5 21 10.5 21 6.5 21 3.5 17 2 12 2z" fill="#FF9A00"/><path d="M8 8v3M10 6.5v6M12 7.5v4M14 6v7M16 8v3" stroke="#0D0D0F" stroke-width="1.4" stroke-linecap="round"/></svg>
+    <div>BACKING TRACK <span>STORE</span></div>
+  </div>
+  <h1>Sem conexão com a internet</h1>
+  <p>O app precisa de internet para abrir suas músicas, cifras e setlists. Confira o Wi-Fi ou os dados móveis e tente de novo.</p>
+  <button type="button" onclick="location.href='https://backingtrack.store/app'">Tentar de novo</button>
+</main>
+</body>
+</html>

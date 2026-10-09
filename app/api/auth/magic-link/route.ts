@@ -15,7 +15,7 @@ export const runtime = "nodejs";
  */
 export async function POST(req: NextRequest) {
   try {
-    const { email, locale, callbackUrl } = await req.json();
+    const { email, locale, callbackUrl, app } = await req.json();
     const e = String(email ?? "").trim().toLowerCase();
     if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
       return NextResponse.json({ error: "invalid_email" }, { status: 400 });
@@ -23,7 +23,11 @@ export async function POST(req: NextRequest) {
     if (!mailerConfigured()) return NextResponse.json({ error: "mail_unavailable" }, { status: 503 });
 
     const lang = locale === "en" ? "en" : "pt";
-    const path = lang === "en" ? "/en/sign-in" : "/entrar";
+    // Pedido feito pelo app (área /app): o link volta para a tela de entrar do
+    // app. Com App Links/Universal Links ativos, o celular abre direto no app.
+    const path = app === true
+      ? (lang === "en" ? "/en/app/entrar" : "/app/entrar")
+      : (lang === "en" ? "/en/sign-in" : "/entrar");
     const url = new URL(`${siteUrl()}${path}`);
     url.searchParams.set("magic", createMagicToken(e));
     // Só caminho relativo do próprio site — nunca um redirect aberto.

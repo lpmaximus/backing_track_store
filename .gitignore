@@ -62,3 +62,14 @@ _COLAR_NA_VERCEL.txt
 
 # artefatos do mount FUSE (aparecem ao mover arquivos abertos)
 .fuse_hidden*
+
+# App nativo (Capacitor): saídas de build e cópias geradas pelo `cap sync`
+android/app/release/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/App/config.xml
+*.keystore
+*.jks

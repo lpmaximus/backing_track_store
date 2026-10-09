@@ -1082,5 +1082,127 @@
     "fromCatalogTitle": "Taken from the catalog",
     "deleteProject": "Delete",
     "confirmDeleteProject": "Delete \"{name}\"? The song and every track recorded in it go with it, and this can't be undone."
+  },
+  "app": {
+    "tabs": {
+      "aria": "Main navigation",
+      "home": "Home",
+      "studio": "Studio",
+      "setlists": "Setlists",
+      "band": "Band",
+      "account": "Account"
+    },
+    "home": {
+      "messages": "Messages",
+      "messagesUnread": "Messages ({n} unread)",
+      "account": "Your account",
+      "greeting": {
+        "morning": "Good morning, {name}",
+        "afternoon": "Good afternoon, {name}",
+        "evening": "Good evening, {name}"
+      },
+      "greetingNoName": {
+        "morning": "Good morning",
+        "afternoon": "Good afternoon",
+        "evening": "Good evening"
+      },
+      "title": "What are we playing today?",
+      "uploadTitle": "Upload a track",
+      "uploadText": "We split drums, bass, guitar, piano and vocals — and generate synced chords.",
+      "uploadCta": "Choose audio",
+      "nextRehearsal": "NEXT REHEARSAL",
+      "nextShow": "NEXT SHOW",
+      "seeSetlist": "See setlist",
+      "eventMeta": "{setlist} · {n, plural, one {# song} other {# songs}} · {time}",
+      "keepPracticing": "KEEP PRACTICING",
+      "emptyRecent": "Songs you play show up here. Start with the catalog or upload your own.",
+      "browseCatalog": "Browse catalog",
+      "songMeta": "{artist} · Key {key} · {bpm} BPM",
+      "stems": "{n, plural, one {# track} other {# tracks}}",
+      "chordsOnly": "Chords"
+    },
+    "welcome": {
+      "title": "Split, practice, rehearse and play live.",
+      "text": "Upload any track: we split the instruments, generate synced chords and take your band's set list to the stage.",
+      "chips": {
+        "stems": "STEMS",
+        "chords": "CHORDS",
+        "loops": "LOOPS",
+        "band": "BAND",
+        "stage": "STAGE"
+      },
+      "signUp": "Create free account",
+      "signIn": "I already have an account"
+    },
+    "signIn": {
+      "handoffFailed": "We couldn't finish signing in with Google. Please try again.",
+      "signUpTitle": "Create account",
+      "signInText": "Use the same account as the website. Your songs, chords and set lists come along.",
+      "signUpText": "Free, no card needed. Split up to 3 songs a month on the Free plan.",
+      "back": "Back",
+      "orEmail": "or with email",
+      "emailPlaceholder": "you@email.com",
+      "forgotShort": "Forgot password",
+      "legal": "By continuing you accept the <terms>Terms of Use</terms> and the <privacy>Privacy Policy</privacy>."
+    },
+    "handoff": {
+      "invalidTitle": "Invalid sign-in link",
+      "invalidText": "Go back to the BackingTrack app and tap “Continue with Google” again.",
+      "readyTitle": "Ready to sign in to the app",
+      "readyText": "You'll sign in to the BackingTrack app as {email}.",
+      "backToApp": "Back to the app",
+      "otherAccount": "Use another account",
+      "googleTitle": "Sign in with Google",
+      "continueGoogle": "Continue with Google"
+    },
+    "studio": {
+      "title": "My Studio",
+      "tabMine": "My songs",
+      "tabCatalog": "Catalog",
+      "search": "Search",
+      "searchMine": "Search your songs",
+      "searchCatalog": "Search catalog tracks",
+      "noResults": "Nothing found.",
+      "emptyMine": "You haven't uploaded any songs yet. Upload a track and we'll split the instruments and generate the chords.",
+      "uploadCta": "Upload a track",
+      "meta": "{artist} · {bpm} BPM",
+      "processing": "Processing",
+      "failed": "Failed",
+      "sharedBadge": "Shared",
+      "versionsTitle": "MY VERSIONS",
+      "myVersion": "My version",
+      "catalogHintStudio": "Tap + to add the track to your studio: you get the stems and chords — your takes stay yours.",
+      "catalogHint": "Ready-to-practice tracks with synced chords.",
+      "communityTitle": "FROM THE COMMUNITY",
+      "catalogTitle": "CATALOG",
+      "added": "In your studio",
+      "add": "Add to my studio"
+    },
+    "player": {
+      "back": "Back",
+      "meta": "Key {key} · {bpm} BPM",
+      "fullPlayer": "Open full player (record, loop pedal, download)",
+      "tabTracks": "Tracks",
+      "tabChords": "Chords",
+      "key": "Key",
+      "keyOriginal": "{key}",
+      "keyShift": "{key} ({n})",
+      "keyDown": "Down a half step",
+      "keyUp": "Up a half step",
+      "speed": "Speed",
+      "slower": "Slower",
+      "faster": "Faster",
+      "seePlans": "See plans",
+      "noChords": "The chords for this song aren't ready yet. In the full player you can generate or write them.",
+      "openFull": "Open full player",
+      "play": "Play",
+      "scrollAuto": "Scroll: auto",
+      "scrollManual": "Scroll: manual",
+      "fontDown": "Smaller text",
+      "fontUp": "Larger text",
+      "back10": "−10 s",
+      "fwd10": "+10 s",
+      "fixChart": "Fix chords"
+    }
   }
 }

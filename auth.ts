@@ -8,7 +8,7 @@ import { authConfig } from "./auth.config";
 import { expireTrialIfDue } from "@/src/lib/trials";
 import { track } from "@/src/lib/activity";
 import { isInternalTestEmail } from "@/src/lib/internalTest";
-import { verifyMagicToken } from "@/src/lib/authTokens";
+import { verifyMagicToken, verifyHandoffCode } from "@/src/lib/authTokens";
 import { onUserCreated } from "@/src/lib/lifecycle";
 
 // Conta impedida de logar: suspensa, banida ou em processo de exclusão (R3).
@@ -67,6 +67,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Conta nova → boas-vindas por e-mail (idioma vem do cookie/país).
           if (user) onUserCreated(user.id);
         }
+        if (!user || isLoginBlocked(user)) return null;
+        return { id: String(user.id), email: user.email, name: user.name, role: user.role };
+      },
+    }),
+    // Retorno do login Google feito no navegador do sistema pelo app nativo
+    // (Capacitor). O código só vale com o `verifier` que nunca saiu do app —
+    // ver createHandoffCode em src/lib/authTokens.ts. Não cria conta: o
+    // navegador já passou pelo signIn do Google, que faz o upsert.
+    Credentials({
+      id: "app-handoff",
+      name: "App",
+      credentials: {
+        code:     { label: "Code", type: "text" },
+        verifier: { label: "Verifier", type: "text" },
+      },
+      async authorize(credentials) {
+        const email = verifyHandoffCode(String(credentials?.code ?? ""), String(credentials?.verifier ?? ""));
+        if (!email) return null;
+        const [user] = await db.select().from(users).where(sql`lower(${users.email}) = ${email}`).limit(1);
         if (!user || isLoginBlocked(user)) return null;
         return { id: String(user.id), email: user.email, name: user.name, role: user.role };
       },

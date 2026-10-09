@@ -1,0 +1,4 @@
+# Projetos nativos do app (Capacitor) não entram no deploy do site.
+android/
+ios/
+assets/
