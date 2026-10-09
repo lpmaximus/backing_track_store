@@ -31,7 +31,9 @@ export type Action =
   // ─── Exclusivas do BTS-Studio (EVT-004) ────────────────────────────────
   | "guitar_tab" // ver a tablatura gerada automaticamente (BETA — ver nota)
   | "record_take" // gravar take próprio por cima dos stems (overdub)
-  | "copy_song"; // pegar música do catálogo para a sua área (/estudio)
+  | "copy_song" // pegar música do catálogo para a sua área (/estudio)
+  // ─── Todo plano pago (EVT-005) ─────────────────────────────────────────
+  | "loop_pedal"; // pedal de loop ao vivo — efêmero, não gera arquivo
 
 /**
  * Resolve o tipo efetivo do usuário a partir do role (users.role) + vínculo
@@ -64,6 +66,18 @@ const CAPABILITIES: Record<Action, ReadonlySet<UserType>> = {
   guitar_tab: new Set(["studio", "admin"]),
   record_take: new Set(["studio", "admin"]),
   copy_song: new Set(["studio", "admin"]),
+
+  // O pedal de loop usa o microfone, como `record_take` — e mesmo assim NÃO é
+  // exclusivo do Studio. A diferença que justifica isso não é de grau, é de
+  // natureza: o loop vive na memória da aba e some quando a janela fecha. Não
+  // vira arquivo, não sobe para o R2 e não deixa gravação de voz de ninguém
+  // parada num servidor, que é justamente o que a decisão de 14/08/2026 quis
+  // reservar ao tier. O que sobra é uma ferramenta de ensaio, da mesma família
+  // do loop A–B que o Pro já tem. Ver EVT-005 §7.
+  //
+  // Se um dia surgir "salvar o loop", ele NÃO herda esta linha: salvar produz
+  // arquivo e cai na régua do `record_take`.
+  loop_pedal: new Set(["pro", "proband", "studio", "admin"]),
 };
 
 /**

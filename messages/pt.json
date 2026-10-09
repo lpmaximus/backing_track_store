@@ -541,6 +541,63 @@
     "cutApplyFileBusy": "Aplicando…",
     "cutApplyFileTitle": "Grava os cortes dentro do arquivo da gravação. Não dá para desfazer.",
     "cutApplyConfirm": "Aplicar os cortes de \"{label}\" no arquivo? A partir daí não dá para trazer os trechos de volta — só gravando de novo.",
+    "looper": {
+      "title": "Pedal de loop",
+      "pitch": "Grave um trecho ao vivo e ele repete sozinho. Vá empilhando camadas por cima sem parar de tocar — para estudar improviso, montar uma harmonia ou ensaiar sem banda.",
+      "open": "Abrir pedal",
+      "close": "Fechar",
+      "arm": "Liberar microfone",
+      "headphones": "Use fone de ouvido. No alto-falante, o microfone captura o que já está tocando e o loop vai engrossando a cada volta.",
+      "input": "Entrada",
+      "help": "Interruptor esquerdo ({primary}): gravar, tocar e sobrepor, nessa ordem. Dois toques seguidos desfazem a última camada. Direito ({stop}): parar; segurar apaga tudo.",
+      "showSettings": "Ajustes",
+      "hideSettings": "Ocultar ajustes",
+      "level": "Nível",
+      "state": {
+        "idle": "PRONTO",
+        "recording": "GRAVANDO",
+        "playing": "TOCANDO",
+        "overdubbing": "SOBREPONDO",
+        "stopped": "PARADO"
+      },
+      "sw": {
+        "rec": "Gravar",
+        "play": "Tocar",
+        "dub": "Sobrepor",
+        "stop": "Parar"
+      },
+      "swUndo": "2 toques: desfazer",
+      "swClear": "segurar: apagar",
+      "micLabel": "Entrada",
+      "micDefault": "Padrão do sistema",
+      "micSwitchHelp": "Trocar de entrada vale a partir da próxima vez que você abrir o pedal.",
+      "gain": "Ganho de entrada",
+      "latency": "Latência",
+      "latencyAuto": "Estimar",
+      "latencyHelp": "Se as camadas sobrepostas soarem adiantadas ou atrasadas em relação à primeira, ajuste aqui e grave a camada de novo. O valor passa a valer na próxima camada.",
+      "monitor": "Ouvir a entrada pelo navegador",
+      "monitorHelp": "Só para quem toca plugado numa interface e não se ouve de outro jeito. Acrescenta um pequeno atraso — com microfone e instrumento acústico, deixe desligado.",
+      "pedalTitle": "Pedal de página (Bluetooth)",
+      "pedalHelp": "Pedal Bluetooth aparece para o computador como teclado: pisar nele envia uma tecla. Clique em Aprender e pise — funciona com qualquer modelo, sem instalar nada.",
+      "pedalSwitch": {
+        "primary": "Gravar/sobrepor",
+        "stop": "Parar"
+      },
+      "learn": "Aprender",
+      "learning": "Pise agora…",
+      "learnPrompt": "Pise no pedal ou aperte a tecla que quer usar. Esc cancela.",
+      "presets": "Comuns:",
+      "preset": {
+        "teclado": "Teclado",
+        "setas": "Setas",
+        "pagina": "Página"
+      },
+      "ephemeral": "O loop vive só enquanto esta janela estiver aberta: nada é enviado nem guardado. Fechar apaga.",
+      "full": "O loop chegou ao limite de {s} segundos e fechou sozinho.",
+      "unsupported": "Este navegador não tem o motor de áudio que o pedal precisa. Tente uma versão mais recente do Chrome, Edge, Firefox ou Safari.",
+      "micDenied": "Não consegui acessar o microfone. Confira a permissão do navegador para este site.",
+      "micGone": "A entrada escolhida não está mais disponível. Escolha outra nos ajustes."
+    },
     "cutApplyError": "Não foi possível aplicar os cortes no arquivo. Tente de novo."
   },
   "setlists": {

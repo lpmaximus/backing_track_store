@@ -13,6 +13,7 @@ import CifraEditor from "./CifraEditor";
 import Metronome from "./Metronome";
 import AdBanner from "@/app/components/AdBanner";
 import TakePanel from "./TakePanel";
+import LoopPedal from "./LoopPedal";
 import EstudioPanel, { type Versao } from "./EstudioPanel";
 import type { Stem, Take, Transport } from "./WavePlayer";
 import type { ResolvedStem } from "@/src/lib/mix";
@@ -101,6 +102,11 @@ export default function SongPlayer({
   const { data: sessionTakes } = useSession();
   const canRecord = roleCan(sessionTakes?.user?.role, "record_take");
   const canCopy = roleCan(sessionTakes?.user?.role, "copy_song");
+  // Pedal de loop (EVT-005). Capacidade PRÓPRIA, não um apêndice de
+  // `record_take`: o loop é efêmero, não vira arquivo e por isso vale em todo
+  // plano pago. `isPro` entra junto porque cobre o integrante de banda com
+  // assinatura ativa, que o role sozinho não revela.
+  const canLooper = isPro || roleCan(sessionTakes?.user?.role, "loop_pedal");
   const [takes, setTakes] = useState<Take[]>([]);
   const transportRef = useRef<Transport | null>(null);
 
@@ -608,6 +614,7 @@ export default function SongPlayer({
             bpm={song.bpm}
           />
         )}
+        {canLooper && <LoopPedal />}
         <Metronome beats={beats} currentTime={currentTime} enabled={metronome} />
 
         {/* ── Content: cifra + sidebar (empilha em telas estreitas — .player-content) ── */}

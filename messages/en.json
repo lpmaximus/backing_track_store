@@ -541,6 +541,63 @@
     "cutApplyFileBusy": "Applying…",
     "cutApplyFileTitle": "Writes the cuts into the recording's file. This cannot be undone.",
     "cutApplyConfirm": "Apply the cuts on \"{label}\" to the file? After this the passages can't be brought back — only re-recorded.",
+    "looper": {
+      "title": "Loop pedal",
+      "pitch": "Record a phrase live and it repeats on its own. Stack layers on top without stopping — for practising improvisation, building a harmony or rehearsing without a band.",
+      "open": "Open pedal",
+      "close": "Close",
+      "arm": "Enable microphone",
+      "headphones": "Use headphones. Through speakers, the mic picks up what is already playing and the loop thickens with every pass.",
+      "input": "Input",
+      "help": "Left switch ({primary}): record, play and overdub, in that order. Two quick taps undo the last layer. Right ({stop}): stop; hold to erase everything.",
+      "showSettings": "Settings",
+      "hideSettings": "Hide settings",
+      "level": "Level",
+      "state": {
+        "idle": "READY",
+        "recording": "RECORDING",
+        "playing": "PLAYING",
+        "overdubbing": "OVERDUB",
+        "stopped": "STOPPED"
+      },
+      "sw": {
+        "rec": "Record",
+        "play": "Play",
+        "dub": "Overdub",
+        "stop": "Stop"
+      },
+      "swUndo": "2 taps: undo",
+      "swClear": "hold: erase",
+      "micLabel": "Input",
+      "micDefault": "System default",
+      "micSwitchHelp": "Changing the input takes effect the next time you open the pedal.",
+      "gain": "Input gain",
+      "latency": "Latency",
+      "latencyAuto": "Estimate",
+      "latencyHelp": "If overdubbed layers sound early or late against the first one, adjust here and record the layer again. The value applies from the next layer on.",
+      "monitor": "Hear the input through the browser",
+      "monitorHelp": "Only for players plugged into an audio interface with no other way to hear themselves. It adds a little delay — with a microphone and an acoustic instrument, leave it off.",
+      "pedalTitle": "Page pedal (Bluetooth)",
+      "pedalHelp": "A Bluetooth pedal shows up to the computer as a keyboard: stepping on it sends a key. Click Learn and step on it — works with any model, nothing to install.",
+      "pedalSwitch": {
+        "primary": "Record/overdub",
+        "stop": "Stop"
+      },
+      "learn": "Learn",
+      "learning": "Step now…",
+      "learnPrompt": "Step on the pedal or press the key you want to use. Esc cancels.",
+      "presets": "Common:",
+      "preset": {
+        "teclado": "Keyboard",
+        "setas": "Arrows",
+        "pagina": "Page"
+      },
+      "ephemeral": "The loop lives only while this window is open: nothing is uploaded or stored. Closing erases it.",
+      "full": "The loop hit the {s}-second limit and closed on its own.",
+      "unsupported": "This browser lacks the audio engine the pedal needs. Try a newer version of Chrome, Edge, Firefox or Safari.",
+      "micDenied": "I could not reach the microphone. Check the browser permission for this site.",
+      "micGone": "The selected input is no longer available. Pick another one in settings."
+    },
     "cutApplyError": "Couldn't apply the cuts to the file. Try again."
   },
   "setlists": {

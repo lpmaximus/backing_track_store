@@ -82,6 +82,15 @@ describe("tier studio", () => {
     expect(can("proband", "record_take")).toBe(false);
   });
 
+  it("uma capacidade aberta ao Pro NÃO vira brecha nas exclusivas", () => {
+    // O pedal de loop (EVT-005) mora na mesma matriz e vale para todo plano
+    // pago. O risco é o inverso do de sempre: alguém copiar a linha dele ao
+    // criar a próxima função com microfone e liberar, sem querer, gravação que
+    // gera arquivo. Estes dois asserts quebram se isso acontecer.
+    expect(can("pro", "loop_pedal")).toBe(true);
+    expect(can("pro", "record_take")).toBe(false);
+  });
+
   it("admin continua sendo supraconjunto do studio", () => {
     expect(can("admin", "guitar_tab")).toBe(true);
     expect(can("admin", "record_take")).toBe(true);
