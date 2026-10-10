@@ -45,13 +45,13 @@ export default async function HomeView({ locale, user, nextEvent, recent, unread
             <Wordmark />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <Link href="/conta" className="app-icon-btn" aria-label={unread ? t("messagesUnread", { n: unread }) : t("messages")}>
+            <Link href="/app/mensagens" className="app-icon-btn" aria-label={unread ? t("messagesUnread", { n: unread }) : t("messages")}>
               <IconBell size={20} />
               {unread > 0 && (
                 <span style={{ position: "absolute", top: 9, right: 10, width: 8, height: 8, borderRadius: 4, background: "var(--accent)" }} />
               )}
             </Link>
-            <Link href="/conta" className="app-icon-btn" aria-label={t("account")}
+            <Link href="/app/conta" className="app-icon-btn" aria-label={t("account")}
               style={{ background: "var(--surface3)", border: 0, fontWeight: 700, fontSize: 14 }}>
               {initials(user.name, user.email)}
             </Link>
@@ -84,13 +84,13 @@ export default async function HomeView({ locale, user, nextEvent, recent, unread
           <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <h2 className="app-section-title">{t(nextEvent.type === "show" ? "nextShow" : "nextRehearsal")}</h2>
-              <Link href={{ pathname: "/setlists/[id]", params: { id: String(nextEvent.setlistId) } }}
+              <Link href={{ pathname: "/app/setlists/[id]", params: { id: String(nextEvent.setlistId) } }}
                 style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>
                 {t("seeSetlist")}
               </Link>
             </div>
             <Link
-              href={{ pathname: "/setlists/[id]/ensaios/[eventId]", params: { id: String(nextEvent.setlistId), eventId: String(nextEvent.id) } }}
+              href={{ pathname: "/app/setlists/[id]", params: { id: String(nextEvent.setlistId) } }}
               className="app-card"
               style={{ padding: 16, display: "flex", alignItems: "center", gap: 14 }}
             >

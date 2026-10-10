@@ -7,6 +7,7 @@ import { Link, useRouter } from "@/src/i18n/navigation";
 import { track } from "@/app/track";
 import { haptic, keepScreenOn } from "@/src/lib/native";
 import type { Stem, Transport } from "@/app/[locale]/song/[slug]/WavePlayer";
+import type { ResolvedStem } from "@/src/lib/mix";
 import { CifraText, CifraView, formatTime, type ChordSection, type LyricsLine } from "@/app/[locale]/song/[slug]/CifraView";
 import { IconBack, IconPause, IconPlay } from "../../_components/AppIcons";
 
@@ -42,8 +43,19 @@ const PITCH_MAX = 6;
  * aba não pode parar a música nem recarregar os stems. Na aba Cifra o
  * transporte é o mini-player de baixo, que fala com o motor pelo transportRef.
  */
-export default function AppSongScreen({ song, stems, isPro, initialTab }: {
+type SetlistContext = {
+  id: number;
+  name: string | null;
+  mix: ResolvedStem[];
+  transpose: number;
+  speed: number;
+};
+
+export default function AppSongScreen({ song, stems, isPro, initialTab, soloInstrument = null, setlist = null }: {
   song: Song; stems: Stem[]; isPro: boolean; initialTab: Tab;
+  soloInstrument?: string | null;
+  /** Aberta pelo setlist (?sl=): mixagem/tom/velocidade já resolvidos no servidor. */
+  setlist?: SetlistContext | null;
 }) {
   const t = useTranslations("app.player");
   const ts = useTranslations("song");
@@ -53,8 +65,8 @@ export default function AppSongScreen({ song, stems, isPro, initialTab }: {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(song.duration || 0);
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(1);
-  const [pitch, setPitch] = useState(0);
+  const [speed, setSpeed] = useState(setlist?.speed ?? 1);
+  const [pitch, setPitch] = useState(setlist?.transpose ?? 0);
   const [fontSize, setFontSize] = useState(16);
   const [autoFollow, setAutoFollow] = useState(true);
   const transportRef = useRef<Transport | null>(null);
@@ -111,6 +123,7 @@ export default function AppSongScreen({ song, stems, isPro, initialTab }: {
 
   function goBack() {
     if (window.history.length > 1) router.back();
+    else if (setlist) router.push({ pathname: "/app/setlists/[id]", params: { id: String(setlist.id) } });
     else router.push("/app");
   }
 
@@ -185,6 +198,17 @@ export default function AppSongScreen({ song, stems, isPro, initialTab }: {
         <button role="tab" type="button" aria-selected={tab === "cifra"} onClick={() => switchTab("cifra")}>{t("tabChords")}</button>
       </div>
 
+      {setlist && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 12, background: "rgba(255,154,0,0.08)", border: "1px solid rgba(255,154,0,0.25)", fontSize: 12, color: "#c8c8ce" }}>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            {setlist.name ? t("setlistMix", { name: setlist.name }) : t("setlistMixNoName")}
+          </span>
+          <Link href={{ pathname: "/app/song/[slug]", params: { slug: song.slug } }} replace style={{ color: "var(--accent)", fontWeight: 700, flexShrink: 0 }}>
+            {t("useOriginal")}
+          </Link>
+        </div>
+      )}
+
       {/* Motor + mesa: sempre montado; na aba Cifra fica fora da tela. */}
       {/* Fora da tela, e não display:none: o WaveSurfer mede a largura do
           contêiner ao montar — escondido com display:none ele nasceria com 0px
@@ -208,6 +232,8 @@ export default function AppSongScreen({ song, stems, isPro, initialTab }: {
           onMixerTouch={() => track("mixer", { songId: song.id })}
           speed={speed}
           pitch={pitch}
+          soloInstrument={soloInstrument}
+          initialMix={setlist?.mix ?? null}
           transportRef={transportRef}
           projectMode={song.projectMode}
         />

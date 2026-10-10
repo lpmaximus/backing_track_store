@@ -67,6 +67,11 @@ export const pathnames = {
   "/app/handoff": "/app/handoff",
   "/app/estudio": "/app/estudio",
   "/app/song/[slug]": "/app/song/[slug]",
+  "/app/setlists": "/app/setlists",
+  "/app/setlists/[id]": "/app/setlists/[id]",
+  "/app/bandas": "/app/bandas",
+  "/app/conta": "/app/conta",
+  "/app/mensagens": "/app/mensagens",
 
   // Legal
   "/termos": { pt: "/termos", en: "/terms" },
