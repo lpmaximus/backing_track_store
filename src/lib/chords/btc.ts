@@ -22,7 +22,7 @@ import type {
   ChordPollResult,
   ChordMeta,
 } from "./types";
-import { toSections, distinctCount, type DetectedChord } from "./sections";
+import { toSections, distinctCount, assessConfidence, type DetectedChord } from "./sections";
 import { keyFromChords, keyUsesFlats, respell } from "./spelling";
 
 import { replicateCreatePrediction } from "../replicateSubmit";
@@ -174,7 +174,11 @@ export class BTCChordProvider implements ChordDetectionProvider {
       // Tom pela HARMONIA detectada, não pelo chroma do mix (que confundia Cm
       // com Gm). E grafia na armadura do tom: o BTC só fala sustenido, então
       // "G# D# A#" em Dó menor vira "Ab Eb Bb". Ver spelling.ts.
-      const chordKey = keyFromChords(detected);
+      // Cifra de baixa confiança (acordes sem tom): o "tom" deduzido deles seria
+      // lixo (Creeping Death saiu "Am" sendo Mi menor) — não sobrescreve o tom do
+      // librosa nesse caso.
+      const confidence = assessConfidence(detected);
+      const chordKey = confidence === "low" ? "" : keyFromChords(detected);
       if (chordKey) {
         if (meta) meta.key = chordKey;
       }
@@ -182,7 +186,8 @@ export class BTCChordProvider implements ChordDetectionProvider {
       if (flats !== null) detected = detected.map((c) => ({ ...c, label: respell(c.label, flats) }));
       const metaOut = meta ?? (chordKey ? { key: chordKey } : undefined);
 
-      const sections = toSections(detected);
+      const baseSections = toSections(detected);
+      const sections = confidence === "low" ? baseSections.map((s) => ({ ...s, lowConfidence: true })) : baseSections;
 
       if (sections.length === 0) {
         return { status: "failed", error: "Nenhum acorde detectado", meta: metaOut };

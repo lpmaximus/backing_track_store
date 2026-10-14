@@ -20,6 +20,12 @@ export interface ChordSection {
    * a correção manual. Agora o editor marca explicitamente.
    */
   aligned?: boolean;
+  /**
+   * true = cifra AUTOMÁTICA com baixa confiança (acordes que não formam um tom —
+   * típico de metal/distorção). Some quando uma pessoa salva a correção, porque
+   * o editor grava seções novas sem este campo. Ver assessConfidence.
+   */
+  lowConfidence?: boolean;
 }
 
 export interface ChordDetectionSubmitResult {

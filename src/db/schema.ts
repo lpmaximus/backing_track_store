@@ -726,6 +726,8 @@ export interface ChordSection {
   // sem redistribuir os acordes por tempo. Campo novo em jsonb: retrocompatível,
   // cifras antigas simplesmente não têm.
   aligned?: boolean;
+  // true = cifra AUTOMÁTICA de baixa confiança (ver src/lib/chords/sections.ts).
+  lowConfidence?: boolean;
 }
 
 export interface LyricsWord {

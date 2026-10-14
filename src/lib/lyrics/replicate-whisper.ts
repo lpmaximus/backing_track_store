@@ -53,7 +53,7 @@ export class ReplicateWhisperProvider implements LyricsProvider {
     return Boolean(process.env.REPLICATE_API_TOKEN && process.env.REPLICATE_WHISPER_VERSION);
   }
 
-  async submit(vocalUrl: string, opts?: { fast?: boolean }): Promise<LyricsSubmitResult> {
+  async submit(vocalUrl: string, opts?: { fast?: boolean; relaxed?: boolean }): Promise<LyricsSubmitResult> {
     if (!this.isConfigured()) throw new Error("Whisper (Replicate) não configurado");
     const input: Record<string, unknown> = {
       audio: vocalUrl,
@@ -68,6 +68,13 @@ export class ReplicateWhisperProvider implements LyricsProvider {
       no_speech_threshold: 0.6,
       compression_ratio_threshold: 2.4,
     };
+    // 2ª tentativa (a 1ª voltou vazia): vocal gritado/distorcido pode ter sido
+    // lido como "sem fala". Afrouxa os limiares; o sanitizeLyrics ainda limpa.
+    if (opts?.relaxed) {
+      input.no_speech_threshold = 0.9;
+      input.compression_ratio_threshold = 3.2;
+      input.logprob_threshold = -1.5;
+    }
     // Idioma fixo elimina a deriva do large-v3, que redetecta ao longo da faixa
     // e escorrega de alfabeto no meio da música. Sem a env, segue automático — e
     // aí quem segura a deriva é o sanitizeLyrics no poll.

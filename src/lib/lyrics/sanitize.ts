@@ -91,6 +91,47 @@ const repeatKey = (text: string) =>
   text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
 
 /**
+ * 4. ALUCINAÇÃO DE SILÊNCIO — o Whisper, diante de trecho sem voz (intro
+ * instrumental, vazamento de guitarra no stem), inventa texto da sua base de
+ * treino. Caso real em produção: "Satsang with Mooji" em 0:00 numa música do
+ * Metallica. Três frentes:
+ *   • frases-assinatura conhecidas (créditos de legenda, "obrigado por assistir",
+ *     URLs, [Music]…) — descartadas sempre;
+ *   • frases curtas genéricas ("Thank you.", "E aí", "Música") — só se ISOLADAS
+ *     (>25 s de distância das linhas vizinhas), porque no meio de uma letra
+ *     podem ser canto de verdade;
+ *   • linha curta (≤5 palavras) na PONTA da faixa, separada do resto por >40 s —
+ *     sobra do trecho instrumental da intro/outro.
+ */
+const HALLUCINATION_ALWAYS: RegExp[] = [
+  /\b(satsang|mooji)\b/i,
+  /amara\.org|https?:\/\/|www\./i,
+  /legendas?\s+(pela|por|de)\b|subtitles?\s+(by|from)\b|transcribed by/i,
+  /obrigad[oa]\s+por\s+(assistir|ver)|thanks?\s+for\s+watching|please\s+subscribe|inscreva-se/i,
+  /^\s*[\[(♪\s]*(music|música|musica|applause|aplausos|silence|silêncio)[\])♪\s.]*$/i,
+];
+const HALLUCINATION_STOCK = /^\s*(thank you|thanks|obrigad[oa]|e aí|música|music|amém|amen|tchau|bye|you)[\s.!,]*$/i;
+const ISOLATION_GAP_S = 25;
+const EDGE_GAP_S = 40;
+
+export function dropHallucinations(lines: LyricsLine[]): LyricsLine[] {
+  const kept = lines.filter((l) => !HALLUCINATION_ALWAYS.some((re) => re.test(l.text)));
+  return kept.filter((l, i) => {
+    const prev = kept[i - 1];
+    const next = kept[i + 1];
+    const gapPrev = prev ? l.time - prev.time : Infinity;
+    const gapNext = next ? next.time - l.time : Infinity;
+    const nearest = Math.min(gapPrev, gapNext);
+    if (HALLUCINATION_STOCK.test(l.text) && nearest > ISOLATION_GAP_S) return false;
+    const words = l.text.trim().split(/\s+/).length;
+    const isFirst = !prev;
+    const isLast = !next;
+    if (words <= 5 && nearest > EDGE_GAP_S && ((isFirst && l.time < 10) || isLast)) return false;
+    return true;
+  });
+}
+
+/**
  * Aplica as três limpezas e devolve a letra em ordem de tempo. Sempre devolve um
  * array (possivelmente vazio) — quem chama decide se vazio é falha.
  */
@@ -107,11 +148,12 @@ export function sanitizeLyrics(lines: LyricsLine[]): LyricsLine[] {
   }
 
   cleaned.sort((a, b) => a.time - b.time);
+  const sane = dropHallucinations(cleaned);
 
   const out: LyricsLine[] = [];
   let lastKey = "";
   let run = 0;
-  for (const line of cleaned) {
+  for (const line of sane) {
     const key = repeatKey(line.text);
     if (key && key === lastKey) {
       run++;

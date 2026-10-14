@@ -1,8 +1,9 @@
 /**
  * POST /api/jobs/backfill   (admin / cron)
  *
- * Cria os jobs de CIFRA e LETRA para músicas que foram separadas ANTES do
- * pipeline automático existir. O webhook de separação só dispara cifra/letra em
+ * ENFILEIRA os jobs de CIFRA e LETRA para músicas que ainda precisam deles
+ * (separadas antes do pipeline automático, ou cujo job falhou) e submete até
+ * `max` por chamada; o resto é submetido pelo worker /api/jobs/finalize. O webhook de separação só dispara cifra/letra em
  * separações novas; as músicas antigas ficaram sem job nenhum e, por isso, nunca
  * preenchem sozinhas. Este endpoint varre as músicas já prontas (`ready`) que
  * ainda não têm cifra/letra nem job criado e submete os jobs sobre os stems já
@@ -19,6 +20,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, songs, stems, processingJobs } from "@/src/db";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { enqueueJob, submitJob, type JobStage } from "@/src/lib/jobs/queue";
+import { isPermanent, PERM_PREFIX } from "@/src/lib/jobs/retry";
 import { isAdminRequest } from "@/src/lib/adminAuth";
 import { getChordProvider } from "@/src/lib/chords";
 import { pickChordAudio } from "@/src/lib/chords/source";
@@ -65,23 +68,38 @@ async function runBackfill(req: NextRequest) {
   }
 
   try {
-    // Músicas já separadas que AINDA precisam de algo. Antes a query trazia as
-    // `limit` primeiras músicas prontas sem filtro nem ordem — com o acervo
-    // crescendo, as que já tinham cifra ocupavam a janela e as do catálogo
-    // (importadas pelo scripts/import-batch.mjs, que não cria job) nunca eram
-    // alcançadas. Diagnóstico de 09/10/2026: 55 de 55 bases sem cifra e sem job.
+    // Músicas já separadas que AINDA precisam de algo — e que ALGUÉM PODE ATENDER.
+    //
+    // O filtro é feito no SQL, não depois do limit. Antes a janela (`limit`
+    // primeiras por id) enchia de músicas que nunca serão atendidas — faixas
+    // instrumentais (sem vocal, nunca terão letra), cifra que falhou de forma
+    // definitiva, jobs já em andamento — e as músicas novas ficavam fora da
+    // janela: "scanned 20, skipped 20" com a #227 esperando. Agora só entra quem:
+    //   • falta cifra e não há job ativo/concluído nem falha DEFINITIVA de cifra;
+    //   • falta letra, TEM stem de vocal e não há job ativo/concluído nem falha
+    //     DEFINITIVA de letra.
+    // Falha transitória esgotada (sem marca [perm]) volta a entrar: é o retry
+    // de longo prazo. Ver src/lib/jobs/retry.ts.
+    const permLike = `${PERM_PREFIX}%`;
+    const noBlockingJob = (stage: JobStage) => sql`NOT EXISTS (
+      SELECT 1 FROM ${processingJobs} j
+      WHERE j.song_id = ${songs.id} AND j.stage = ${stage}
+        AND (j.status IN ('pending','running','done')
+             OR (j.status = 'failed' AND j.error_message LIKE ${permLike}))
+    )`;
+    const hasVocal = sql`EXISTS (SELECT 1 FROM ${stems} sv WHERE sv.song_id = ${songs.id} AND sv.instrument = 'vocal')`;
     const missingChords = sql`(${songs.chords} IS NULL OR jsonb_array_length(${songs.chords}) = 0)`;
     const missingLyrics = sql`(${songs.lyrics} IS NULL OR jsonb_array_length(${songs.lyrics}) = 0)`;
     const missingBpm = sql`(${songs.bpm} IS NULL OR ${songs.bpm} <= 0)`;
+    const needsChords = sql`(${missingChords} AND ${noBlockingJob("chord_detection")})`;
+    const needsLyrics = sql`(${missingLyrics} AND ${hasVocal} AND ${noBlockingJob("lyrics_detection")})`;
+    // refreshMeta: reanalisa quem já tem cifra mas não tem BPM (não sobrescreve a cifra).
+    const needsAnything = refreshMeta ? sql`(${needsChords} OR ${needsLyrics} OR ${missingBpm})` : sql`(${needsChords} OR ${needsLyrics})`;
+
     const ready = await db
       .select()
       .from(songs)
-      .where(
-        and(
-          eq(songs.processingStatus, "ready"),
-          refreshMeta ? sql`(${missingChords} OR ${missingLyrics} OR ${missingBpm})` : sql`(${missingChords} OR ${missingLyrics})`,
-        ),
-      )
+      .where(and(eq(songs.processingStatus, "ready"), needsAnything))
       .orderBy(asc(songs.id))
       .limit(limit);
     if (ready.length === 0) return NextResponse.json({ ok: true, ...summary });
@@ -93,100 +111,78 @@ async function runBackfill(req: NextRequest) {
     const existingJobs = await db
       .select()
       .from(processingJobs)
-      .where(
-        and(
-          inArray(processingJobs.songId, ids),
-          inArray(processingJobs.stage, ["chord_detection", "lyrics_detection"]),
-        ),
+      .where(and(inArray(processingJobs.songId, ids), inArray(processingJobs.stage, ["chord_detection", "lyrics_detection"])));
+
+    // Bloqueia quem já tem job ativo/concluído OU falha definitiva. Falha
+    // transitória esgotada é reprocessada (retry de longo prazo).
+    const blocked = (stage: JobStage) =>
+      new Set(
+        existingJobs
+          .filter((j) => j.stage === stage && (j.status !== "failed" || isPermanent(j.errorMessage)))
+          .map((j) => j.songId),
       );
+    const chordBlocked = blocked("chord_detection");
+    const lyricsBlocked = blocked("lyrics_detection");
 
-    // Só bloqueia quem já tem job NÃO-falho (pending/running/done). Jobs 'failed'
-    // (ex.: 429 do Replicate) são reprocessados — é o retry automático.
-    const hasChordJob = new Set(existingJobs.filter((j) => j.stage === "chord_detection" && j.status !== "failed").map((j) => j.songId));
-    const hasLyricsJob = new Set(existingJobs.filter((j) => j.stage === "lyrics_detection" && j.status !== "failed").map((j) => j.songId));
-
-    // Teto de submissões por chamada: respeita o "burst" do Replicate e evita
-    // timeout da função serverless. Se sobrar, é só chamar o backfill de novo.
+    // ENFILEIRA tudo que a janela trouxe (inserir `pending` é barato) e submete
+    // só até MAX_SUBMITS por chamada, respeitando o burst do Replicate. O resto
+    // fica `pending` e é submetido pelo worker (/api/jobs/finalize, a cada 5 min).
     // ?max= sobe o teto (até 20) para o cron diário, com pausa entre submits.
     const MAX_SUBMITS = Math.min(Math.max(Number(url.searchParams.get("max")) || 5, 1), 20);
     let submitted = 0;
+    let throttled = false;
     const pause = () => new Promise((r) => setTimeout(r, MAX_SUBMITS > 5 ? 1200 : 0));
 
-    // Quem nunca teve job vai na frente de quem já falhou: uma música que
-    // falha sempre (ex.: "Nenhum acorde detectado") não pode tomar a vaga das
-    // que nunca foram tentadas a cada chamada.
+    // Quem nunca teve job vai na frente de quem já falhou.
     const failedChord = new Set(existingJobs.filter((j) => j.stage === "chord_detection" && j.status === "failed").map((j) => j.songId));
     ready.sort((a, b) => Number(failedChord.has(a.id)) - Number(failedChord.has(b.id)));
 
-    // Cria o job e submete; apaga jobs 'failed' antigos do mesmo estágio (não acumula).
-    async function createJob(
-      songId: number,
-      stage: "chord_detection" | "lyrics_detection",
-      providerName: string,
-      submit: () => Promise<{ providerJobId: string }>,
-    ): Promise<boolean> {
-      await db.delete(processingJobs).where(and(
-        eq(processingJobs.songId, songId),
-        eq(processingJobs.stage, stage),
-        eq(processingJobs.status, "failed"),
-      ));
-      const [job] = await db
-        .insert(processingJobs)
-        .values({ songId, provider: providerName, stage, status: "pending" })
-        .returning();
-      try {
-        const { providerJobId } = await submit();
-        await db.update(processingJobs).set({ providerJobId, status: "running" }).where(eq(processingJobs.id, job.id));
-        return true;
-      } catch (submitErr) {
-        console.error(`[jobs/backfill] ${stage} submit song#${songId}`, submitErr);
-        await db.update(processingJobs).set({ status: "failed", errorMessage: String(submitErr).slice(0, 500) }).where(eq(processingJobs.id, job.id));
-        return false;
+    async function enqueueAndTry(songId: number, stage: JobStage, providerName: string) {
+      const job = await enqueueJob(songId, stage, providerName);
+      if (!throttled && submitted < MAX_SUBMITS) {
+        await pause();
+        const r = await submitJob(job);
+        if (r === "submitted") submitted++;
+        if (r === "throttled") throttled = true;
       }
     }
 
     for (const song of ready) {
       summary.scanned++;
-      if (submitted >= MAX_SUBMITS) { summary.skipped++; continue; }
       const songStems = allStems.filter((s) => s.songId === song.id);
       let touched = false;
 
       // ── Cifra (e/ou meta: bpm/tom/batidas) ──
       const alreadyHasChords = Boolean(song.chords && song.chords.length > 0);
-      // Critério = falta BPM (o que a detecção preenche de forma confiável). As
-      // batidas o app deriva do BPM (o stem de harmonia não dá beats por si só).
       const needsMeta = refreshMeta && !(song.bpm && song.bpm > 0);
-      // Roda se: falta cifra (fluxo normal) OU falta o meta (reanálise) — nesse
-      // caso mesmo com cifra/job existente, pois só o meta será atualizado.
-      if (chordsOn && submitted < MAX_SUBMITS && (needsMeta || (!alreadyHasChords && !hasChordJob.has(song.id)))) {
-        // Fonte da cifra: o MIX quando ainda existe, senão guitar/harmony/melody.
-        // NUNCA songStems[0] (podia ser a bateria) e nunca o resíduo "harmony"
-        // por padrão — ver src/lib/chords/source.ts.
-        const source = pickChordAudio(song.audioUrl, songStems);
-        if (source) {
-          submitted++;
-          await pause();
-          if (await createJob(song.id, "chord_detection", chordProvider.name, () => chordProvider.submit(source.url))) {
-            summary.chordJobsCreated++; touched = true;
-          }
+      if (chordsOn && (needsMeta || (!alreadyHasChords && !chordBlocked.has(song.id)))) {
+        // Há de onde detectar? (mix, senão guitar/harmony/melody — ver source.ts).
+        // Sem fonte o submitJob marcaria falha definitiva; poupa o job.
+        if (pickChordAudio(song.audioUrl, songStems)) {
+          await enqueueAndTry(song.id, "chord_detection", chordProvider.name);
+          summary.chordJobsCreated++; touched = true;
+        } else if (!needsMeta) {
+          // Sem fonte de áudio: registra falha DEFINITIVA para a música sair da
+          // janela da próxima varredura (senão ela volta aqui para sempre).
+          await db.insert(processingJobs).values({
+            songId: song.id, provider: chordProvider.name, stage: "chord_detection", status: "failed",
+            errorMessage: `${PERM_PREFIX} Sem áudio elegível para detectar a cifra`, completedAt: new Date(),
+          });
         }
       }
 
       // ── Letra ──
       const alreadyHasLyrics = Boolean(song.lyrics && song.lyrics.length > 0);
       const vocal = songStems.find((s) => s.instrument === "vocal");
-      if (lyricsOn && !alreadyHasLyrics && !hasLyricsJob.has(song.id) && vocal && submitted < MAX_SUBMITS) {
-        submitted++;
-        await pause();
-        if (await createJob(song.id, "lyrics_detection", lyricsProvider.name, () => lyricsProvider.submit(vocal.audioUrl))) {
-          summary.lyricsJobsCreated++; touched = true;
-        }
+      if (lyricsOn && !alreadyHasLyrics && !lyricsBlocked.has(song.id) && vocal) {
+        await enqueueAndTry(song.id, "lyrics_detection", lyricsProvider.name);
+        summary.lyricsJobsCreated++; touched = true;
       }
 
       if (!touched) summary.skipped++;
     }
 
-    return NextResponse.json({ ok: true, ...summary, submitted, capped: submitted >= MAX_SUBMITS });
+    return NextResponse.json({ ok: true, ...summary, submitted, throttled, capped: submitted >= MAX_SUBMITS });
   } catch (err) {
     console.error("[POST /api/jobs/backfill]", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

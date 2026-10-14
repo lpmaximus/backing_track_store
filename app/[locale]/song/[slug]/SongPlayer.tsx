@@ -629,7 +629,7 @@ export default function SongPlayer({
               <div style={{ borderBottom: "1px solid var(--border)", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <span style={{ background: "var(--accent)", color: "#000", border: "1px solid var(--border2)", borderRadius: 6, padding: "3px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em" }}>{t("chordsTab")}</span>
                 {(isDraft && hasChords) || (lyricsIsDraft && hasLyrics) ? (
-                  <span style={{ background: "rgba(245,158,11,0.15)", color: "#b45309", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4 }}>{t("badgeAuto")}</span>
+                  <span style={{ background: "rgba(245,158,11,0.15)", color: "#b45309", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4 }}>{isDraft && hasChords && chords?.[0]?.lowConfidence ? t("badgeAutoLow") : t("badgeAuto")}</span>
                 ) : hasChords ? (
                   <span style={{ background: "rgba(255,154,0,0.15)", color: "var(--accent)", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4 }}>{t("badgeSynced")}</span>
                 ) : null}

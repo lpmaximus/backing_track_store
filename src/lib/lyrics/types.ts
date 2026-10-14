@@ -33,7 +33,12 @@ export interface LyricsProvider {
   /** true se as env vars necessárias estão presentes. */
   isConfigured(): boolean;
   /** Cria o job de transcrição sobre a URL do stem de vocal. */
-  submit(vocalUrl: string, opts?: { fast?: boolean }): Promise<LyricsSubmitResult>;
+  /**
+   * `fast`: sem espera/retry num 429 (quem chama reenfileira).
+   * `relaxed`: parâmetros mais permissivos — usado na 2ª tentativa quando a 1ª
+   * devolveu letra vazia (filtros de silêncio podem ter descartado canto gritado).
+   */
+  submit(vocalUrl: string, opts?: { fast?: boolean; relaxed?: boolean }): Promise<LyricsSubmitResult>;
   /** Consulta o job; devolve running/done(linhas)/failed. */
   poll(providerJobId: string): Promise<LyricsPollResult>;
 }

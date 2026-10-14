@@ -380,6 +380,7 @@
     },
     "chordsTab": "CIFRA",
     "badgeAuto": "● AUTOMÁTICA · não revisada",
+    "badgeAutoLow": "● AUTOMÁTICA · baixa confiança — confira e corrija",
     "badgeSynced": "● SINCRONIZADA",
     "fixChart": "✎ Corrigir letra/cifra",
     "generating": "Gerando cifra automática… isso pode levar alguns minutos.",

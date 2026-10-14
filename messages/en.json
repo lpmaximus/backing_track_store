@@ -380,6 +380,7 @@
     },
     "chordsTab": "CHORDS",
     "badgeAuto": "● AUTOMATIC · not reviewed",
+    "badgeAutoLow": "● AUTOMATIC · low confidence — please check and fix",
     "badgeSynced": "● SYNCED",
     "fixChart": "✎ Fix lyrics/chords",
     "generating": "Generating the chord chart… this can take a few minutes.",

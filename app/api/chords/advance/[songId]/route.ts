@@ -1,9 +1,13 @@
 /**
  * GET /api/chords/advance/:songId  (Fase 1.5, Frente C)
  *
- * Avança o job de detecção de cifra (Music.ai é por polling). Pode ser chamado
- * pelo poll do client na página da música OU por um cron (Vercel) que varre jobs
- * pendentes. Idempotente: se o job já terminou, só devolve o estado atual.
+ * Avança o job de detecção de cifra (por polling no provider). Chamado pelo poll
+ * do client na página da música OU por cron. Idempotente: se o job já terminou,
+ * só devolve o estado atual.
+ *
+ * Toda a lógica de submit / poll / retry vive em src/lib/jobs/queue.ts (a mesma
+ * usada pelo webhook, pelo cron finalize e pelo backfill): um erro transitório
+ * do provider devolve o job à fila em vez de matá-lo.
  *
  * Auth: sessão logada OU header x-cron-secret === CRON_SECRET.
  */
@@ -11,18 +15,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db, songs, processingJobs } from "@/src/db";
 import { and, eq, desc } from "drizzle-orm";
+import { pollJob, submitJob } from "@/src/lib/jobs/queue";
 import { getChordProvider } from "@/src/lib/chords";
-import { purgeSourceMix } from "@/src/lib/retention";
-import type { ChordMeta } from "@/src/lib/chords/types";
-
-/** Campos de bpm/tom/batidas a gravar, quando o detector devolveu algum. */
-function metaPatch(m: ChordMeta | undefined) {
-  return {
-    ...(m?.bpm ? { bpm: m.bpm } : {}),
-    ...(m?.key ? { key: m.key } : {}),
-    ...(m?.beats?.length ? { beats: m.beats } : {}),
-  };
-}
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ songId: string }> }) {
   const session = await auth();
@@ -44,12 +38,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ song
       return NextResponse.json({ chordsStatus: song.chordsStatus, chords: song.chords, jobStatus: "done" });
     }
 
-    const [job] = await db
+    let [job] = await db
       .select()
       .from(processingJobs)
       .where(and(eq(processingJobs.songId, songId), eq(processingJobs.stage, "chord_detection")))
       .orderBy(desc(processingJobs.id))
       .limit(1);
+
+    // Job na fila (nasceu pending ou voltou de um retry): este poll submete.
+    if (job && job.status === "pending" && !job.providerJobId && getChordProvider().isConfigured()) {
+      await submitJob(job);
+      [job] = await db.select().from(processingJobs).where(eq(processingJobs.id, job.id)).limit(1);
+    }
+
+    if (job && job.status === "pending") {
+      // Ainda na fila (429 do Replicate ou retry agendado).
+      return NextResponse.json({ chordsStatus: "generating", chords: null, jobStatus: "running" });
+    }
 
     if (!job || !job.providerJobId || job.status === "done" || job.status === "failed") {
       return NextResponse.json({
@@ -59,48 +64,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ song
       });
     }
 
-    // Job em andamento → consulta o provider.
-    const provider = getChordProvider();
-    const result = await provider.poll(job.providerJobId);
-
-    if (result.status === "running") {
+    const outcome = await pollJob(job, song);
+    if (outcome === "running" || outcome === "retry") {
       return NextResponse.json({ chordsStatus: "generating", chords: null, jobStatus: "running" });
     }
-
-    if (result.status === "failed") {
-      // BPM, tom e batidas vêm da MESMA execução do detector e não dependem de a
-      // cifra ter saído. Descartá-los junto com a cifra era o motivo de "Tom ?" e
-      // "BPM 0" justamente nas músicas em que a detecção falhava.
-      const patch = metaPatch(result.meta);
-      if (Object.keys(patch).length > 0) {
-        await db.update(songs).set(patch).where(eq(songs.id, songId));
-      }
-      await db
-        .update(processingJobs)
-        .set({ status: "failed", errorMessage: result.error.slice(0, 500), completedAt: new Date() })
-        .where(eq(processingJobs.id, job.id));
-      // O mix só era guardado por causa deste job — pode ir embora (EVT 5.1).
-      await purgeSourceMix(songId);
+    if (outcome === "failed") {
       return NextResponse.json({ chordsStatus: song.chordsStatus, chords: song.chords ?? null, jobStatus: "failed" });
     }
 
-    // Sucesso: salva a cifra automática (draft), a menos que já exista cifra da comunidade.
-    const setChords = !(song.chords && song.chords.length > 0);
-    const patch = metaPatch(result.meta);
-    if (setChords || Object.keys(patch).length > 0) {
-      await db.update(songs).set({
-        ...(setChords ? { chords: result.sections, chordsSource: "auto" as const, chordsStatus: "draft" as const } : {}),
-        ...patch,
-      }).where(eq(songs.id, songId));
-    }
-    await db
-      .update(processingJobs)
-      .set({ status: "done", completedAt: new Date() })
-      .where(eq(processingJobs.id, job.id));
-    // Retenção adiada (EVT 5.1): a cifra já leu o mix, ele pode ser apagado.
-    await purgeSourceMix(songId);
-
-    return NextResponse.json({ chordsStatus: "draft", chords: result.sections, jobStatus: "done" });
+    // done: devolve o que ficou salvo.
+    const [fresh] = await db.select().from(songs).where(eq(songs.id, songId)).limit(1);
+    return NextResponse.json({ chordsStatus: fresh?.chordsStatus ?? "draft", chords: fresh?.chords ?? null, jobStatus: "done" });
   } catch (err) {
     console.error("[GET /api/chords/advance]", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

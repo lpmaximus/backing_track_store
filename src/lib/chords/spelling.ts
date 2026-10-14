@@ -91,6 +91,31 @@ export function keyFromChords(chords: TimedChord[]): string {
   return (flats ? FLATS : SHARPS)[best.tonic] + (best.minor ? "m" : "");
 }
 
+/**
+ * Quão bem UM tom explica a harmonia: fração (ponderada pela duração) de acordes
+ * diatônicos ao tom que melhor os encaixa. 1 = tudo no tom; ruído de detector
+ * (acordes que não formam tom nenhum) fica bem abaixo. Usado só p/ medir
+ * confiança da cifra automática — não escolhe o tom (isso é keyFromChords).
+ */
+export function keyFit(chords: TimedChord[]): number {
+  const sorted = [...chords].filter((c) => parse(c.label)).sort((a, b) => a.start - b.start);
+  if (sorted.length < 3) return 1;
+  const items = sorted.map((c, i) => {
+    const next = sorted[i + 1]?.start;
+    return { ...parse(c.label)!, dur: next !== undefined ? Math.max(0.1, Math.min(next - c.start, 16)) : 2 };
+  });
+  const total = items.reduce((s, x) => s + x.dur, 0) || 1;
+  let best = 0;
+  for (let tonic = 0; tonic < 12; tonic++) {
+    for (const deg of [MAJOR_DEG, MINOR_DEG]) {
+      let fit = 0;
+      for (const it of items) if (fits(deg, tonic, it)) fit += it.dur;
+      if (fit > best) best = fit;
+    }
+  }
+  return best / total;
+}
+
 /** Armadura com bemóis? (F, Bb, Eb, Ab, Db maiores; Dm, Gm, Cm, Fm, Bbm, Ebm menores.) */
 function prefersFlats(tonic: number, minor: boolean): boolean {
   const major = minor ? (tonic + 3) % 12 : tonic; // relativo maior

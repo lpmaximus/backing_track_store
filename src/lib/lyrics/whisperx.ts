@@ -74,7 +74,7 @@ export class WhisperXProvider implements LyricsProvider {
     return Boolean(process.env.REPLICATE_API_TOKEN && process.env.REPLICATE_WHISPERX_VERSION);
   }
 
-  async submit(vocalUrl: string, opts?: { fast?: boolean }): Promise<LyricsSubmitResult> {
+  async submit(vocalUrl: string, opts?: { fast?: boolean; relaxed?: boolean }): Promise<LyricsSubmitResult> {
     if (!this.isConfigured()) throw new Error("WhisperX (Replicate) não configurado");
     const input: Record<string, unknown> = {
       audio_file: vocalUrl,
@@ -85,6 +85,11 @@ export class WhisperXProvider implements LyricsProvider {
       vad_onset: 0.5,
       vad_offset: 0.363,
     };
+    // 2ª tentativa após letra vazia: VAD mais sensível.
+    if (opts?.relaxed) {
+      input.vad_onset = 0.3;
+      input.vad_offset = 0.2;
+    }
     if (process.env.WHISPER_LANGUAGE) input.language = process.env.WHISPER_LANGUAGE;
 
     const data = await replicateCreatePrediction(process.env.REPLICATE_WHISPERX_VERSION as string, input, "WhisperX", opts);

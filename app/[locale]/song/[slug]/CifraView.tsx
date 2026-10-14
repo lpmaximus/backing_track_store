@@ -29,6 +29,7 @@ export type ChordSection = {
   chords: string;
   times?: number[]; // tempo de cada acorde em `chords` (quando disponível)
   aligned?: boolean; // string posicionada por uma pessoa — renderiza literal
+  lowConfidence?: boolean; // cifra automática com acordes que não formam um tom (ver assessConfidence)
 };
 
 export type LyricsWord = { text: string; start: number; end: number };

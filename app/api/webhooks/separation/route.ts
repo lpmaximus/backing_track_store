@@ -17,7 +17,7 @@ import { eq } from "drizzle-orm";
 import { getSeparationProvider } from "@/src/lib/separation";
 import { putObjectFromUrl } from "@/src/lib/r2";
 import { getChordProvider } from "@/src/lib/chords";
-import { pickChordAudio } from "@/src/lib/chords/source";
+import { enqueueJob, submitJob } from "@/src/lib/jobs/queue";
 import { purgeSourceMix } from "@/src/lib/retention";
 import { getLyricsProvider } from "@/src/lib/lyrics";
 import { createNotification } from "@/src/lib/notifications";
@@ -145,57 +145,35 @@ export async function POST(req: NextRequest) {
       await sendSongReadyEmail(song.uploadedByUserId, song.title, song.slug);
     }
 
-    // 5. Frente C: detecção de cifra sobre o MIX (ver src/lib/chords/source.ts
-    //    para a ordem de preferência e o porquê). Só na 1ª vez por música.
-    //    O provider é por polling: aqui só criamos e submetemos o job; quem
-    //    finaliza é /api/chords/advance/[songId] ou o cron /api/jobs/finalize.
+    // 5/6. Cifra (sobre o MIX — ver src/lib/chords/source.ts) e letra (sobre o
+    //    stem de VOCAL). Só ENFILEIRA o job `pending` e tenta submeter uma vez
+    //    (fast, sem esperar rate limit). Quem finaliza/retenta é a fila
+    //    (src/lib/jobs/queue.ts): o cron /api/jobs/finalize, o poll da página
+    //    ou o backfill. Antes a cifra era submetida UMA vez aqui e qualquer erro
+    //    do provider matava o job; agora erro transitório / 429 só devolve o job
+    //    à fila.
+    //    Faixa sem stem de vocal (backing track instrumental, ex. do Suno) não
+    //    gera letra — o submitJob marca isso como definitivo, não é falha.
     try {
       const chordProvider = getChordProvider();
       const alreadyHasChords = Boolean(song?.chords && song.chords.length > 0);
       if (chordProvider.isConfigured() && song && !alreadyHasChords) {
-        const source = pickChordAudio(song.audioUrl, persistedStems);
-        if (source) {
-          const [chordJob] = await db
-            .insert(processingJobs)
-            .values({ songId: job.songId, provider: chordProvider.name, stage: "chord_detection", status: "pending" })
-            .returning();
-          try {
-            const { providerJobId } = await chordProvider.submit(source.url);
-            await db
-              .update(processingJobs)
-              .set({ providerJobId, status: "running" })
-              .where(eq(processingJobs.id, chordJob.id));
-          } catch (submitErr) {
-            console.error("[webhook/separation] chord submit", submitErr);
-            await db
-              .update(processingJobs)
-              .set({ status: "failed", errorMessage: String(submitErr).slice(0, 500) })
-              .where(eq(processingJobs.id, chordJob.id));
-          }
-        } else {
-          console.warn("[webhook/separation] nenhum áudio elegível p/ cifra", job.songId);
-        }
+        const chordJob = await enqueueJob(job.songId, "chord_detection", chordProvider.name);
+        await submitJob(chordJob);
       }
     } catch (chordErr) {
       console.error("[webhook/separation] chord detection setup", chordErr);
     }
 
-    // 6. Caminho 3: transcrição de LETRA sobre o stem de VOCAL (voz isolada
-    //    transcreve muito melhor e é barata). Também por polling.
-    //    Faixa sem stem de vocal (backing track instrumental, ex. importada do
-    //    Suno) simplesmente não gera letra — é o correto, não é falha.
     try {
       const lyricsProvider = getLyricsProvider();
       const alreadyHasLyrics = Boolean(song?.lyrics && song.lyrics.length > 0);
       const vocal = persistedStems.find((s) => s.instrument === "vocal");
       if (lyricsProvider.isConfigured() && song && !alreadyHasLyrics && vocal) {
-        // FILA: só registra o job (pending, sem providerJobId). Quem submete é o
-        // /api/lyrics/advance (poll da página) ou o backfill, respeitando o rate
-        // limit do Replicate (6/min, burst 1 com saldo < US$5). Submeter aqui,
-        // 350 ms depois da cifra, era o que tomava 429 e deixava a música sem letra.
-        await db
-          .insert(processingJobs)
-          .values({ songId: job.songId, provider: lyricsProvider.name, stage: "lyrics_detection", status: "pending" });
+        // Logo após a cifra o Replicate (saldo < US$5) costuma devolver 429: o
+        // job fica `pending` e o worker/poll submete na sequência.
+        const lyricsJob = await enqueueJob(job.songId, "lyrics_detection", lyricsProvider.name);
+        await submitJob(lyricsJob);
       }
     } catch (lyricsErr) {
       console.error("[webhook/separation] lyrics detection setup", lyricsErr);

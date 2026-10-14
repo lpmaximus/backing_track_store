@@ -5,14 +5,18 @@
  * Espelha /api/chords/advance. Chamado pelo poll do client na página da música
  * ou por cron. Idempotente.
  *
+ * Submissão, poll e retry de erro transitório vivem em src/lib/jobs/queue.ts.
+ * O caso que motivou isso: "Prediction interrupted; please retry (code: PA)" —
+ * falha de infra do Replicate — marcava o job `failed` para sempre.
+ *
  * Auth: sessão logada OU header x-cron-secret === CRON_SECRET.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { db, songs, stems, processingJobs } from "@/src/db";
+import { db, songs, processingJobs } from "@/src/db";
 import { and, eq, desc } from "drizzle-orm";
 import { getLyricsProvider } from "@/src/lib/lyrics";
-import { isThrottled } from "@/src/lib/replicateSubmit";
+import { pollJob, submitJob } from "@/src/lib/jobs/queue";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ songId: string }> }) {
   const session = await auth();
@@ -34,46 +38,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ song
       return NextResponse.json({ lyricsStatus: song.lyricsStatus, lyrics: song.lyrics, jobStatus: "done" });
     }
 
-    const [job] = await db
+    let [job] = await db
       .select()
       .from(processingJobs)
       .where(and(eq(processingJobs.songId, songId), eq(processingJobs.stage, "lyrics_detection")))
       .orderBy(desc(processingJobs.id))
       .limit(1);
 
-    // FILA DE SUBMISSÃO. Com saldo < US$5 o Replicate deixa criar 6 predições/min
-    // (burst 1). O webhook só registra o job 'pending'; quem submete é este poll,
-    // que roda a cada ~5s enquanto a página está aberta. Num 429 o job continua
-    // 'pending' e a próxima rodada tenta de novo (sem segurar a função). Também
-    // reaproveita job 'failed' que nunca chegou ao provider, se ainda sem letra.
-    const noLyrics = !(song.lyrics && song.lyrics.length > 0);
-    const neverSubmitted = job && !job.providerJobId && (job.status === "pending" || job.status === "failed");
-    if (job && neverSubmitted && noLyrics) {
-      const provider = getLyricsProvider();
-      const [vocal] = await db.select().from(stems)
-        .where(and(eq(stems.songId, songId), eq(stems.instrument, "vocal"))).limit(1);
-      if (provider.isConfigured() && vocal) {
-        try {
-          const { providerJobId } = await provider.submit(vocal.audioUrl, { fast: true });
-          await db.update(processingJobs)
-            .set({ providerJobId, status: "running", errorMessage: null, completedAt: null })
-            .where(eq(processingJobs.id, job.id));
-          return NextResponse.json({ lyricsStatus: "generating", lyrics: null, jobStatus: "running" });
-        } catch (submitErr) {
-          if (isThrottled(submitErr)) {
-            // Na fila: espera o Replicate liberar. Renova o createdAt p/ a faxina
-            // de órfãos do cron não derrubar quem está legitimamente esperando.
-            await db.update(processingJobs)
-              .set({ status: "pending", errorMessage: null, completedAt: null, createdAt: new Date() })
-              .where(eq(processingJobs.id, job.id));
-            return NextResponse.json({ lyricsStatus: "generating", lyrics: null, jobStatus: "running" });
-          }
-          console.error("[GET /api/lyrics/advance] submit falhou", submitErr);
-          await db.update(processingJobs)
-            .set({ status: "failed", errorMessage: String(submitErr).slice(0, 500), completedAt: new Date() })
-            .where(eq(processingJobs.id, job.id));
-        }
-      }
+    // FILA DE SUBMISSÃO. O job nasce `pending` (webhook/backfill) ou volta p/
+    // `pending` num retry; este poll (a cada ~5s com a página aberta) submete.
+    // Num 429 o job continua na fila e a próxima rodada tenta de novo.
+    if (job && job.status === "pending" && !job.providerJobId && getLyricsProvider().isConfigured()) {
+      await submitJob(job);
+      [job] = await db.select().from(processingJobs).where(eq(processingJobs.id, job.id)).limit(1);
+    }
+
+    if (job && (job.status === "pending" || (job.status === "running" && !job.providerJobId))) {
+      return NextResponse.json({ lyricsStatus: "generating", lyrics: null, jobStatus: "running" });
     }
 
     if (!job || !job.providerJobId || job.status === "done" || job.status === "failed") {
@@ -84,34 +65,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ song
       });
     }
 
-    const provider = getLyricsProvider();
-    const result = await provider.poll(job.providerJobId);
-
-    if (result.status === "running") {
+    const outcome = await pollJob(job, song);
+    if (outcome === "running" || outcome === "retry") {
       return NextResponse.json({ lyricsStatus: "generating", lyrics: null, jobStatus: "running" });
     }
-
-    if (result.status === "failed") {
-      await db
-        .update(processingJobs)
-        .set({ status: "failed", errorMessage: result.error.slice(0, 500), completedAt: new Date() })
-        .where(eq(processingJobs.id, job.id));
+    if (outcome === "failed") {
       return NextResponse.json({ lyricsStatus: song.lyricsStatus, lyrics: song.lyrics ?? null, jobStatus: "failed" });
     }
 
-    // Sucesso: salva a letra automática (draft), a menos que já exista letra da comunidade.
-    if (!(song.lyrics && song.lyrics.length > 0)) {
-      await db
-        .update(songs)
-        .set({ lyrics: result.lines, lyricsSource: "auto", lyricsStatus: "draft" })
-        .where(eq(songs.id, songId));
-    }
-    await db
-      .update(processingJobs)
-      .set({ status: "done", completedAt: new Date() })
-      .where(eq(processingJobs.id, job.id));
-
-    return NextResponse.json({ lyricsStatus: "draft", lyrics: result.lines, jobStatus: "done" });
+    const [fresh] = await db.select().from(songs).where(eq(songs.id, songId)).limit(1);
+    return NextResponse.json({ lyricsStatus: fresh?.lyricsStatus ?? "draft", lyrics: fresh?.lyrics ?? null, jobStatus: "done" });
   } catch (err) {
     console.error("[GET /api/lyrics/advance]", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
