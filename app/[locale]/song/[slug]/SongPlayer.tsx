@@ -20,6 +20,7 @@ import type { ResolvedStem } from "@/src/lib/mix";
 import { roleCan } from "@/src/lib/permissions";
 import { CifraView, CifraText, type ChordSection, type LyricsLine } from "./CifraView";
 import { track } from "@/app/track";
+import { usePracticeTracker } from "./practiceTracker";
 import type { TrackCuts } from "@/src/lib/cuts";
 import { applyCuts, exportMixdown } from "./exportAudio";
 
@@ -45,6 +46,8 @@ type Song = {
   lyricsStatus?: string | null;
   lyricsSource?: string | null;
   beats?: number[] | null;
+  /** Dono do upload — habilita o "Tentar de novo" quando a cifra automática falha. */
+  uploadedByUserId?: number | null;
   published: boolean;
   /**
    * 'studio_project' = música em branco criada no Meu Estúdio, sem áudio de
@@ -107,6 +110,11 @@ export default function SongPlayer({
   // plano pago. `isPro` entra junto porque cobre o integrante de banda com
   // assinatura ativa, que o role sozinho não revela.
   const canLooper = isPro || roleCan(sessionTakes?.user?.role, "loop_pedal");
+  // Dono do upload (ou admin) pode pedir nova detecção de cifra/letra.
+  const canReprocess =
+    song.sourceType === "user_upload" &&
+    (sessionTakes?.user?.role === "admin" ||
+      (song.uploadedByUserId != null && String(song.uploadedByUserId) === String(sessionTakes?.user?.id ?? "")));
   const [takes, setTakes] = useState<Take[]>([]);
   const transportRef = useRef<Transport | null>(null);
 
@@ -234,16 +242,24 @@ export default function SongPlayer({
   const tituloExibido = versao?.title ?? song.title;
 
   const [currentTime, setCurrentTime]   = useState(0);
+  // Telemetria do piloto (PRD-BTS-001 §3–4): mede reprodução efetiva e
+  // interações musicais; o servidor decide quando vira "prática significativa".
+  const practice = usePracticeTracker(song.id);
+  const { onTime: practiceTime, onInteraction: practiceInteraction } = practice;
+  useEffect(() => {
+    track("player_open", { songId: song.id, meta: { origin: song.sourceType === "user_upload" ? "upload" : "catalog" } });
+  }, [song.id, song.sourceType]);
   // Analytics de produto: o primeiro segundo de áudio que roda conta como "play".
   // Evita marcar quem só abriu a página e saiu. Ver src/lib/activity.ts.
   const playedRef = useRef(false);
   const handleTimeUpdate = useCallback((time: number) => {
     setCurrentTime(time);
+    practiceTime(time);
     if (!playedRef.current && time > 1) {
       playedRef.current = true;
       track("play", { songId: song.id });
     }
-  }, [song.id]);
+  }, [song.id, practiceTime]);
   const [autoScroll,  setAutoScroll]    = useState(false);
   const [autoFollow,  setAutoFollow]    = useState(false); // segue o andamento real da música
   const [scrollSpd,   setScrollSpd]     = useState(0.4);
@@ -267,6 +283,11 @@ export default function SongPlayer({
   const [chordsStatus, setChordsStatus] = useState<string>(song.chordsStatus ?? "validated");
   const [editing, setEditing]           = useState(false);
   const [generating, setGenerating]     = useState(false);
+  // A detecção automática terminou SEM cifra (job failed): o painel mostra o
+  // aviso + "Tentar de novo" em vez de ficar mudo.
+  const [chartFailed, setChartFailed]   = useState(false);
+  const [retrying, setRetrying]         = useState(false);
+  const [retryError, setRetryError]     = useState(false);
   const [reported, setReported]         = useState(false);
   // Desliga os polls de cifra/letra assim que o usuário salva uma correção.
   // Os efeitos abaixo têm deps [song.id, isAuth] e o guard "já tem cifra" só é
@@ -287,6 +308,18 @@ export default function SongPlayer({
   const [pitch, setPitch]                       = useState(setlistTranspose);
   const [metronome, setMetronome]               = useState(false);
 
+  // Mudar velocidade, tom ou ligar a rolagem da cifra conta como interação
+  // musical para a prática significativa. O primeiro render (valores herdados
+  // do setlist) não conta — só a mudança feita pela pessoa.
+  const interactionArmed = useRef(false);
+  useEffect(() => {
+    if (!interactionArmed.current) { interactionArmed.current = true; return; }
+    practiceInteraction();
+  }, [speed, pitch, practiceInteraction]);
+  useEffect(() => {
+    if (autoScroll || autoFollow) practiceInteraction();
+  }, [autoScroll, autoFollow, practiceInteraction]);
+
   // Analytics de produto: cifra/letra disponíveis na tela e modo palco (tela cheia).
   useEffect(() => {
     if (chords && chords.length > 0) track("cifra", { songId: song.id });
@@ -300,16 +333,55 @@ export default function SongPlayer({
 
   const [songKey, setSongKey]                   = useState(song.key ?? "");
   const [songBpm, setSongBpm]                   = useState(song.bpm ? String(song.bpm) : "");
+  // Batidas detectadas depois do carregamento da página (poll) — alimentam o metrônomo.
+  const [detectedBeats, setDetectedBeats]       = useState<number[] | null>(null);
+  // Muda a cada "Tentar de novo" para reiniciar os polls de cifra e letra.
+  const [pollNonce, setPollNonce]               = useState(0);
 
   // Batidas do metrônomo: usa as detectadas se houver; senão gera uma grade
   // regular a partir do BPM + duração (stem de harmonia não produz beats sozinho).
   const beats = useMemo(() => {
     if (song.beats && song.beats.length > 0) return song.beats;
+    if (detectedBeats && detectedBeats.length > 0) return detectedBeats;
     const bpm = Number(songBpm) || song.bpm || 0;
     if (bpm <= 0 || !song.duration) return [];
     const step = 60 / bpm;
     return Array.from({ length: Math.floor(song.duration / step) }, (_, i) => Math.round(i * step * 1000) / 1000);
-  }, [song.beats, song.duration, song.bpm, songBpm]);
+  }, [song.beats, song.duration, song.bpm, songBpm, detectedBeats]);
+
+  // Aplica tom/BPM detectados SÓ onde ainda não há valor — nunca sobrescreve o
+  // que a pessoa digitou ou corrigiu.
+  function applyDetectedMeta(m: { key?: string | null; bpm?: number | null; beats?: number[] | null }) {
+    if (m.key && m.key !== "?") setSongKey((cur) => (!cur || cur === "?" ? m.key as string : cur));
+    if (m.bpm && m.bpm > 0) setSongBpm((cur) => (!cur || cur === "0" ? String(m.bpm) : cur));
+    if (m.beats && m.beats.length > 0) setDetectedBeats((cur) => cur ?? m.beats as number[]);
+  }
+
+  // "Tentar de novo": recoloca a cifra e a letra na fila e volta a acompanhar.
+  async function retryChart() {
+    if (retrying) return;
+    setRetrying(true);
+    setRetryError(false);
+    try {
+      const res = await fetch(`/api/songs/${song.id}/reprocess`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: "both" }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      // Recarrega o estado do servidor: o job novo nasce `pending` e o poll
+      // (reiniciado pelo refresh) o acompanha até terminar.
+      setChartFailed(false);
+      setGenerating(true);
+      setGeneratingLyrics(true);
+      router.refresh();
+      setPollNonce((n) => n + 1);
+    } catch {
+      setRetryError(true);
+    } finally {
+      setRetrying(false);
+    }
+  }
 
   async function saveMeta(patch: { key?: string; bpm?: number }) {
     try {
@@ -336,26 +408,33 @@ export default function SongPlayer({
         if (res.ok) {
           const data = await res.json();
           if (pollsStopped.current) return;
+          // Tom/BPM/batidas gravados pelo detector — atualiza o cabeçalho sem
+          // recarregar a página (mesmo quando a cifra em si não saiu).
+          if (!cancelled && data.meta) applyDetectedMeta(data.meta);
           if (!cancelled && data.chords && data.chords.length > 0) {
             setChords(data.chords);
             setChordsStatus(data.chordsStatus ?? "draft");
             setGenerating(false);
+            setChartFailed(false);
             return;
           }
           if (!cancelled && (data.jobStatus === "none" || data.jobStatus === "failed")) {
             setGenerating(false);
+            setChartFailed(true);
             return;
           }
-          if (!cancelled) setGenerating(true);
+          if (!cancelled) { setGenerating(true); setChartFailed(false); }
         }
       } catch { /* ignora e tenta de novo */ }
-      if (!cancelled && tries < 40) setTimeout(tick, 5000);
+      // 5 s no começo, depois 10 s: o BTC em CPU pode levar vários minutos e o
+      // cron do plano Hobby só roda 1x/dia. ~15 min de acompanhamento no total.
+      if (!cancelled && tries < 100) setTimeout(tick, tries < 24 ? 5000 : 10000);
       else if (!cancelled) setGenerating(false);
     };
     const timer = setTimeout(tick, 1200);
     return () => { cancelled = true; clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [song.id, isAuth]);
+  }, [song.id, isAuth, pollNonce]);
 
   // Letra: mesmo padrão de poll da cifra — finaliza a transcrição automática
   // (Whisper é assíncrono). Só para usuário logado e enquanto não há letra.
@@ -391,7 +470,7 @@ export default function SongPlayer({
     const timer = setTimeout(tick, 1500);
     return () => { cancelled = true; clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [song.id, isAuth]);
+  }, [song.id, isAuth, pollNonce]);
 
   async function reportCifra() {
     if (reported) return;
@@ -535,7 +614,7 @@ export default function SongPlayer({
             </button>
             <h1 style={{ fontWeight: 900, fontSize: 26, margin: "0 0 5px", color: "var(--text)" }}>{tituloExibido}</h1>
             <p style={{ color: "var(--muted)", fontSize: 14, margin: 0 }}>
-              {t("songMetaLine", { artist: song.artist, genre: song.genre })}<strong style={{ color: "var(--text)" }}>{song.key}</strong>{t("songMetaBpm", { bpm: song.bpm })}
+              {t("songMetaLine", { artist: song.artist, genre: song.genre })}<strong style={{ color: "var(--text)" }}>{songKey && songKey !== "?" ? songKey : "—"}</strong>{t("songMetaBpm", { bpm: songBpm && songBpm !== "0" ? songBpm : "—" })}
             </p>
           </div>
         </div>
@@ -578,7 +657,7 @@ export default function SongPlayer({
           songTitle={tituloExibido}
           songArtist={song.artist}
           onTimeUpdate={handleTimeUpdate}
-          onMixerTouch={() => track("mixer", { songId: song.id })}
+          onMixerTouch={() => { track("mixer", { songId: song.id }); practiceInteraction(); }}
           // `once: false`: cada download é um evento — diferente do play/mixer,
           // baixar de novo (outra combinação de faixas) é uso novo, não ruído.
           onExport={(kind, count) => track("export", { songId: song.id, meta: { kind, count }, once: false })}
@@ -609,12 +688,31 @@ export default function SongPlayer({
           <TakePanel
             songId={song.id}
             takes={takes}
-            onChange={setTakes}
+            onChange={(next) => { if (next.length > takes.length) practiceInteraction(); setTakes(next); }}
             transportRef={transportRef}
-            bpm={song.bpm}
+            bpm={Number(songBpm) || song.bpm}
           />
         )}
         {canLooper && <LoopPedal />}
+        {/* Gravação e pedal de loop eram os recursos menos descobertos
+            (PRD-BTS-001 §2). Visitante sem conta não vê nenhum dos dois, então
+            avisamos que existem — e que, no Beta, são liberados de graça. */}
+        {authStatus === "unauthenticated" && (
+          <div style={{
+            display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12,
+            background: "var(--surface)", border: "1px dashed var(--border2)", borderRadius: 12,
+            padding: "14px 16px", margin: "12px 0",
+          }}>
+            <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+              <p style={{ margin: "0 0 2px", fontWeight: 800, fontSize: 14, color: "var(--text)" }}>{t("recordTeaserTitle")}</p>
+              <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>{t("recordTeaserBody")}</p>
+            </div>
+            <Link href={{ pathname: "/entrar", query: { tab: "cadastro" } }} className="btn-primary"
+              style={{ padding: "10px 18px", fontSize: 13, whiteSpace: "nowrap" }}>
+              {t("recordTeaserCta")}
+            </Link>
+          </div>
+        )}
         <Metronome beats={beats} currentTime={currentTime} enabled={metronome} />
 
         {/* ── Content: cifra + sidebar (empilha em telas estreitas — .player-content) ── */}
@@ -674,7 +772,23 @@ export default function SongPlayer({
                       ? <CifraText text={song.cifraText} fontSize={fontSize} />
                       : (generating || generatingLyrics)
                         ? <p style={{ color: "var(--muted)", fontStyle: "italic", textAlign: "center", marginTop: 40 }}>{t("generating")}</p>
-                        : <p style={{ color: "var(--muted)", fontStyle: "italic", textAlign: "center", marginTop: 40 }}>{t("noChart")}</p>
+                        : (
+                          <div style={{ textAlign: "center", marginTop: 40 }}>
+                            <p style={{ color: "var(--muted)", fontStyle: "italic", margin: "0 0 14px" }}>
+                              {chartFailed ? t("chartFailed") : t("noChart")}
+                            </p>
+                            {canReprocess && (chartFailed || !hasChords) && (
+                              <button
+                                onClick={retryChart}
+                                disabled={retrying}
+                                style={{ background: "var(--accent)", color: "#000", border: "none", borderRadius: 8, padding: "9px 20px", fontWeight: 700, fontSize: 13, cursor: retrying ? "default" : "pointer", opacity: retrying ? 0.6 : 1 }}
+                              >
+                                {retrying ? t("retryingChart") : t("retryChart")}
+                              </button>
+                            )}
+                            {retryError && <p style={{ color: "var(--muted)", fontSize: 12, margin: "10px 0 0" }}>{t("retryError")}</p>}
+                          </div>
+                        )
                 }
               </div>
               {/* Controles flutuantes na tela cheia */}

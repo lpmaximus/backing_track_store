@@ -18,6 +18,11 @@ import { and, eq, desc } from "drizzle-orm";
 import { pollJob, submitJob } from "@/src/lib/jobs/queue";
 import { getChordProvider } from "@/src/lib/chords";
 
+/** Tom/BPM/batidas que o detector gravou — o cliente atualiza o cabeçalho sem recarregar. */
+function metaOf(s: { key: string | null; bpm: number | null; beats?: number[] | null } | undefined) {
+  return { key: s?.key ?? null, bpm: s?.bpm ?? 0, beats: s?.beats ?? null };
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ songId: string }> }) {
   const session = await auth();
   const cronOk = req.headers.get("x-cron-secret") && req.headers.get("x-cron-secret") === process.env.CRON_SECRET;
@@ -35,7 +40,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ song
 
     // Já tem cifra pronta? Nada a fazer.
     if (song.chords && song.chords.length > 0 && song.chordsStatus !== "draft") {
-      return NextResponse.json({ chordsStatus: song.chordsStatus, chords: song.chords, jobStatus: "done" });
+      return NextResponse.json({ chordsStatus: song.chordsStatus, chords: song.chords, jobStatus: "done", meta: metaOf(song) });
     }
 
     let [job] = await db
@@ -61,6 +66,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ song
         chordsStatus: song.chordsStatus,
         chords: song.chords ?? null,
         jobStatus: job?.status ?? "none",
+        // Mensagem do job falho (ex.: "[perm] Nenhum acorde detectado") — a tela
+        // usa só para decidir o texto do aviso; nunca é exibida crua.
+        failed: job?.status === "failed",
+        meta: metaOf(song),
       });
     }
 
@@ -68,13 +77,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ song
     if (outcome === "running" || outcome === "retry") {
       return NextResponse.json({ chordsStatus: "generating", chords: null, jobStatus: "running" });
     }
-    if (outcome === "failed") {
-      return NextResponse.json({ chordsStatus: song.chordsStatus, chords: song.chords ?? null, jobStatus: "failed" });
-    }
-
-    // done: devolve o que ficou salvo.
+    // failed ou done: relê a música — o poll pode ter gravado tom/BPM/batidas
+    // mesmo quando a cifra não saiu.
     const [fresh] = await db.select().from(songs).where(eq(songs.id, songId)).limit(1);
-    return NextResponse.json({ chordsStatus: fresh?.chordsStatus ?? "draft", chords: fresh?.chords ?? null, jobStatus: "done" });
+    if (outcome === "failed") {
+      return NextResponse.json({ chordsStatus: fresh?.chordsStatus ?? song.chordsStatus, chords: fresh?.chords ?? null, jobStatus: "failed", failed: true, meta: metaOf(fresh ?? song) });
+    }
+    return NextResponse.json({ chordsStatus: fresh?.chordsStatus ?? "draft", chords: fresh?.chords ?? null, jobStatus: "done", meta: metaOf(fresh ?? song) });
   } catch (err) {
     console.error("[GET /api/chords/advance]", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

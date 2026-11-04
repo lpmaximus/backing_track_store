@@ -37,6 +37,25 @@ const TRANSIENT: RegExp[] = [
 /** Whisper devolveu nada utilizável — vale UMA nova tentativa com parâmetros relaxados. */
 const EMPTY = /Nenhuma linha transcrita/i;
 
+/**
+ * Cifra que falhou por "o detector não achou harmonia NESSE áudio" (≠ falha de
+ * infra). Vale tentar a próxima fonte (mix → harmonia → guitarra → melodia): o
+ * BTC lê bem um stem de harmonia onde o mix, cheio de percussão, não rendeu.
+ */
+export const NO_CHORDS = /Nenhum acorde detectado|Cifra pobre demais/i;
+
+/** Qual fonte de áudio o job de cifra está tentando (lido de "[src:N]"; 0 = a primeira). */
+export function srcIndexOf(errorMessage: string | null | undefined): number {
+  const m = /\[src:(\d+)\]/.exec(errorMessage ?? "");
+  return m ? Number(m[1]) : 0;
+}
+
+/** Anexa o marcador de fonte ao FIM da mensagem (o início carrega "[retry n/3]"/"[perm]"). */
+export function withSrcTag(message: string, srcIndex: number): string {
+  if (srcIndex <= 0) return message;
+  return `${message.replace(/\s*\[src:\d+\]/g, "").slice(0, 440)} [src:${srcIndex}]`;
+}
+
 export type FailureKind = "transient" | "empty" | "permanent";
 
 export function classifyFailure(error: string): FailureKind {

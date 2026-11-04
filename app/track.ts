@@ -20,7 +20,11 @@ type Event =
   | "setlist_create"
   | "stage_mode"
   | "upload"
-  | "export";
+  | "export"
+  // Telemetria do piloto (PRD-BTS-001 §4)
+  | "player_open"
+  | "practice_progress"
+  | "take_started";
 
 // Evita repetir o mesmo evento na mesma sessão de navegação (o servidor também
 // deduplica, mas isso poupa requisição).

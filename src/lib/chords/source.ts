@@ -44,3 +44,28 @@ export function pickChordAudio(
   }
   return null;
 }
+
+/**
+ * Todas as fontes possíveis, em ordem de tentativa. Quando o detector não acha
+ * acordes numa fonte (merengue, percussão densa, stem de guitarra quase mudo), o
+ * job de cifra passa para a PRÓXIMA em vez de morrer. Caso real: "Ritmo Merembe"
+ * falhou no mix ("Nenhum acorde detectado") e o BTC devolveu 85 acordes, tom e BPM
+ * no stem de harmonia.
+ *
+ * Depois do mix vem a harmonia (o BTC lê bem teclado/sanfona/naipe), depois a
+ * guitarra e por fim a melodia. Bateria e baixo nunca entram.
+ */
+const CANDIDATE_STEM_ORDER = ["harmony", "guitar", "melody"];
+
+export function chordAudioCandidates(
+  mixUrl: string | null | undefined,
+  stems: StemLike[],
+): ChordAudioSource[] {
+  const out: ChordAudioSource[] = [];
+  if (mixUrl) out.push({ url: mixUrl, from: "mix" });
+  for (const instrument of CANDIDATE_STEM_ORDER) {
+    const stem = stems.find((s) => s.instrument === instrument && s.audioUrl);
+    if (stem) out.push({ url: stem.audioUrl, from: instrument });
+  }
+  return out;
+}

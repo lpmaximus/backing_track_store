@@ -116,6 +116,22 @@ function extractMeta(data: unknown): ChordMeta | undefined {
     const beats = o.beats.map(Number).filter((n) => Number.isFinite(n));
     if (beats.length) meta.beats = beats;
   }
+  // Sem "bpm" na saída mas com batidas: deriva o andamento da mediana do
+  // intervalo entre elas (robusta a batidas fora do lugar). Assim "0 BPM" não
+  // sobrevive quando o detector devolveu as batidas.
+  if (!meta.bpm && meta.beats && meta.beats.length >= 8) {
+    const gaps: number[] = [];
+    for (let i = 1; i < meta.beats.length; i++) {
+      const g = meta.beats[i] - meta.beats[i - 1];
+      if (g > 0) gaps.push(g);
+    }
+    gaps.sort((a, b) => a - b);
+    const median = gaps[Math.floor(gaps.length / 2)];
+    if (median) {
+      const bpm = Math.round(60 / median);
+      if (bpm >= 40 && bpm <= 240) meta.bpm = bpm;
+    }
+  }
   return Object.keys(meta).length ? meta : undefined;
 }
 

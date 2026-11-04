@@ -26,12 +26,12 @@ import { db, songs, stems, processingJobs } from "@/src/db";
 import { and, asc, eq, inArray, isNull, isNotNull, lt } from "drizzle-orm";
 import { getChordProvider } from "@/src/lib/chords";
 import { getLyricsProvider } from "@/src/lib/lyrics";
-import { pickChordAudio } from "@/src/lib/chords/source";
+import { chordAudioCandidates } from "@/src/lib/chords/source";
 import { purgeSourceMix } from "@/src/lib/retention";
 import { isThrottled } from "@/src/lib/replicateSubmit";
 import type { ChordPollResult, ChordMeta } from "@/src/lib/chords/types";
 import type { LyricsPollResult } from "@/src/lib/lyrics/types";
-import { decideFailure, isRelaxed, PERM_PREFIX } from "./retry";
+import { decideFailure, isRelaxed, PERM_PREFIX, NO_CHORDS, srcIndexOf, withSrcTag } from "./retry";
 
 export type Job = typeof processingJobs.$inferSelect;
 export type Song = typeof songs.$inferSelect;
@@ -62,16 +62,19 @@ export function metaPatch(m: ChordMeta | undefined) {
 /** Aplica a política de retry.ts: volta p/ a fila (pending) ou marca `failed`. */
 export async function failOrRetry(job: Pick<Job, "id" | "errorMessage">, error: string): Promise<"retry" | "failed"> {
   const d = decideFailure(job.errorMessage, error);
+  // Mantém em qual fonte de áudio a cifra estava (marcador "[src:N]"): sem isso
+  // um retry transitório reiniciaria a cadeia pelo mix.
+  const message = withSrcTag(d.message, srcIndexOf(job.errorMessage));
   if (d.action === "retry") {
     await db
       .update(processingJobs)
-      .set({ status: "pending", providerJobId: null, errorMessage: d.message, completedAt: null, createdAt: new Date() })
+      .set({ status: "pending", providerJobId: null, errorMessage: message, completedAt: null, createdAt: new Date() })
       .where(eq(processingJobs.id, job.id));
     return "retry";
   }
   await db
     .update(processingJobs)
-    .set({ status: "failed", errorMessage: d.message, completedAt: new Date() })
+    .set({ status: "failed", errorMessage: message, completedAt: new Date() })
     .where(eq(processingJobs.id, job.id));
   return "failed";
 }
@@ -86,6 +89,29 @@ export async function applyChordResult(job: Job, song: Song, result: ChordPollRe
     // BPM/tom/batidas saem da mesma execução e não dependem da cifra ter saído.
     const patch = metaPatch(result.meta);
     if (Object.keys(patch).length > 0) await db.update(songs).set(patch).where(eq(songs.id, song.id));
+
+    // "Não achei acordes NESTA fonte" ≠ "a música não tem acordes": tenta a
+    // próxima (mix → harmonia → guitarra → melodia) antes de desistir. O mix
+    // continua no R2 enquanto o job não for terminal (purgeSourceMix).
+    if (NO_CHORDS.test(result.error)) {
+      const songStems = await db.select().from(stems).where(eq(stems.songId, song.id));
+      const candidates = chordAudioCandidates(song.audioUrl, songStems);
+      const next = srcIndexOf(job.errorMessage) + 1;
+      if (next < candidates.length) {
+        await db
+          .update(processingJobs)
+          .set({
+            status: "pending",
+            providerJobId: null,
+            errorMessage: withSrcTag(`${result.error} (fonte ${candidates[next - 1]?.from ?? "?"})`, next),
+            completedAt: null,
+            createdAt: new Date(),
+          })
+          .where(eq(processingJobs.id, job.id));
+        return "retry";
+      }
+    }
+
     const r = await failOrRetry(job, result.error);
     // Só libera o mix quando o job é terminal; em retry o mix ainda é necessário.
     if (r === "failed") await purgeSourceMix(song.id);
@@ -175,7 +201,9 @@ export async function submitJob(job: Job): Promise<SubmitOutcome> {
       if (job.stage === "chord_detection") {
         const provider = getChordProvider();
         if (!provider.isConfigured()) { await releaseToQueue(job.id); return "skipped"; }
-        const source = pickChordAudio(song.audioUrl, songStems);
+        // Fonte da vez: a 1ª tentativa usa o mix (se ainda existir); se a anterior
+        // não achou acordes, o marcador "[src:N]" aponta a próxima da lista.
+        const source = chordAudioCandidates(song.audioUrl, songStems)[srcIndexOf(job.errorMessage)];
         if (!source) {
           await db
             .update(processingJobs)
