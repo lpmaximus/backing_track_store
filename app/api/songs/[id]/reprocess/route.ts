@@ -9,7 +9,8 @@
  * (src/lib/jobs/queue.ts) submete e finaliza.
  *
  * Regras:
- *  - só dono do upload ou admin;
+ *  - só dono do upload, admin da sessão OU quem enviar a senha do painel /admin
+ *    (header x-admin-password — o admin do projeto é um segredo compartilhado);
  *  - a música precisa estar separada (processingStatus = ready);
  *  - não duplica: se já há job pendente/rodando daquele estágio, não cria outro;
  *  - não sobrescreve cifra/letra que já existe.
@@ -22,12 +23,16 @@ import { and, eq, inArray } from "drizzle-orm";
 import { getChordProvider } from "@/src/lib/chords";
 import { getLyricsProvider } from "@/src/lib/lyrics";
 import { enqueueJob, submitJob, type JobStage } from "@/src/lib/jobs/queue";
+import { isAdminRequest } from "@/src/lib/adminAuth";
 
 type StageChoice = "chords" | "lyrics" | "both";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  const adminByPassword = isAdminRequest(req);
+  const session = adminByPassword ? null : await auth();
+  if (!adminByPassword && !session?.user) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
 
   const { id: idParam } = await params;
   const songId = Number(idParam);
@@ -45,10 +50,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const [song] = await db.select().from(songs).where(eq(songs.id, songId)).limit(1);
     if (!song) return NextResponse.json({ error: "Música não encontrada" }, { status: 404 });
 
-    const userId = Number(session.user.id);
-    const isOwner = song.uploadedByUserId === userId;
-    const isAdmin = session.user.role === "admin";
-    if (!isOwner && !isAdmin) return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+    if (!adminByPassword && session?.user) {
+      const isOwner = song.uploadedByUserId === Number(session.user.id);
+      const isAdmin = session.user.role === "admin";
+      if (!isOwner && !isAdmin) return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+    }
 
     if (song.processingStatus !== "ready") {
       return NextResponse.json({ error: "A música ainda não terminou de ser separada" }, { status: 409 });

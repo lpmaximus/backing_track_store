@@ -40,6 +40,22 @@ function AudioContent() {
     const res = await fetch("/api/admin/audio", { method: "PATCH", headers: adminHeaders(), body: JSON.stringify({ songId, moderationStatus }) });
     if (res.ok) load(filter);
   }
+  // Recoloca cifra e letra na fila (mesma rota do "Tentar de novo" do player).
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string>("");
+  async function reprocess(songId: number, title: string) {
+    setBusyId(songId);
+    setNotice("");
+    try {
+      const res = await fetch(`/api/songs/${songId}/reprocess`, { method: "POST", headers: adminHeaders(), body: JSON.stringify({ stage: "both" }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setNotice(`"${title}": ${data.error ?? "falhou"}`); return; }
+      const label: Record<string, string> = { queued: "na fila", already_running: "já em andamento", already_has: "já existe", not_configured: "provider não configurado", failed: "falhou" };
+      setNotice(`"${title}" — cifra: ${label[data.chords] ?? "—"} · letra: ${label[data.lyrics] ?? "—"}`);
+    } finally {
+      setBusyId(null);
+    }
+  }
   async function remove(songId: number, title: string) {
     if (!confirm(`Excluir "${title}" do catálogo? (takedown definitivo — remove do banco)`)) return;
     const res = await fetch(`/api/admin/audio?id=${songId}`, { method: "DELETE", headers: adminHeaders() });
@@ -61,6 +77,7 @@ function AudioContent() {
         </div>
       </div>
 
+      {notice && <p style={{ color: "var(--muted)", fontSize: 13, margin: "0 0 12px" }}>{notice}</p>}
       {loading ? <p style={{ color: "var(--muted)" }}>Carregando…</p> : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {rows.length === 0 && <p style={{ color: "var(--muted)", fontStyle: "italic" }}>Nada aqui.</p>}
@@ -77,6 +94,11 @@ function AudioContent() {
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 <a href={`/song/${s.slug}`} target="_blank" rel="noreferrer" style={{ background: "var(--surface2)", color: "var(--muted)", border: "1px solid var(--border)", padding: "5px 10px", borderRadius: 6, fontSize: 12, textDecoration: "none" }}>Ver</a>
+                {s.processingStatus === "ready" && (
+                  <button onClick={() => reprocess(s.id, s.title)} disabled={busyId === s.id} style={btn("var(--accent)")}>
+                    {busyId === s.id ? "Enviando…" : "Reprocessar cifra/letra"}
+                  </button>
+                )}
                 {s.moderationStatus !== "blocked"
                   ? <button onClick={() => setStatus(s.id, "blocked")} style={btn("#f59e0b")}>Bloquear</button>
                   : <button onClick={() => setStatus(s.id, "approved")} style={btn("var(--accent)")}>Aprovar</button>}

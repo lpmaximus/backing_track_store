@@ -18,6 +18,7 @@ import EstudioPanel, { type Versao } from "./EstudioPanel";
 import type { Stem, Take, Transport } from "./WavePlayer";
 import type { ResolvedStem } from "@/src/lib/mix";
 import { roleCan } from "@/src/lib/permissions";
+import { adminHeaders, getAdminPassword } from "@/app/admin/adminClient";
 import { CifraView, CifraText, type ChordSection, type LyricsLine } from "./CifraView";
 import { track } from "@/app/track";
 import { usePracticeTracker } from "./practiceTracker";
@@ -111,9 +112,13 @@ export default function SongPlayer({
   // assinatura ativa, que o role sozinho não revela.
   const canLooper = isPro || roleCan(sessionTakes?.user?.role, "loop_pedal");
   // Dono do upload (ou admin) pode pedir nova detecção de cifra/letra.
+  // O admin do projeto é uma senha compartilhada guardada na aba (sessionStorage):
+  // quem já entrou no /admin nesta aba também pode reprocessar.
+  const [hasAdminPw, setHasAdminPw] = useState(false);
+  useEffect(() => { setHasAdminPw(Boolean(getAdminPassword())); }, []);
   const canReprocess =
     song.sourceType === "user_upload" &&
-    (sessionTakes?.user?.role === "admin" ||
+    (hasAdminPw || sessionTakes?.user?.role === "admin" ||
       (song.uploadedByUserId != null && String(song.uploadedByUserId) === String(sessionTakes?.user?.id ?? "")));
   const [takes, setTakes] = useState<Take[]>([]);
   const transportRef = useRef<Transport | null>(null);
@@ -365,7 +370,7 @@ export default function SongPlayer({
     try {
       const res = await fetch(`/api/songs/${song.id}/reprocess`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: hasAdminPw ? adminHeaders() : { "Content-Type": "application/json" },
         body: JSON.stringify({ stage: "both" }),
       });
       if (!res.ok) throw new Error(String(res.status));
