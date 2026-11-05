@@ -5,6 +5,9 @@ import { createResetToken } from "@/src/lib/authTokens";
 import { sendResetEmail } from "@/src/lib/authEmails";
 import { mailerConfigured } from "@/src/lib/mailer";
 import { siteUrl } from "@/src/lib/siteUrl";
+import { hasLocale } from "next-intl";
+import { routing } from "@/src/i18n/routing";
+import { getPathname } from "@/src/i18n/navigation";
 
 export const runtime = "nodejs";
 
@@ -26,8 +29,8 @@ export async function POST(req: NextRequest) {
     const blocked = user && (user.status === "blocked" || user.status === "banned" || user.deletionScheduledAt);
 
     if (user && !blocked) {
-      const lang = locale === "en" ? "en" : "pt";
-      const path = lang === "en" ? "/en/sign-in" : "/entrar";
+      const lang = hasLocale(routing.locales, locale) ? locale : routing.defaultLocale;
+      const path = getPathname({ href: "/entrar", locale: lang });
       const token = createResetToken(user.id, user.passwordHash);
       const url = `${siteUrl()}${path}?reset=${encodeURIComponent(token)}`;
       await sendResetEmail(lang, user.email, url);

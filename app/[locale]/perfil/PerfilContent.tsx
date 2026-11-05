@@ -4,7 +4,8 @@ import type * as React from "react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { htmlLang, type Locale } from "@/src/i18n/routing";
 import { Link } from "@/src/i18n/navigation";
 import { isProRole, roleLabel } from "@/src/lib/roles";
 import { GENRE_OPTIONS, genreEmoji, normalizeGenre } from "@/src/lib/genres";
@@ -26,8 +27,8 @@ type MySong = {
 
 const PENDING_STATUSES = new Set<MySong["processingStatus"]>(["queued", "separating", "transcribing"]);
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+function formatDate(iso: string, loc: string) {
+  return new Date(iso).toLocaleDateString(loc, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 /** Comparação sem acento e sem caixa — "sertao" acha "Sertão". */
@@ -358,6 +359,7 @@ function SongCard({
   onRemove: () => void;
 }) {
   const t = useTranslations("mySongs");
+  const dateLocale = htmlLang[useLocale() as Locale] ?? "pt-BR";
   const tc = useTranslations("common");
   const [form, setForm] = useState<EditValues>({
     title: song.title, artist: song.artist, genre: normalizeGenre(song.genre), key: song.key, bpm: String(song.bpm),
@@ -462,7 +464,7 @@ function SongCard({
             </span>
           </p>
           <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>
-            {song.artist} · {song.key} · {song.bpm} BPM · Enviada em {formatDate(song.createdAt)}
+            {song.artist} · {song.key} · {song.bpm} BPM · {t("uploadedOn", { date: formatDate(song.createdAt, dateLocale) })}
           </p>
         </Link>
 

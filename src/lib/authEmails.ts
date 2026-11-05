@@ -7,7 +7,7 @@
  */
 import { sendMail } from "@/src/lib/mailer";
 
-type Lang = "pt" | "en";
+type Lang = "pt" | "en" | "es";
 
 const COPY = {
   reset: {
@@ -25,6 +25,13 @@ const COPY = {
       expiry: "The link is valid for 1 hour and stops working once the password is changed.",
       ignore: "If this wasn't you, ignore this email — your password stays the same.",
     },
+    es: {
+      subject: "Restablece tu contraseña — BackingTrack.store",
+      intro: "Recibimos una solicitud para restablecer la contraseña de tu cuenta.",
+      cta: "Crear nueva contraseña",
+      expiry: "El enlace es válido por 1 hora y deja de funcionar en cuanto se cambia la contraseña.",
+      ignore: "Si no fuiste tú, ignora este correo — tu contraseña sigue siendo la misma.",
+    },
   },
   magic: {
     pt: {
@@ -40,6 +47,13 @@ const COPY = {
       cta: "Sign in to BackingTrack.store",
       expiry: "The link is valid for 20 minutes.",
       ignore: "If you didn't request this, ignore this email.",
+    },
+    es: {
+      subject: "Tu enlace de acceso — BackingTrack.store",
+      intro: "Usa el enlace de abajo para entrar. Si todavía no tienes cuenta, se crea ahora, en el plan Free.",
+      cta: "Entrar a BackingTrack.store",
+      expiry: "El enlace es válido por 20 minutos.",
+      ignore: "Si no lo pediste tú, ignora este correo.",
     },
   },
 } as const;

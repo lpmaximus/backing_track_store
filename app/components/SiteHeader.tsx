@@ -4,6 +4,7 @@ import { Link } from "@/src/i18n/navigation";
 import UserMenu from "./UserMenu";
 import BrandLogo from "./BrandLogo";
 import MobileNav, { type NavItem } from "./MobileNav";
+import LanguageSwitcher from "./LanguageSwitcher";
 import { roleCan } from "@/src/lib/permissions";
 
 export default async function SiteHeader() {
@@ -69,6 +70,11 @@ export default async function SiteHeader() {
             <path d="M20 20l-3.5-3.5" />
           </svg>
         </Link>
+
+        {/* Idioma — combo PT/EN/ES. O sistema escolhe pelo país, mas o visitante
+            pode trocar a qualquer momento. Abaixo de 880px some daqui e vai
+            para dentro do menu hamburguer (MobileNav), para não espremer o header. */}
+        <LanguageSwitcher variant="header" />
 
         {/* Auth */}
         {user ? (

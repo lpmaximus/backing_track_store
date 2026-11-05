@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { htmlLang, type Locale } from "@/src/i18n/routing";
 import { Link } from "@/src/i18n/navigation";
 import { isProRole } from "@/src/lib/roles";
 
@@ -15,13 +16,14 @@ type CommentItem = {
   userRole: string;
 };
 
-function formatDate(iso: string) {
+function formatDate(iso: string, loc: string) {
   const d = new Date(iso);
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+  return d.toLocaleDateString(loc, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export default function Comments({ songId }: { songId: number }) {
   const t = useTranslations("song");
+  const dateLocale = htmlLang[useLocale() as Locale] ?? "pt-BR";
   const { data: session } = useSession();
   const [items,   setItems]   = useState<CommentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,7 +152,7 @@ export default function Comments({ songId }: { songId: number }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
                   <span style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{c.userName ?? "Usuario"}</span>
                   {isProRole(c.userRole) && <span className="pro-badge" style={{ fontSize: 9 }}>PRO</span>}
-                  <span style={{ color: "var(--muted2)", fontSize: 12 }}>{formatDate(c.createdAt)}</span>
+                  <span style={{ color: "var(--muted2)", fontSize: 12 }}>{formatDate(c.createdAt, dateLocale)}</span>
                 </div>
                 <p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.6, margin: 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
                   {c.content}

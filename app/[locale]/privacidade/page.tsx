@@ -36,7 +36,8 @@ export default async function PrivacidadePage({
       <SiteHeader />
 
       <LegalPage title={t("privacyTitle")} effectiveDate={t("privacyEffective")}>
-        {locale === "en" ? <PrivacyContentEn /> : <PrivacyContentPt />}
+        {/* es: usa o texto em inglês até existir a versão em espanhol */}
+        {locale === "pt" ? <PrivacyContentPt /> : <PrivacyContentEn />}
       </LegalPage>
 
       <SiteFooter />

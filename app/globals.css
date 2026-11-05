@@ -222,6 +222,8 @@ input[type="range"]::-webkit-slider-thumb:hover {
   .header-row { gap: 16px !important; }
   .desktop-nav { display: none !important; }
   .mobile-nav-toggle { display: flex !important; }
+  /* Combo de idioma sai do header e passa a viver dentro do menu hamburguer. */
+  .lang-switcher-header { display: none !important; }
 }
 @media (max-width: 480px) {
   .auth-buttons a { padding: 8px 12px !important; font-size: 12px !important; white-space: nowrap; }

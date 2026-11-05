@@ -70,7 +70,8 @@ async function handleDeepLink(url: string) {
     await closeSystemBrowser();
     if (!code) return;
     const verifier = takeHandoffVerifier();
-    const base = window.location.pathname.startsWith("/en/") ? "/en/app" : "/app";
+    const prefix = window.location.pathname.match(/^\/(en|es)\//)?.[1];
+    const base = prefix ? `/${prefix}/app` : "/app";
     if (!verifier) {
       window.location.href = `${base}/entrar?erro=handoff`;
       return;

@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import type { Locale } from "@/src/i18n/routing";
+import { locales, LANGUAGE_NAMES, type Locale } from "@/src/i18n/routing";
 import { Link } from "@/src/i18n/navigation";
 import AppTabBar from "../_components/AppTabBar";
 import { IconChevronRight } from "../_components/AppIcons";
@@ -17,7 +17,8 @@ export default async function ContaView({ locale, name, email, tier, bandCount, 
   quota: { used: number; limit: number; trialPack: boolean } | null;
 }) {
   const t = await getTranslations({ locale, namespace: "app.account" });
-  const otherLocale = locale === "en" ? "pt" : "en";
+  // Toque na linha alterna para o próximo idioma (pt → en → es → pt).
+  const otherLocale = locales[(locales.indexOf(locale) + 1) % locales.length];
 
   const rowStyle: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, minHeight: 56, padding: "0 16px", borderBottom: "1px solid var(--border)" };
   const value = (v: React.ReactNode) => <span style={{ fontSize: 13, color: "var(--muted)" }}>{v}</span>;
@@ -71,7 +72,7 @@ export default async function ContaView({ locale, name, email, tier, bandCount, 
           </Link>
           <Link href="/app/conta" locale={otherLocale} style={rowStyle}>
             <span style={{ flex: 1, fontSize: 15, fontWeight: 600 }}>{t("language")}</span>
-            {value(locale === "en" ? "English" : "Português")}
+            {value(LANGUAGE_NAMES[locale])}
             {chev}
           </Link>
           <Link href="/conta" style={{ ...rowStyle, borderBottom: 0 }}>

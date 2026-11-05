@@ -57,7 +57,7 @@ export default function AddToSetlist({ songId }: { songId: number }) {
       }
       setDone(prev => new Set(prev).add(setlistId));
     } catch {
-      setError("Erro de conexao. Tente novamente.");
+      setError(t("errConnection"));
     } finally {
       setAdding(null);
     }

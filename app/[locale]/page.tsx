@@ -106,10 +106,10 @@ export default async function HomePage({
     "@context": "https://schema.org",
     "@type": "WebApplication",
     name: "BackingTrack.store",
-    url: siteUrl() + (locale === "en" ? "/en" : ""),
+    url: siteUrl() + (locale === "pt" ? "" : `/${locale}`),
     applicationCategory: "MultimediaApplication",
     operatingSystem: "Any (web browser)",
-    inLanguage: ["pt-BR", "en"],
+    inLanguage: ["pt-BR", "en", "es"],
     description: t("faq.a3"),
     featureList: [
       "AI stem separation (drums, bass, guitar, keys, vocals)",
@@ -118,7 +118,7 @@ export default async function HomePage({
       "Tempo and key change, section loop",
       "Band setlists for rehearsal and live shows",
     ],
-    offers: { "@type": "Offer", price: "0", priceCurrency: locale === "en" ? "USD" : "BRL", description: "Free plan" },
+    offers: { "@type": "Offer", price: "0", priceCurrency: locale === "pt" ? "BRL" : "USD", description: "Free plan" },
   };
 
   return (

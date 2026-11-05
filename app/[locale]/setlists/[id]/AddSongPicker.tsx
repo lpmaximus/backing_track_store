@@ -125,7 +125,7 @@ export default function AddSongPicker({
       }
       onAdded(data.item);
     } catch {
-      setError("Erro de conexao. Tente novamente.");
+      setError(t("errConnection"));
     } finally {
       setAdding(null);
     }

@@ -1,6 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { auth } from "@/auth";
-import type { Locale } from "@/src/i18n/routing";
+import { htmlLang, type Locale } from "@/src/i18n/routing";
 import { redirect } from "@/src/i18n/navigation";
 import AppTabBar from "../_components/AppTabBar";
 import ScreenHeader from "../_components/ScreenHeader";
@@ -18,7 +18,7 @@ export default async function AppMensagensPage({ params }: { params: Promise<{ l
   if (!session?.user?.id) redirect({ href: "/app/boas-vindas", locale });
   const t = await getTranslations({ locale, namespace: "app.messages" });
   const items = await getNotifications(Number(session!.user.id)).catch(() => []);
-  const fmt = new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pt-BR", { day: "numeric", month: "short", timeZone: "America/Sao_Paulo" });
+  const fmt = new Intl.DateTimeFormat(htmlLang[locale as Locale] ?? "pt-BR", { day: "numeric", month: "short", timeZone: "America/Sao_Paulo" });
 
   return (
     <>

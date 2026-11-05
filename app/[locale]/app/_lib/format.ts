@@ -1,8 +1,10 @@
 /** Formatação de data/hora das telas do app — sempre no fuso de Brasília. */
+import { htmlLang, type Locale } from "@/src/i18n/routing";
+
 export const APP_TZ = "America/Sao_Paulo";
 
 export function dateParts(d: Date, locale: string) {
-  const loc = locale === "en" ? "en-US" : "pt-BR";
+  const loc = htmlLang[locale as Locale] ?? "pt-BR";
   const fmt = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(loc, { timeZone: APP_TZ, ...o }).format(d);
   return {
     dow: fmt({ weekday: "short" }).replace(".", "").toUpperCase(),
@@ -30,11 +32,11 @@ export const INSTRUMENT_KEY: Record<string, string> = {
 /** Link de notificação/convite do site → equivalente dentro do app, quando existe. */
 export function toAppPath(link: string | null | undefined): string | null {
   if (!link || !link.startsWith("/") || link.startsWith("//")) return null;
-  const m = link.match(/^\/(?:en\/)?song\/([^/?#]+)/);
+  const m = link.match(/^\/(?:en\/|es\/)?song\/([^/?#]+)/);
   if (m) return `/app/song/${m[1]}`;
-  const s = link.match(/^\/(?:en\/)?setlists\/(\d+)\/?$/);
+  const s = link.match(/^\/(?:en\/|es\/)?setlists\/(\d+)\/?$/);
   if (s) return `/app/setlists/${s[1]}`;
-  if (/^\/(?:en\/)?(bandas|bands)\/?$/.test(link)) return "/app/bandas";
+  if (/^\/(?:en\/|es\/)?(bandas|bands)\/?$/.test(link)) return "/app/bandas";
   return link;
 }
 

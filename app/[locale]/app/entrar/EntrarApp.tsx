@@ -24,7 +24,7 @@ export default function EntrarApp() {
   const ta = useTranslations("app.signIn");
   const tc = useTranslations("common");
   const sp = useSearchParams();
-  const base = locale === "en" ? "/en/app" : "/app";
+  const base = locale === "pt" ? "/app" : `/${locale}/app`;
 
   const [mode, setMode] = useState<Mode>(sp.get("tab") === "cadastro" ? "cadastro" : "login");
   const [email, setEmail] = useState("");

@@ -50,7 +50,7 @@ export default function LyricsEditor({
       .map((r) => ({ time: Number(r.time) || 0, text: r.text.trim() }))
       .filter((r) => r.text);
     if (cleaned.length === 0) {
-      setError("Adicione ao menos uma linha de letra.");
+      setError(t("errNeedLyricsLine"));
       return;
     }
     setSaving(true);

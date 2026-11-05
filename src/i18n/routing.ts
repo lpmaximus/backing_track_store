@@ -4,6 +4,9 @@
  * pt  → idioma padrão, SEM prefixo (mantém todas as URLs atuais intactas:
  *       backingtrack.store/planos continua funcionando e mantém o SEO).
  * en  → prefixo /en com slugs traduzidos (backingtrack.store/en/pricing).
+ * es  → prefixo /es com slugs traduzidos (backingtrack.store/es/precios).
+ *       Espanhol NUNCA é escolhido automaticamente: fora do Brasil o padrão é
+ *       inglês (regra de produto). Só entra por escolha manual no seletor.
  *
  * `localeDetection: false` porque a negociação NÃO é por Accept-Language e sim
  * por país (ver proxy.ts): fora do Brasil o visitante cai em inglês. O cookie
@@ -11,7 +14,7 @@
  */
 import { defineRouting } from "next-intl/routing";
 
-export const locales = ["pt", "en"] as const;
+export const locales = ["pt", "en", "es"] as const;
 export type Locale = (typeof locales)[number];
 export const defaultLocale: Locale = "pt";
 
@@ -19,6 +22,17 @@ export const defaultLocale: Locale = "pt";
 export const htmlLang: Record<Locale, string> = {
   pt: "pt-BR",
   en: "en",
+  es: "es",
+};
+
+/**
+ * Nome de cada idioma escrito NELE MESMO — é assim que o seletor mostra, para
+ * quem caiu no idioma errado reconhecer o seu (padrão de mercado).
+ */
+export const LANGUAGE_NAMES: Record<Locale, string> = {
+  pt: "Português",
+  en: "English",
+  es: "Español",
 };
 
 /**
@@ -29,34 +43,35 @@ export const pathnames = {
   "/": "/",
 
   // Público / marketing
-  "/catalogo": { pt: "/catalogo", en: "/catalog" },
-  "/planos": { pt: "/planos", en: "/pricing" },
-  "/como-funciona": { pt: "/como-funciona", en: "/how-it-works" },
-  "/sobre": { pt: "/sobre", en: "/about" },
-  "/contato": { pt: "/contato", en: "/contact" },
-  "/entrar": { pt: "/entrar", en: "/sign-in" },
+  "/catalogo": { pt: "/catalogo", en: "/catalog", es: "/catalogo" },
+  "/planos": { pt: "/planos", en: "/pricing", es: "/precios" },
+  "/como-funciona": { pt: "/como-funciona", en: "/how-it-works", es: "/como-funciona" },
+  "/sobre": { pt: "/sobre", en: "/about", es: "/sobre-nosotros" },
+  "/contato": { pt: "/contato", en: "/contact", es: "/contacto" },
+  "/entrar": { pt: "/entrar", en: "/sign-in", es: "/iniciar-sesion" },
   "/coming-soon": "/coming-soon",
 
   // App logado
-  "/upload": { pt: "/upload", en: "/upload" },
-  "/perfil": { pt: "/perfil", en: "/my-songs" },
-  "/estudio": { pt: "/estudio", en: "/studio" },
-  "/compartilhadas": { pt: "/compartilhadas", en: "/shared" },
-  "/conta": { pt: "/conta", en: "/account" },
-  "/song/[slug]": { pt: "/song/[slug]", en: "/song/[slug]" },
+  "/upload": { pt: "/upload", en: "/upload", es: "/upload" },
+  "/perfil": { pt: "/perfil", en: "/my-songs", es: "/mis-canciones" },
+  "/estudio": { pt: "/estudio", en: "/studio", es: "/estudio" },
+  "/compartilhadas": { pt: "/compartilhadas", en: "/shared", es: "/compartidas" },
+  "/conta": { pt: "/conta", en: "/account", es: "/cuenta" },
+  "/song/[slug]": { pt: "/song/[slug]", en: "/song/[slug]", es: "/song/[slug]" },
 
   "/setlists": "/setlists",
   "/setlists/[id]": "/setlists/[id]",
-  "/setlists/[id]/palco": { pt: "/setlists/[id]/palco", en: "/setlists/[id]/stage" },
+  "/setlists/[id]/palco": { pt: "/setlists/[id]/palco", en: "/setlists/[id]/stage", es: "/setlists/[id]/escenario" },
   "/setlists/[id]/ensaios/[eventId]": {
     pt: "/setlists/[id]/ensaios/[eventId]",
     en: "/setlists/[id]/rehearsals/[eventId]",
+    es: "/setlists/[id]/ensayos/[eventId]",
   },
 
-  "/bandas": { pt: "/bandas", en: "/bands" },
-  "/bandas/entrar/[token]": { pt: "/bandas/entrar/[token]", en: "/bands/join/[token]" },
-  "/convite/[token]": { pt: "/convite/[token]", en: "/invite/[token]" },
-  "/convite/[token]/sair": { pt: "/convite/[token]/sair", en: "/invite/[token]/leave" },
+  "/bandas": { pt: "/bandas", en: "/bands", es: "/bandas" },
+  "/bandas/entrar/[token]": { pt: "/bandas/entrar/[token]", en: "/bands/join/[token]", es: "/bandas/unirse/[token]" },
+  "/convite/[token]": { pt: "/convite/[token]", en: "/invite/[token]", es: "/invitacion/[token]" },
+  "/convite/[token]/sair": { pt: "/convite/[token]/sair", en: "/invite/[token]/leave", es: "/invitacion/[token]/salir" },
 
   // App nativo (Capacitor) — área mobile carregada pelo WebView do app.
   // Mesmo slug nos dois idiomas: não é página de SEO (noindex no layout) e o
@@ -74,9 +89,9 @@ export const pathnames = {
   "/app/mensagens": "/app/mensagens",
 
   // Legal
-  "/termos": { pt: "/termos", en: "/terms" },
-  "/privacidade": { pt: "/privacidade", en: "/privacy" },
-  "/cookies": { pt: "/cookies", en: "/cookies" },
+  "/termos": { pt: "/termos", en: "/terms", es: "/terminos" },
+  "/privacidade": { pt: "/privacidade", en: "/privacy", es: "/privacidad" },
+  "/cookies": { pt: "/cookies", en: "/cookies", es: "/cookies" },
 } as const;
 
 /** Toda rota do mapa, inclusive as dinâmicas (`/song/[slug]`). */

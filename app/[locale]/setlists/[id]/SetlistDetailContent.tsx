@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { htmlLang, type Locale } from "@/src/i18n/routing";
 import { useRouter } from "@/src/i18n/navigation";
 import { Link } from "@/src/i18n/navigation";
 import AddSongPicker, { AddedItem } from "./AddSongPicker";
@@ -219,7 +220,7 @@ export default function SetlistDetailContent({ id }: { id: string }) {
                   value={notesDraft}
                   onChange={e => setNotesDraft(e.target.value)}
                   rows={3}
-                  placeholder="Anotacoes gerais (local, data, horario...)"
+                  placeholder={t("notesPlaceholder")}
                   style={{
                     width: "100%", resize: "vertical", padding: "10px 14px", borderRadius: 10, marginBottom: 12,
                     border: "1px solid var(--border2)", background: "var(--surface2)", color: "var(--text)",
@@ -426,6 +427,7 @@ type SetlistCommentItem = {
 
 function SetlistComments({ setlistId }: { setlistId: string }) {
   const t = useTranslations("setlists");
+  const dateLocale = htmlLang[useLocale() as Locale] ?? "pt-BR";
   const tc = useTranslations("common");
   const [comments, setComments] = useState<SetlistCommentItem[]>([]);
   const [draft, setDraft] = useState("");
@@ -507,7 +509,7 @@ function SetlistComments({ setlistId }: { setlistId: string }) {
                 <p style={{ margin: "0 0 2px", fontSize: 13 }}>
                   <strong style={{ color: "var(--text)" }}>{c.userName ?? t("memberFallback")}</strong>
                   <span style={{ color: "var(--muted2)", fontSize: 11, marginLeft: 8 }}>
-                    {new Date(c.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    {new Date(c.createdAt).toLocaleDateString(dateLocale, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </p>
                 <p style={{ margin: 0, color: "var(--muted)", fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{c.content}</p>

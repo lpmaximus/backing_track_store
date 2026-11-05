@@ -4,7 +4,7 @@ import type { Locale } from "@/src/i18n/routing";
 import { alternatesFor } from "@/src/lib/seo";
 import { db, songs as songsTable } from "@/src/db";
 import { eq, ilike, or, and, inArray } from "drizzle-orm";
-import { ptTitlesMatchingEn } from "@/src/lib/catalogTitles";
+import { ptTitlesMatching } from "@/src/lib/catalogTitles";
 import SiteHeader from "@/app/components/SiteHeader";
 import SiteFooter from "@/app/components/SiteFooter";
 import CatalogSection from "@/app/components/CatalogSection";
@@ -41,7 +41,7 @@ export default async function CatalogoPage({
   if (q) {
     // No /en os títulos aparecem traduzidos (src/lib/catalogTitles.ts), então
     // a busca também precisa achar pelo nome em inglês ("ballad" → "Balada…").
-    const enMatches = locale === "en" ? ptTitlesMatchingEn(q) : [];
+    const enMatches = ptTitlesMatching(q, locale);
     const cond = or(
       ilike(songsTable.title, `%${q}%`),
       ilike(songsTable.artist, `%${q}%`),

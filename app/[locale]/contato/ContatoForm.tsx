@@ -82,8 +82,7 @@ export default function ContatoForm() {
 
         {sent && (
           <p style={{ color: "var(--muted)", fontSize: 13, margin: 0, textAlign: "center" }}>
-            Abrimos seu aplicativo de e-mail com a mensagem pronta para envio. Se nada abrir, escreva
-            diretamente para{" "}
+            {t("sentNote")}{" "}
             <a href={`mailto:${CONTACT_EMAIL}`} style={{ textDecoration: "underline", color: "var(--accent)", fontWeight: 600 }}>
               {CONTACT_EMAIL}
             </a>

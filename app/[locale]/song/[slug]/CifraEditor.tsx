@@ -328,9 +328,9 @@ export default function CifraEditor({
                 {r.section && (
                   <span style={{ color: "var(--accent)", fontWeight: 700, fontSize: 11, letterSpacing: "0.08em" }}>[{r.section}]</span>
                 )}
-                <input value={r.chords} onChange={(e) => updateRow(i, { chords: e.target.value })} placeholder="Acordes da linha (ex: D C D7)"
+                <input value={r.chords} onChange={(e) => updateRow(i, { chords: e.target.value })} placeholder={t("lineChordsPlaceholder")}
                   style={{ fontFamily: "'Courier New', monospace", fontWeight: 700, color: "var(--chord)", padding: "6px 9px", borderRadius: 7, border: "1px solid var(--border2)", background: "var(--surface2)", fontSize: 13, outline: "none" }} />
-                <input value={r.text} onChange={(e) => updateRow(i, { text: e.target.value })} placeholder="Letra da linha"
+                <input value={r.text} onChange={(e) => updateRow(i, { text: e.target.value })} placeholder={t("lineLyricsPlaceholder")}
                   style={{ padding: "7px 10px", borderRadius: 7, border: "1px solid var(--border2)", background: "var(--surface2)", color: "var(--text)", fontSize: 14, outline: "none" }} />
                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--muted2)" }}>
                   <span>t = {Number(r.time).toFixed(1)}s</span>

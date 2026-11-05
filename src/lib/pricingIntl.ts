@@ -26,7 +26,8 @@ export type Cycle = "monthly" | "yearly";
  */
 export const PRICES_BLURRED = true;
 
-/** Moeda pela língua da interface (que já vem do país — ver src/i18n/geo.ts). */
+/** Moeda pela língua da interface (que já vem do país — ver src/i18n/geo.ts).
+ *  Só o português cobra em real; inglês e espanhol veem dólar. */
 export function currencyForLocale(locale: Locale): Currency {
   return locale === "pt" ? "BRL" : "USD";
 }

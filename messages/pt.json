@@ -633,7 +633,10 @@
     "cutApplyError": "Não foi possível aplicar os cortes no arquivo. Tente de novo.",
     "recordTeaserTitle": "Grave por cima e use o pedal de loop",
     "recordTeaserBody": "Com uma conta grátis você grava sua voz ou instrumento sobre esta base, ouve de volta e cria camadas ao vivo.",
-    "recordTeaserCta": "Criar conta grátis"
+    "recordTeaserCta": "Criar conta grátis",
+    "lineChordsPlaceholder": "Acordes da linha (ex: D C D7)",
+    "lineLyricsPlaceholder": "Letra da linha",
+    "errNeedLyricsLine": "Adicione ao menos uma linha de letra."
   },
   "setlists": {
     "title": "Minhas Setlists",
@@ -854,7 +857,8 @@
     "showing": "{shown} de {total} faixas",
     "noResults": "Nenhuma faixa encontrada com esses filtros.",
     "clearFilters": "Limpar filtros",
-    "sortGenre": "Gênero"
+    "sortGenre": "Gênero",
+    "uploadedOn": "Enviada em {date}"
   },
   "shared": {
     "title": "Músicas Compartilhadas",
@@ -881,7 +885,8 @@
     "metaDescription": "Fale com a equipe do backingtrack.store.",
     "messagePlaceholder": "Escreva sua mensagem",
     "namePlaceholder": "Seu nome",
-    "sendMessage": "Enviar mensagem"
+    "sendMessage": "Enviar mensagem",
+    "sentNote": "Abrimos seu aplicativo de e-mail com a mensagem pronta para envio. Se nada abrir, escreva diretamente para"
   },
   "about": {
     "title": "Conectando músicos através da música.",
@@ -954,7 +959,8 @@
   "language": {
     "pt": "Português (BR)",
     "en": "English",
-    "switch": "Trocar idioma"
+    "switch": "Trocar idioma",
+    "es": "Español"
   },
   "rehearsal": {
     "instDrums": "Bateria",

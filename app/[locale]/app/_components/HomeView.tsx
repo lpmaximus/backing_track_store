@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import type { Locale } from "@/src/i18n/routing";
+import { htmlLang, type Locale } from "@/src/i18n/routing";
 import { Link } from "@/src/i18n/navigation";
 import { localizeSongTitle } from "@/src/lib/catalogTitles";
 import AppTabBar from "./AppTabBar";
@@ -29,7 +29,7 @@ export default async function HomeView({ locale, user, nextEvent, recent, unread
 }) {
   const t = await getTranslations({ locale, namespace: "app.home" });
   const firstName = (user.name ?? "").trim().split(/\s+/)[0] || null;
-  const dateLocale = locale === "en" ? "en-US" : "pt-BR";
+  const dateLocale = htmlLang[locale as Locale] ?? "pt-BR";
   const wd = nextEvent
     ? new Intl.DateTimeFormat(dateLocale, { weekday: "short", timeZone: TZ }).format(nextEvent.startsAt).replace(".", "").toUpperCase()
     : "";

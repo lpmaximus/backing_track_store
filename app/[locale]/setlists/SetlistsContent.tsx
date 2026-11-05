@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { htmlLang, type Locale } from "@/src/i18n/routing";
 import { Link } from "@/src/i18n/navigation";
 
 type SetlistItem = {
@@ -16,12 +17,13 @@ type SetlistItem = {
   updatedAt: string;
 };
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+function formatDate(iso: string, loc: string) {
+  return new Date(iso).toLocaleDateString(loc, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export default function SetlistsContent() {
   const t = useTranslations("setlists");
+  const dateLocale = htmlLang[useLocale() as Locale] ?? "pt-BR";
   const tc = useTranslations("common");
   const { data: session, status } = useSession();
   const [items, setItems]     = useState<SetlistItem[]>([]);
@@ -203,7 +205,7 @@ export default function SetlistsContent() {
                       )}
                     </p>
                     <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>
-                      {t("songCountUpdated", { count: s.songCount, date: formatDate(s.updatedAt) })}
+                      {t("songCountUpdated", { count: s.songCount, date: formatDate(s.updatedAt, dateLocale) })}
                     </p>
                   </div>
                   <span style={{ color: "var(--muted2)", fontSize: 18, flexShrink: 0 }}>→</span>

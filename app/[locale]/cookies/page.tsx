@@ -36,7 +36,8 @@ export default async function CookiesPage({
       <SiteHeader />
 
       <LegalPage title={t("cookiesTitle")} effectiveDate={t("cookiesEffective")}>
-        {locale === "en" ? <CookiesContentEn /> : <CookiesContentPt />}
+        {/* es: usa o texto em inglês até existir a versão em espanhol */}
+        {locale === "pt" ? <CookiesContentPt /> : <CookiesContentEn />}
       </LegalPage>
 
       <SiteFooter />

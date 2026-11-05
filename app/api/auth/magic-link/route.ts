@@ -3,6 +3,9 @@ import { createMagicToken } from "@/src/lib/authTokens";
 import { sendMagicLinkEmail } from "@/src/lib/authEmails";
 import { mailerConfigured } from "@/src/lib/mailer";
 import { siteUrl } from "@/src/lib/siteUrl";
+import { hasLocale } from "next-intl";
+import { routing } from "@/src/i18n/routing";
+import { getPathname } from "@/src/i18n/navigation";
 
 export const runtime = "nodejs";
 
@@ -22,12 +25,12 @@ export async function POST(req: NextRequest) {
     }
     if (!mailerConfigured()) return NextResponse.json({ error: "mail_unavailable" }, { status: 503 });
 
-    const lang = locale === "en" ? "en" : "pt";
+    const lang = hasLocale(routing.locales, locale) ? locale : routing.defaultLocale;
     // Pedido feito pelo app (área /app): o link volta para a tela de entrar do
     // app. Com App Links/Universal Links ativos, o celular abre direto no app.
     const path = app === true
-      ? (lang === "en" ? "/en/app/entrar" : "/app/entrar")
-      : (lang === "en" ? "/en/sign-in" : "/entrar");
+      ? getPathname({ href: "/app/entrar", locale: lang })
+      : getPathname({ href: "/entrar", locale: lang });
     const url = new URL(`${siteUrl()}${path}`);
     url.searchParams.set("magic", createMagicToken(e));
     // Só caminho relativo do próprio site — nunca um redirect aberto.

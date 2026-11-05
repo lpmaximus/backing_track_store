@@ -1,5 +1,5 @@
 /**
- * Títulos do catálogo próprio em inglês.
+ * Títulos do catálogo próprio em inglês e espanhol.
  *
  * As 55 bases do catálogo nasceram com título em português (carga do Suno,
  * 3-SUNO/Levantamento-BackingTracks-Suno.xlsx), mas ~75% de quem abre o
@@ -70,21 +70,90 @@ export const CATALOG_TITLES_EN: Record<string, string> = {
   "Xote": "Xote (Brazilian folk)",
 };
 
+/** Mesmos títulos em espanhol (chave = título em português, como no mapa acima). */
+export const CATALOG_TITLES_ES: Record<string, string> = {
+  "Arena rock anos 80": "Arena rock de los 80",
+  "Arrocha": "Arrocha (romántico brasileño)",
+  "Bachata": "Bachata",
+  "Baião": "Baião (nordeste brasileño)",
+  "Balada acústica em tom menor": "Balada acústica en tono menor",
+  "Black gospel": "Black gospel",
+  "Blues rock": "Blues rock",
+  "Bossa nova": "Bossa nova",
+  "Bossa nova jazz": "Bossa nova jazz",
+  "Brega Paraense": "Brega paraense (pop amazónico)",
+  "Classic rock": "Rock clásico",
+  "Classic rock lento": "Rock clásico lento",
+  "Congregacional pop": "Pop congregacional (alabanza)",
+  "Forró pé de serra": "Forró pé de serra (folk brasileño)",
+  "Funk clássico (anos 60/70)": "Funk clásico (años 60/70)",
+  "Funky blues": "Funky blues",
+  "Grunge anos 90": "Grunge de los 90",
+  "Hard rock": "Hard rock",
+  "Hard rock anos 70 (riff pesado)": "Hard rock de los 70 (riff pesado)",
+  "Heavy metal": "Heavy metal",
+  "Indie/alt rock": "Indie/rock alternativo",
+  "Jazz blues": "Jazz blues",
+  "Jazz modal": "Jazz modal",
+  "Louvor alto/celebração": "Alabanza alegre/celebración",
+  "MPB pop": "MPB pop (pop brasileño)",
+  "Motown/Soul": "Motown/Soul",
+  "Neo soul": "Neo soul",
+  "Pagode romântico": "Pagode romántico (samba)",
+  "Pop acústico": "Pop acústico",
+  "Pop dance": "Pop dance",
+  "Pop moderno": "Pop moderno",
+  "Pop punk anos 2000": "Pop punk de los 2000",
+  "Pop rock ballad": "Balada pop rock",
+  "Pop rock nacional anos 90": "Pop rock brasileño de los 90",
+  "Power ballad rock": "Power ballad de rock",
+  "Punk rock": "Punk rock",
+  "R&B moderno": "R&B moderno",
+  "Rock acústico / unplugged": "Rock acústico / unplugged",
+  "Rock alternativo anos 2000": "Rock alternativo de los 2000",
+  "Rock and roll anos 50": "Rock and roll de los 50",
+  "Rock em tom menor": "Rock en tono menor",
+  "Rock en español / rock latino": "Rock en español / rock latino",
+  "Rock instrumental (guitarra solo)": "Rock instrumental (solo de guitarra)",
+  "Samba de raiz": "Samba de raíz",
+  "Samba-jazz": "Samba-jazz",
+  "Sertanejo raiz/moda de viola": "Sertanejo de raíz (country brasileño)",
+  "Sertanejo sofrência": "Sertanejo sofrência (balada country brasileña)",
+  "Sertanejo universitário": "Sertanejo universitário (country pop brasileño)",
+  "Shuffle blues (Texas)": "Shuffle blues (Texas)",
+  "Slow blues 12/8": "Slow blues 12/8",
+  "Slow rock 12/8": "Slow rock 12/8",
+  "Southern rock": "Southern rock",
+  "Swing/Bebop": "Swing/Bebop",
+  "Worship contemporâneo": "Alabanza contemporánea",
+  "Xote": "Xote (folk brasileño)",
+};
+
+const TITLE_MAPS: Partial<Record<string, Record<string, string>>> = {
+  en: CATALOG_TITLES_EN,
+  es: CATALOG_TITLES_ES,
+};
+
 /** Título para exibir no idioma da página. */
 export function localizeSongTitle(title: string, locale: Locale | string): string {
-  if (locale !== "en") return title;
-  return CATALOG_TITLES_EN[title] ?? title;
+  return TITLE_MAPS[locale]?.[title] ?? title;
 }
 
 /**
- * Busca em inglês: devolve os títulos ORIGINAIS (pt) cuja tradução contém o
- * termo — o caller soma isso ao ILIKE do banco, senão "ballad" nunca acharia
- * "Balada acústica em tom menor".
+ * Busca no idioma da página: devolve os títulos ORIGINAIS (pt) cuja tradução
+ * contém o termo — o caller soma isso ao ILIKE do banco, senão "ballad" nunca
+ * acharia "Balada acústica em tom menor". Em pt devolve lista vazia.
  */
-export function ptTitlesMatchingEn(q: string): string[] {
+export function ptTitlesMatching(q: string, locale: Locale | string): string[] {
+  const map = TITLE_MAPS[locale];
   const needle = q.trim().toLowerCase();
-  if (!needle) return [];
-  return Object.entries(CATALOG_TITLES_EN)
-    .filter(([, en]) => en.toLowerCase().includes(needle))
+  if (!map || !needle) return [];
+  return Object.entries(map)
+    .filter(([, translated]) => translated.toLowerCase().includes(needle))
     .map(([pt]) => pt);
+}
+
+/** @deprecated use ptTitlesMatching(q, "en") */
+export function ptTitlesMatchingEn(q: string): string[] {
+  return ptTitlesMatching(q, "en");
 }

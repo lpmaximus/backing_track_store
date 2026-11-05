@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Link } from "@/src/i18n/navigation";
 import type { StaticPathname } from "@/src/i18n/routing";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 /** href é validado contra o mapa de rotas do i18n (src/i18n/routing.ts). */
 export type NavItem = { label: string; href: StaticPathname };
@@ -53,6 +54,10 @@ export default function MobileNav({
                 {label}
               </Link>
             ))}
+            {/* Idioma também no menu: no celular o combo do header fica oculto. */}
+            <div style={{ paddingTop: 14 }}>
+              <LanguageSwitcher variant="menu" />
+            </div>
           </div>
         </>
       )}

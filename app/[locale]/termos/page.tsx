@@ -42,7 +42,8 @@ export default async function TermosPage({
       <SiteHeader />
 
       <LegalPage title={t("termsTitle")} effectiveDate={t("termsEffective")}>
-        {locale === "en" ? <TermsContentEn /> : <TermsContentPt />}
+        {/* es: usa o texto em inglês até existir a versão em espanhol */}
+        {locale === "pt" ? <TermsContentPt /> : <TermsContentEn />}
       </LegalPage>
 
       <SiteFooter />

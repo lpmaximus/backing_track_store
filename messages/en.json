@@ -255,7 +255,7 @@
     "f5Text": "Record your own performance over the backing track (overdub) straight from the browser. Private by default — you decide whether to share it with the band or publish it.",
     "f6Title": "Bands and setlists",
     "f6Text": "Create a band, invite members, build shared setlists and let the community suggest chord fixes before the show.",
-    "disclaimer": "AI separation is an evolving technology and can be imprecise — treat the result as a study reference, and count on the community to fix the chart when needed. Only upload audio you own or are authorised to use; we honour copyright holder notices under our <link>Terms of Use</link>.",
+    "disclaimer": "AI separation is an evolving technology and can be imprecise — treat the result as a study reference, and count on the community to fix the chart when needed. Only upload audio you own or are authorized to use; we honor copyright holder notices under our <link>Terms of Use</link>.",
     "ctaTitle": "Ready to try it?",
     "ctaText": "The catalog is open during the beta — no account required to explore.",
     "ctaExplore": "Browse songs",
@@ -333,7 +333,7 @@
     "quotaTitle": "Separations this month",
     "quotaLeft": "{used} of {total} songs used this cycle",
     "quotaExceeded": "You've hit your plan's limit for this cycle.",
-    "rightsNotice": "Only upload audio you own or are authorised to use.",
+    "rightsNotice": "Only upload audio you own or are authorized to use.",
     "signedOut": "Sign in to upload tracks.",
     "quotaUnlimited": "{used, plural, =1 {# used} other {# used}} this month",
     "quotaUsed": "{used} of {limit} used · {remaining} left in your monthly allowance",
@@ -563,7 +563,7 @@
     },
     "looper": {
       "title": "Loop pedal",
-      "pitch": "Record a phrase live and it repeats on its own. Stack layers on top without stopping — for practising improvisation, building a harmony or rehearsing without a band.",
+      "pitch": "Record a phrase live and it repeats on its own. Stack layers on top without stopping — for practicing improvisation, building a harmony or rehearsing without a band.",
       "open": "Open pedal",
       "close": "Close",
       "arm": "Enable microphone",
@@ -633,11 +633,14 @@
     "cutApplyError": "Couldn't apply the cuts to the file. Try again.",
     "recordTeaserTitle": "Record on top and use the loop pedal",
     "recordTeaserBody": "With a free account you record your voice or instrument over this track, play it back and build live layers.",
-    "recordTeaserCta": "Create free account"
+    "recordTeaserCta": "Create free account",
+    "lineChordsPlaceholder": "Chords for this line (e.g. D C D7)",
+    "lineLyricsPlaceholder": "Lyrics for this line",
+    "errNeedLyricsLine": "Add at least one line of lyrics."
   },
   "setlists": {
     "title": "My Setlists",
-    "subtitle": "Organise your repertoire for gigs and rehearsals",
+    "subtitle": "Organize your repertoire for gigs and rehearsals",
     "new": "New setlist",
     "namePlaceholder": "Setlist name (e.g. Friday gig - Jun 15)",
     "empty": "You don't have any setlists yet.",
@@ -746,7 +749,7 @@
     "songLine": "{artist} · Key: {key} · {bpm} BPM",
     "proOnly": "Setlists are a Pro-only feature. Build repertoires, set the running order and add notes for each show.",
     "newSetlistCaps": "NEW SETLIST",
-    "emptyList": "You don't have any setlists yet. Create your first one to organise your next show.",
+    "emptyList": "You don't have any setlists yet. Create your first one to organize your next show.",
     "backToList": "← My setlists",
     "run": "▶ Run",
     "mixerTitle": "SETLIST MIX",
@@ -854,7 +857,8 @@
     "showing": "{shown} of {total} tracks",
     "noResults": "No tracks match these filters.",
     "clearFilters": "Clear filters",
-    "sortGenre": "Genre"
+    "sortGenre": "Genre",
+    "uploadedOn": "Uploaded {date}"
   },
   "shared": {
     "title": "Shared Songs",
@@ -881,26 +885,27 @@
     "metaDescription": "Talk to the backingtrack.store team.",
     "messagePlaceholder": "Write your message",
     "namePlaceholder": "Your name",
-    "sendMessage": "Send message"
+    "sendMessage": "Send message",
+    "sentNote": "We opened your email app with the message ready to send. If nothing opened, write directly to"
   },
   "about": {
     "title": "Connecting musicians through music.",
     "metaDescription": "The mission, the values and the team behind backingtrack.store.",
     "metaTitle": "About us",
     "kicker": "● ABOUT US",
-    "intro": "backingtrack.store started from a simple problem: practising or performing with a good instrumental bed and a synced chord chart always meant juggling a YouTube video, a chord chart from one site, a tuner from another, and hours separating parts by ear. We brought all of that together — plus the AI that does the instrument separation for you.",
+    "intro": "backingtrack.store started from a simple problem: practicing or performing with a good instrumental bed and a synced chord chart always meant juggling a YouTube video, a chord chart from one site, a tuner from another, and hours separating parts by ear. We brought all of that together — plus the AI that does the instrument separation for you.",
     "whatTitle": "What we do",
     "whatP1": "We're a music practice platform: a catalog of backing tracks with chord charts synced in real time, a professional player with speed, key and section-loop controls, and AI tools that split any audio you upload into per-instrument tracks (stems) — drums, bass, guitar and more.",
     "whatP2": "For bands, we offer shared setlists, community chord corrections and a Performance Mode built for rehearsal and stage.",
     "valuesTitle": "What guides us",
     "v1Title": "Built for people who play",
-    "v1Text": "Every feature comes from a real need of someone who practises, rehearses and performs — not of someone who only listens.",
+    "v1Text": "Every feature comes from a real need of someone who practices, rehearses and performs — not of someone who only listens.",
     "v2Title": "The community fixes the chart",
     "v2Text": "No chord chart is perfect the first time. We let the community of musicians suggest and validate corrections.",
     "v3Title": "Respect for copyright",
     "v3Text": "We run a catalog shared between subscribers, but we take rights holder notices seriously — with a clear notice-and-takedown policy.",
     "v4Title": "Your recording is yours",
-    "v4Text": "What you record stays private by default. We never use your content to train AI models without explicit authorisation.",
+    "v4Text": "What you record stays private by default. We never use your content to train AI models without explicit authorization.",
     "operatorTitle": "Who operates backingtrack.store",
     "operatorText": "backingtrack.store is operated by L2techs, based in Belo Horizonte, Brazil. The full privacy policy, terms of use and copyright handling are detailed on the site's legal pages.",
     "ctaContact": "Get in touch",
@@ -948,13 +953,14 @@
     "unsubDone": "Done, you're unsubscribed",
     "unsubText": "You won't receive any more invites from us. If this was a mistake or you change your mind, just write to ",
     "backToSite": "Back to the site",
-    "revoked": "This invite was cancelled.",
+    "revoked": "This invite was canceled.",
     "discoverSite": "Explore the site"
   },
   "language": {
     "pt": "Português (BR)",
     "en": "English",
-    "switch": "Change language"
+    "switch": "Change language",
+    "es": "Español"
   },
   "rehearsal": {
     "instDrums": "Drums",
@@ -1041,19 +1047,19 @@
   "legalPages": {
     "termsTitle": "Terms of Use",
     "termsDescription": "Conditions for using backingtrack.store.",
-    "termsEffective": "18 July 2026",
+    "termsEffective": "July 18, 2026",
     "privacyTitle": "Privacy Policy",
     "privacyDescription": "How backingtrack.store handles your personal data.",
-    "privacyEffective": "18 July 2026",
+    "privacyEffective": "July 18, 2026",
     "cookiesTitle": "Cookie Policy",
     "cookiesDescription": "Which cookies backingtrack.store uses, and what for.",
-    "cookiesEffective": "18 July 2026"
+    "cookiesEffective": "July 18, 2026"
   },
   "comingSoon": {
     "title1": "Backing tracks",
     "title2": "+ chord charts.",
     "title3": "Coming soon.",
-    "subtitle": "Practise, rehearse and perform with professional backing tracks and chord charts synced in real time — no ads in the way.",
+    "subtitle": "Practice, rehearse and perform with professional backing tracks and chord charts synced in real time — no ads in the way.",
     "emailPlaceholder": "you@email.com",
     "notifyMe": "Notify me",
     "noSpam": "No spam. Just one message when we launch.",
@@ -1146,7 +1152,7 @@
     },
     "welcome": {
       "title": "Split, practice, rehearse and play live.",
-      "text": "Upload any track: we split the instruments, generate synced chords and take your band's set list to the stage.",
+      "text": "Upload any track: we split the instruments, generate synced chords and take your band's setlist to the stage.",
       "chips": {
         "stems": "STEMS",
         "chords": "CHORDS",
@@ -1160,7 +1166,7 @@
     "signIn": {
       "handoffFailed": "We couldn't finish signing in with Google. Please try again.",
       "signUpTitle": "Create account",
-      "signInText": "Use the same account as the website. Your songs, chords and set lists come along.",
+      "signInText": "Use the same account as the website. Your songs, chords and setlists come along.",
       "signUpText": "Free, no card needed. Split up to 3 songs a month on the Free plan.",
       "back": "Back",
       "orEmail": "or with email",
@@ -1256,7 +1262,7 @@
       "roleLeader": "LEADER",
       "roleMember": "MEMBER",
       "rolePersonal": "PERSONAL",
-      "repertoire": "SET LIST",
+      "repertoire": "SETLIST",
       "empty": "No songs in this setlist yet.",
       "stage": "Stage mode",
       "rehearsalDetails": "Rehearsal agenda and assignments",

@@ -21,6 +21,7 @@ export default function robots(): MetadataRoute.Robots {
     "/admin/",
     "/coming-soon",
     "/en/coming-soon",
+    "/es/coming-soon",
     // pt
     "/conta",
     "/perfil",
@@ -37,6 +38,14 @@ export default function robots(): MetadataRoute.Robots {
     "/en/shared",
     "/en/sign-in",
     "/en/bands/join",
+    // es
+    "/es/cuenta",
+    "/es/mis-canciones",
+    "/es/upload",
+    "/es/setlists",
+    "/es/compartidas",
+    "/es/iniciar-sesion",
+    "/es/bandas/unirse",
   ];
 
   return {

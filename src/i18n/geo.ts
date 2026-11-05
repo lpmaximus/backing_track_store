@@ -8,6 +8,10 @@
  *   2. Cookie NEXT_LOCALE                  → escolha manual do usuário
  *   3. País do IP (x-vercel-ip-country)    → BR = pt, resto = en
  *   4. Accept-Language                     → pt* = pt, resto = en
+ *
+ * Espanhol (es) só entra pelo cookie, ou seja, quando a pessoa escolhe no
+ * seletor de idioma. A detecção automática nunca devolve "es" — inclusive para
+ * visitantes de países hispânicos, que caem em inglês como o resto do mundo.
  *   5. defaultLocale (pt)
  *
  * Países lusófonos ficam em português mesmo fora do Brasil: são mercados que

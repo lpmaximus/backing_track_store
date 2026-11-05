@@ -165,7 +165,7 @@ function EntrarForm() {
       // Free nunca tinham separado nada: caíam na home e não achavam o caminho.
       const isDefaultDestination = callbackUrl === "/" || callbackUrl === `/${locale}`;
       if (mode === "cadastro" && isDefaultDestination) {
-        router.push(locale === "en" ? "/en/upload?welcome=1" : "/upload?welcome=1");
+        router.push(locale === "pt" ? "/upload?welcome=1" : `/${locale}/upload?welcome=1`);
       } else {
         router.push(callbackUrl);
       }

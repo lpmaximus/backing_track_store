@@ -6,6 +6,7 @@ import { authConfig } from "./auth.config";
 import { routing } from "./src/i18n/routing";
 import { LOCALE_COOKIE, localeFromPathname, resolveLocale } from "./src/i18n/geo";
 import { getPathname } from "./src/i18n/navigation";
+import { localizePath } from "./src/i18n/localizePath";
 
 // Instância própria, edge-safe — NÃO usar `auth` de "@/auth" aqui,
 // pois esse arquivo importa src/db (Neon) no topo do módulo, o que
@@ -54,7 +55,12 @@ export default auth((req: NextRequest & { auth: Session | null }) => {
     const { locale, source } = resolveLocale(req);
     if (locale !== routing.defaultLocale) {
       const url = new URL(req.url);
-      url.pathname = `/${locale}${pathname === "/" ? "" : pathname}`;
+      // Traduz o slug junto (/planos → /es/precios) em vez de só prefixar;
+      // rota fora do mapa cai no prefixo simples e o next-intl resolve.
+      const localized = localizePath(pathname, locale);
+      url.pathname = localized.startsWith(`/${locale}`)
+        ? localized
+        : `/${locale}${pathname === "/" ? "" : pathname}`;
       const res = NextResponse.redirect(url);
       // Grava a escolha para não pagar o redirect em toda navegação e para o
       // seletor de idioma ter um estado inicial coerente.
@@ -83,6 +89,8 @@ export default auth((req: NextRequest & { auth: Session | null }) => {
     "/my-songs",
     "/conta",
     "/account",
+    "/mis-canciones",
+    "/cuenta",
     "/upload",
   ];
   const isProtected = protectedPaths.some((p) => bare === p || bare.startsWith(`${p}/`));
