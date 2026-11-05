@@ -22,7 +22,32 @@ export const ACTIVITY_EVENTS = [
   "stage_mode", // entrou no modo palco
   "upload", // enviou música própria
   "export", // exportou/baixou stems
+  // ─── Telemetria do piloto (PRD-BTS-001 v3.0 §4) ──────────────────────────
+  "signup", // conta criada (servidor)
+  "player_open", // abriu o player de uma música
+  "practice_progress", // progresso de reprodução efetiva (meta: sid, effectiveS, interactions)
+  "practice_qualified", // prática significativa — DERIVADO no servidor, 1x por sessão
+  "separation_requested", // separação disparada (servidor)
+  "separation_completed", // stems prontos (servidor, webhook)
+  "take_started", // começou a gravar um take
+  "take_saved", // take gravado e salvo (servidor)
 ] as const;
+
+/**
+ * Eventos que só o SERVIDOR grava. O client não pode mandá-los por
+ * /api/activity — senão bastaria um POST para "virar" usuário ativado.
+ */
+export const SERVER_ONLY_EVENTS: ReadonlySet<string> = new Set([
+  "signup",
+  "practice_qualified",
+  "separation_requested",
+  "separation_completed",
+  "take_saved",
+]);
+
+/** Regra da prática significativa (PRD-BTS-001 §3.1). Hipótese a revisar. */
+export const PRACTICE_QUALIFY_SECONDS = 180;
+export const PRACTICE_QUALIFY_INTERACTIONS = 1;
 
 export type ActivityEvent = (typeof ACTIVITY_EVENTS)[number];
 
@@ -37,6 +62,14 @@ export const EVENT_LABELS: Record<ActivityEvent, string> = {
   stage_mode: "Modo palco",
   upload: "Enviou música",
   export: "Exportou stems",
+  signup: "Criou conta",
+  player_open: "Abriu o player",
+  practice_progress: "Progresso de prática",
+  practice_qualified: "Prática significativa",
+  separation_requested: "Pediu separação",
+  separation_completed: "Separação pronta",
+  take_started: "Começou a gravar",
+  take_saved: "Salvou gravação",
 };
 
 export function isActivityEvent(v: unknown): v is ActivityEvent {

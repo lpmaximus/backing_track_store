@@ -22,6 +22,7 @@
  */
 import { db, processingJobs, songs, users, subscriptions } from "@/src/db";
 import { and, eq, gte, ne, sql, desc } from "drizzle-orm";
+import { freeMonthlyLimit } from "./beta";
 
 export const FREE_MONTHLY_UPLOAD_LIMIT = 3; // ADR-BTS-001: isca de conversão, export completo
 export const PRO_MONTHLY_UPLOAD_LIMIT = 20; // ADR-BTS-001: pacote Pro visível e aplicado
@@ -48,7 +49,9 @@ export function monthlyLimitForRole(role?: string): number {
   if (role === "studio") return STUDIO_MONTHLY_UPLOAD_LIMIT;
   if (role === "proband") return PROBAND_MONTHLY_UPLOAD_LIMIT;
   if (role === "pro") return PRO_MONTHLY_UPLOAD_LIMIT;
-  return FREE_MONTHLY_UPLOAD_LIMIT;
+  // Open Beta: o Free ganha o pacote do piloto (padrão 5/mês, env
+  // BETA_SEPARATIONS_PER_MONTH). Nunca abaixo do Free normal.
+  return freeMonthlyLimit(FREE_MONTHLY_UPLOAD_LIMIT);
 }
 
 /**

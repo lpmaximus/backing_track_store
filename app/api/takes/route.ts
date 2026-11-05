@@ -24,7 +24,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db, userTakes, songs } from "@/src/db";
 import { and, eq, desc, sql } from "drizzle-orm";
-import { roleCan } from "@/src/lib/permissions";
+import { roleCan, grantedOnlyByBeta, resolveUserType } from "@/src/lib/permissions";
+import { betaTakeCap } from "@/src/lib/beta";
+import { track } from "@/src/lib/activity";
 import { presignPut, sanitizeKey } from "@/src/lib/r2";
 import { sanitizeFx } from "@/src/lib/takeFx";
 
@@ -205,6 +207,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── Open Beta: quem grava SÓ por causa do Beta tem teto menor ───────────
+    // (PRD-BTS-001 §7). Studio/admin seguem o teto do plano, acima. O teto
+    // total protege o R2 (10 GB grátis): voz gravada não expira sozinha.
+    const session = await auth();
+    const role = session?.user?.role;
+    const cap = grantedOnlyByBeta(resolveUserType(role), "record_take") ? betaTakeCap(role) : null;
+    if (cap && !substituindo) {
+      if ((contagem?.n ?? 0) >= cap.perSong) {
+        return NextResponse.json(
+          { error: `No Beta, cada música aceita até ${cap.perSong} gravações`, code: "beta_take_song_cap", limit: cap.perSong },
+          { status: 409 },
+        );
+      }
+      const [totalUser] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(userTakes)
+        .where(eq(userTakes.userId, userId));
+      if ((totalUser?.n ?? 0) >= cap.total) {
+        return NextResponse.json(
+          { error: `No Beta, cada conta guarda até ${cap.total} gravações. Apague uma para gravar outra.`, code: "beta_take_total_cap", limit: cap.total },
+          { status: 409 },
+        );
+      }
+    }
+
     // ── Passo 1: assinar o upload ───────────────────────────────────────────
     if (body.step === "presign") {
       const contentType = body.contentType ?? "";
@@ -268,6 +295,8 @@ export async function POST(req: NextRequest) {
           offsetMs,
         })
         .returning();
+
+      void track(userId, "take_saved", { songId, meta: { takeId: criado.id, durationSec: Number.isFinite(dur) ? dur : null } });
 
       return NextResponse.json(
         {

@@ -21,6 +21,7 @@
  *
  * Runtime Node (nodemailer). Toca o banco — não importar em client/edge.
  */
+import { track } from "./activity";
 import crypto from "crypto";
 import { after } from "next/server";
 import { cookies, headers } from "next/headers";
@@ -383,6 +384,8 @@ export async function sendLifecycleEmail(userId: number, kind: LifecycleKind): P
  */
 export function onUserCreated(userId: number, locale?: string | null): void {
   runAfterResponse(async () => {
+    // Telemetria do piloto (PRD-BTS-001 §4): início do funil de ativação.
+    await track(userId, "signup");
     const lang = locale === "en" || locale === "pt" ? locale : await localeFromRequest();
     try {
       await saveLocale(userId, lang);

@@ -22,6 +22,7 @@ import { purgeSourceMix } from "@/src/lib/retention";
 import { getLyricsProvider } from "@/src/lib/lyrics";
 import { createNotification } from "@/src/lib/notifications";
 import { sendSongReadyEmail } from "@/src/lib/lifecycle";
+import { track } from "@/src/lib/activity";
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -140,6 +141,8 @@ export async function POST(req: NextRequest) {
         body: `"${song.title}" já foi separada em stems e pode ser tocada.`,
         link: `/song/${song.slug}`,
       });
+      // Telemetria do piloto (PRD-BTS-001 §4).
+      void track(song.uploadedByUserId, "separation_completed", { songId: job.songId });
       // E por e-mail: a separação leva minutos e a pessoa costuma fechar a aba.
       // Sem isto ela só descobriria que a música ficou pronta se voltasse sozinha.
       await sendSongReadyEmail(song.uploadedByUserId, song.title, song.slug);

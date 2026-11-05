@@ -10,7 +10,12 @@ import type { StaticPathname } from "@/src/i18n/routing";
  * Imagens em /public: carousel-1.jpg … carousel-5.jpg
  * (fallback: gradiente escuro enquanto a imagem não existir).
  */
-const SLIDE_HREFS: StaticPathname[] = ["/upload", "/catalogo", "/como-funciona", "/bandas", "/entrar"];
+// Slide 4 era "bandas" (a seção de bandas continua na home); virou gravação,
+// o recurso menos descoberto e o centro da tese do piloto (PRD-BTS-001). A
+// gravação acontece dentro do player, então o slide leva ao catálogo.
+// As imagens 4 e 5 ainda são as antigas — trocar carousel-4/5.jpg quando houver
+// foto de gravação/pedal de loop.
+const SLIDE_HREFS: StaticPathname[] = ["/upload", "/catalogo", "/como-funciona", "/catalogo", "/entrar"];
 const SLIDE_IMGS = ["/carousel-1.jpg", "/carousel-2.jpg", "/carousel-3.jpg", "/carousel-4.jpg", "/carousel-5.jpg"];
 
 export default function HeroCarousel() {

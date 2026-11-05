@@ -14,6 +14,14 @@ import { db, songs, processingJobs } from "@/src/db";
 import { eq } from "drizzle-orm";
 import { checkUploadQuota } from "@/src/lib/quota";
 import { getSeparationProvider } from "@/src/lib/separation";
+import {
+  alertBudgetCrossing,
+  checkBudget,
+  checkConcurrency,
+  checkDuration,
+  type BudgetStatus,
+} from "@/src/lib/betaGuards";
+import { track } from "@/src/lib/activity";
 
 const HASH_RE = /^[a-f0-9]{64}$/i;
 
@@ -39,8 +47,33 @@ function webhookBaseUrl(): string {
   return process.env.PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || "";
 }
 
+/**
+ * Travas de custo do Open Beta (PRD-BTS-001 §7): duração, uma por vez e
+ * orçamento do mês. Roda só quando vai haver separação de verdade (upload novo
+ * ou retry), nunca em cache-hit. Devolve o bloqueio ou o status do orçamento,
+ * que alimenta o alerta de 70/90/100% depois do disparo.
+ */
+async function runBetaGuards(
+  userId: number,
+  role: string | undefined,
+  durationSec: unknown,
+): Promise<{ blocked: NextResponse } | { budget: BudgetStatus | null }> {
+  const dur = checkDuration(durationSec, role);
+  if (dur) return { blocked: NextResponse.json(dur.body, { status: dur.status }) };
+  const conc = await checkConcurrency(userId, role);
+  if (conc) return { blocked: NextResponse.json(conc.body, { status: conc.status }) };
+  const { block, status } = await checkBudget();
+  if (block) return { blocked: NextResponse.json(block.body, { status: block.status }) };
+  return { budget: status };
+}
+
 /** Cria processing_job e dispara a separação num song já existente (novo ou retry). */
-async function submitSeparation(songId: number, slug: string, audioUrl: string) {
+async function submitSeparation(
+  songId: number,
+  slug: string,
+  audioUrl: string,
+  ctx: { userId: number; budget: BudgetStatus | null; durationSec?: number },
+) {
   const provider = getSeparationProvider();
   const [job] = await db
     .insert(processingJobs)
@@ -66,6 +99,11 @@ async function submitSeparation(songId: number, slug: string, audioUrl: string) 
       .set({ providerJobId, status: "running" })
       .where(eq(processingJobs.id, job.id));
     await db.update(songs).set({ processingStatus: "separating" }).where(eq(songs.id, songId));
+    void track(ctx.userId, "separation_requested", {
+      songId,
+      meta: { durationSec: Number.isFinite(ctx.durationSec) ? ctx.durationSec : null },
+    });
+    void alertBudgetCrossing(ctx.budget);
   } catch (submitErr) {
     console.error("[upload/confirm submit]", submitErr);
     await db
@@ -85,13 +123,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const { key, publicUrl, hash, filename, contentType } = (await req.json()) as {
+  const { key, publicUrl, hash, filename, contentType, durationSec } = (await req.json()) as {
     key?: string;
     publicUrl?: string;
     hash?: string;
     filename?: string;
     contentType?: string;
+    /** Medida no navegador antes do envio (trava de duração do Beta). */
+    durationSec?: number;
   };
+  const role = session.user.role;
+  const dur = Number(durationSec);
 
   if (!publicUrl || !hash || !HASH_RE.test(hash) || !filename) {
     return NextResponse.json({ error: "Parâmetros inválidos" }, { status: 400 });
@@ -111,7 +153,7 @@ export async function POST(req: NextRequest) {
         genre: "Outros",
         key: "?",
         bpm: 0,
-        duration: 0,
+        duration: Number.isFinite(dur) && dur > 0 ? Math.round(dur) : 0,
         audioUrl: publicUrl, // mix original — será apagado ao fim do pipeline
         published: false,
         sourceType: "user_upload",
@@ -141,11 +183,15 @@ export async function POST(req: NextRequest) {
       // o registro e dispara a separação de novo, em vez de fingir que já
       // está pronto.
       if (existing.processingStatus === "failed") {
+        const guard = await runBetaGuards(userId, role, durationSec);
+        if ("blocked" in guard) return guard.blocked;
         await db
           .update(songs)
           .set({ audioUrl: publicUrl, processingStatus: "queued" })
           .where(eq(songs.id, existing.id));
-        return submitSeparation(existing.id, existing.slug, publicUrl);
+        return submitSeparation(existing.id, existing.slug, publicUrl, {
+          userId, budget: guard.budget, durationSec: dur,
+        });
       }
 
       // Já pronta, ou já em andamento por outra requisição — não duplica.
@@ -168,8 +214,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── Travas de custo do Beta (duração, uma por vez, orçamento) ─────────────
+    const guard = await runBetaGuards(userId, role, durationSec);
+    if ("blocked" in guard) {
+      await db.delete(songs).where(eq(songs.id, song.id));
+      return guard.blocked;
+    }
+
     // ── Cria o job e dispara a separação ──────────────────────────────────────
-    return submitSeparation(song.id, song.slug, publicUrl);
+    return submitSeparation(song.id, song.slug, publicUrl, {
+      userId, budget: guard.budget, durationSec: dur,
+    });
   } catch (err) {
     console.error("[POST /api/upload/confirm]", err);
     return NextResponse.json({ error: "Erro ao confirmar upload" }, { status: 500 });

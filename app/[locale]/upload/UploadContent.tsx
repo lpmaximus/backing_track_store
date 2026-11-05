@@ -40,6 +40,44 @@ async function sha256Hex(file: File): Promise<string> {
     .join("");
 }
 
+/**
+ * Duração do áudio em segundos, lida pelo próprio navegador (só metadados, não
+ * decodifica o arquivo). Vai junto do upload para a trava de duração do Beta.
+ * null quando o navegador não consegue ler o formato — o servidor não bloqueia
+ * nesse caso (ver src/lib/betaGuards.ts).
+ */
+function audioDuration(file: File): Promise<number | null> {
+  return new Promise((resolve) => {
+    let url = "";
+    try {
+      url = URL.createObjectURL(file);
+    } catch {
+      resolve(null);
+      return;
+    }
+    const audio = document.createElement("audio");
+    const done = (v: number | null) => {
+      clearTimeout(timer);
+      audio.removeAttribute("src");
+      URL.revokeObjectURL(url);
+      resolve(v);
+    };
+    const timer = setTimeout(() => done(null), 8000);
+    audio.preload = "metadata";
+    audio.onloadedmetadata = () =>
+      done(Number.isFinite(audio.duration) && audio.duration > 0 ? Math.round(audio.duration) : null);
+    audio.onerror = () => done(null);
+    audio.src = url;
+  });
+}
+
+/** Códigos das travas do Beta → mensagem no idioma da tela. */
+const BETA_ERROR_KEY: Record<string, string> = {
+  beta_max_duration: "errBetaDuration",
+  beta_concurrent: "errBetaConcurrent",
+  beta_budget: "errBetaBudget",
+};
+
 export default function UploadContent() {
   const t = useTranslations("upload");
   const tc = useTranslations("common");
@@ -115,18 +153,23 @@ export default function UploadContent() {
     try {
       // 1. Hash primeiro (habilita cache antes de subir).
       setPhase("hashing");
-      const hash = await sha256Hex(file);
+      const [hash, durationSec] = await Promise.all([sha256Hex(file), audioDuration(file)]);
+      const errorFor = (data: { error?: string; code?: string; maxDurationSec?: number }, fallback: string) => {
+        const key = data.code ? BETA_ERROR_KEY[data.code] : undefined;
+        if (key) return t(key, { min: Math.round((data.maxDurationSec ?? 600) / 60) });
+        return data.error ?? fallback;
+      };
 
       // 2. Pede presigned URL (ou recebe cache hit).
       const prep = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, contentType: file.type || "audio/mpeg", hash }),
+        body: JSON.stringify({ filename: file.name, contentType: file.type || "audio/mpeg", hash, durationSec }),
       });
       const prepData = await prep.json();
       if (!prep.ok) {
         setPhase("error");
-        setError(prepData.error ?? t("errPrepare"));
+        setError(errorFor(prepData, t("errPrepare")));
         return;
       }
 
@@ -160,12 +203,13 @@ export default function UploadContent() {
           hash,
           filename: file.name,
           contentType: file.type || "audio/mpeg",
+          durationSec,
         }),
       });
       const confirmData = await confirm.json();
       if (!confirm.ok) {
         setPhase("error");
-        setError(confirmData.error ?? t("errConfirm"));
+        setError(errorFor(confirmData, t("errConfirm")));
         return;
       }
 

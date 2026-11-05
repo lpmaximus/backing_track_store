@@ -29,6 +29,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { Take, Transport } from "./WavePlayer";
+import { track } from "@/app/track";
 import { FX_PRESETS, FX_DEFAULT, sanitizeFx, type FxPresetId } from "@/src/lib/takeFx";
 
 type Props = {
@@ -390,6 +391,9 @@ export default function TakePanel({ songId, takes, onChange, transportRef, bpm }
     // ── Base e microfone partem juntos ──────────────────────────────────────
     // Grava o stream que saiu da cadeia com ganho, não o do microfone cru.
     const rec = new MediaRecorder(dest.stream, { mimeType: mime });
+    // Telemetria do piloto (PRD-BTS-001 §4): gravação iniciada. O take salvo
+    // é registrado no servidor, no commit de /api/takes.
+    track("take_started", { songId, once: false });
     chunksRef.current = [];
     rec.ondataavailable = ev => { if (ev.data.size > 0) chunksRef.current.push(ev.data); };
     rec.onstop = () => {

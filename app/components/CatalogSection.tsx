@@ -52,6 +52,21 @@ export default async function CatalogSection({
         {t("heading")}
       </h2>
 
+      {/* Upload sempre à vista (PRD-BTS-001): o catálogo é de bases genéricas;
+          quem procura uma música específica precisa saber, ANTES de buscar e não
+          achar, que pode enviar a própria. Feedback do Baris (out/2026). */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+        background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 12,
+        padding: "12px 16px", margin: "0 0 22px",
+      }}>
+        <span style={{ flex: "1 1 260px", fontSize: 14, color: "var(--text)", lineHeight: 1.5 }}>{t("uploadStripText")}</span>
+        <TrackedLink href="/upload" className="btn-primary" event="upload_cta_click" eventParams={{ from: "catalog_strip" }}
+          style={{ fontSize: 13, padding: "10px 18px" }}>
+          {t("uploadStripCta")}
+        </TrackedLink>
+      </div>
+
       {/* Search */}
       <form method="GET" style={{ marginBottom: 24 }}>
         <div style={{ background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 10, display: "flex", alignItems: "center", padding: "0 16px", gap: 10, maxWidth: 440 }}>

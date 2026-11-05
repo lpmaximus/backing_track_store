@@ -13,6 +13,8 @@
  * omitir o vínculo de banda — o resultado é o mesmo.
  */
 
+import { isBetaFullAccess } from "./beta";
+
 // Os quatro perfis do ADR-BTS-001 + studio (EVT-004) + admin. FreeBand é estado
 // derivado (role 'free' + membro ativo de banda), não um valor de users.role.
 //
@@ -95,9 +97,37 @@ const CAPABILITIES: Record<Action, ReadonlySet<UserType>> = {
  */
 export const GUITAR_TAB_IS_BETA = true;
 
+/**
+ * O que o Open Beta libera ALÉM da matriz acima (PRD-BTS-001 §7). Fica numa
+ * tabela à parte, e não misturado em CAPABILITIES, para que desligar a flag
+ * devolva exatamente a matriz de planos — sem ninguém precisar lembrar o que
+ * foi aberto.
+ *
+ * Fora de propósito:
+ *  - view_shared_catalog: ver uploads de terceiros fica só no Pro por causa do
+ *    risco de direito autoral (decisão de 13/10/2026), Beta ou não;
+ *  - create_band, guitar_tab, copy_song: não fazem parte da tese do piloto
+ *    (praticar e gravar sobre a própria música).
+ *
+ * record_take entra com TETO próprio (src/lib/beta.ts → betaTakeCap), aplicado
+ * em /api/takes: quem grava pelo Beta não herda o teto do Studio.
+ */
+const BETA_GRANTS: Partial<Record<Action, ReadonlySet<UserType>>> = {
+  comment_publication: new Set(["free", "freeband"]),
+  create_setlist: new Set(["free", "freeband"]),
+  loop_pedal: new Set(["free", "freeband"]),
+  record_take: new Set(["free", "freeband", "pro", "proband"]),
+};
+
 /** Verdadeiro se o tipo de usuário pode executar a ação. */
 export function can(userType: UserType, action: Action): boolean {
-  return CAPABILITIES[action].has(userType);
+  if (CAPABILITIES[action].has(userType)) return true;
+  return isBetaFullAccess() && (BETA_GRANTS[action]?.has(userType) ?? false);
+}
+
+/** A ação só está liberada por causa do Beta (não pelo plano)? */
+export function grantedOnlyByBeta(userType: UserType, action: Action): boolean {
+  return !CAPABILITIES[action].has(userType) && can(userType, action);
 }
 
 /** Atalho: resolve o tipo e consulta a capacidade num passo só. */

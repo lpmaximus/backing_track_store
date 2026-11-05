@@ -12,6 +12,7 @@ import FaqSection, { type FaqItem } from "@/app/components/FaqSection";
 import FreePromoBanner from "@/app/components/FreePromoBanner";
 import BlurredPrice from "@/app/components/BlurredPrice";
 import TrackedLink from "@/app/components/TrackedLink";
+import { isBetaFullAccess } from "@/src/lib/beta";
 
 // Título e descrição vêm do layout (são os da marca). Aqui só o canonical:
 // sem isto a home ficaria sem canonical depois de removermos o do layout.
@@ -35,6 +36,9 @@ export default async function HomePage({
   const t = await getTranslations("home");
   const tb = await getTranslations("beta");
   const tp = await getTranslations("plans");
+  // Open Beta (PRD-BTS-001): a home promete o acesso completo só quando ele
+  // está de fato ligado — desligar a flag volta o texto sozinho.
+  const beta = isBetaFullAccess();
 
   // FAQ da landing — perguntas de quem ainda NÃO conhece o produto.
   // (O FAQ de /planos é outro: trata de cobrança, trial e cancelamento.)
@@ -140,7 +144,7 @@ export default async function HomePage({
             {tb("badge")}
           </span>
           <p className="beta-notice" style={{ color: "#fff", fontSize: 13, margin: 0, lineHeight: 1.5 }}>
-            {tb.rich("notice", { b: (chunks) => <strong>{chunks}</strong> })}
+            {tb.rich(beta ? "noticeOpen" : "notice", { b: (chunks) => <strong>{chunks}</strong> })}
           </p>
         </div>
       </div>
@@ -159,23 +163,43 @@ export default async function HomePage({
             <p style={{ fontSize: 18, color: "var(--muted)", lineHeight: 1.65, margin: "0 auto 38px", maxWidth: 600 }}>
               {t("heroSubtitle")}
             </p>
-            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center" }}>
-              {/* Out/2026: o CTA principal era "Explorar músicas" (catálogo) e o
-                  visitante fazia exatamente isso — quase ninguém chegava na
-                  separação, que é o produto. Agora o principal é enviar uma
-                  música; o secundário abre o mixer de uma base do catálogo,
-                  que toca sem conta, para a pessoa sentir o produto antes do
-                  cadastro. Visitante sem conta que clica em "Enviar" cai na aba
-                  de cadastro (proxy.ts). */}
-              <TrackedLink href="/upload" className="btn-primary" event="upload_cta_click" eventParams={{ from: "home_hero" }}
-                style={{ fontSize: 15, padding: "16px 34px" }}>
-                {t("ctaUpload")}
-              </TrackedLink>
-              <TrackedLink href={{ pathname: "/song/[slug]", params: { slug: "classic-rock-a-120" } }} className="btn-ghost"
-                event="demo_mixer_open" eventParams={{ from: "home_hero" }}
-                style={{ fontSize: 15, padding: "16px 34px" }}>
-                {t("ctaTry")}
-              </TrackedLink>
+            {/* Dois caminhos (Plano de Validação do MVP, PRD-BTS-001):
+                quem já tem a música envia; quem só quer sentir o produto abre
+                uma base do catálogo, que toca sem conta. Os dois levam ao mesmo
+                centro do produto — o estúdio de prática. Out/2026: com só o
+                botão do catálogo em destaque, o visitante achava que o BTS era
+                um repositório de bases prontas e quase ninguém enviava música.
+                Visitante sem conta que clica em "Enviar" cai na aba de
+                cadastro (proxy.ts). */}
+            <div className="home-paths" style={{
+              display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: 16, maxWidth: 880, margin: "0 auto", textAlign: "left",
+            }}>
+              <div style={{
+                background: "var(--text)", color: "#fff", borderRadius: 18, padding: "26px 26px 24px",
+                display: "flex", flexDirection: "column", gap: 10,
+              }}>
+                <div style={{ fontSize: 11, letterSpacing: "0.14em", fontWeight: 800, color: "var(--accent)" }}>{t("pathOwnKicker")}</div>
+                <div style={{ fontSize: 19, fontWeight: 800, lineHeight: 1.25 }}>{t("pathOwnTitle")}</div>
+                <div style={{ fontSize: 13, color: "#bbb", lineHeight: 1.6, flex: 1 }}>{t("pathOwnFlow")}</div>
+                <TrackedLink href="/upload" className="btn-primary" event="upload_cta_click" eventParams={{ from: "home_path_own" }}
+                  style={{ fontSize: 15, padding: "14px 24px", marginTop: 8, background: "var(--accent)", color: "#0D0D0F", textAlign: "center" }}>
+                  {t("ctaUpload")}
+                </TrackedLink>
+              </div>
+              <div style={{
+                background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 18, padding: "26px 26px 24px",
+                display: "flex", flexDirection: "column", gap: 10,
+              }}>
+                <div style={{ fontSize: 11, letterSpacing: "0.14em", fontWeight: 800, color: "var(--muted2)" }}>{t("pathTryKicker")}</div>
+                <div style={{ fontSize: 19, fontWeight: 800, lineHeight: 1.25, color: "var(--text)" }}>{t("pathTryTitle")}</div>
+                <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6, flex: 1 }}>{t("pathTryFlow")}</div>
+                <TrackedLink href={{ pathname: "/song/[slug]", params: { slug: "classic-rock-a-120" } }} className="btn-ghost"
+                  event="demo_mixer_open" eventParams={{ from: "home_path_try" }}
+                  style={{ fontSize: 15, padding: "14px 24px", marginTop: 8, textAlign: "center" }}>
+                  {t("ctaTry")}
+                </TrackedLink>
+              </div>
             </div>
             <div style={{ marginTop: 18 }}>
               <Link href="/catalogo" style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", textDecoration: "underline", textUnderlineOffset: 3 }}>
@@ -183,7 +207,7 @@ export default async function HomePage({
               </Link>
             </div>
             <div style={{ fontSize: 12, color: "var(--muted2)", marginTop: 16 }}>
-              {t("heroNote")}
+              {beta ? t("heroNoteBeta") : t("heroNote")}
             </div>
             <div style={{ marginTop: 48, fontSize: 11, letterSpacing: 4, color: "var(--muted2)", fontWeight: 600 }}>
               {t("strip")}
@@ -222,7 +246,7 @@ export default async function HomePage({
             <h2 style={{ fontSize: "clamp(30px, 4vw, 48px)", fontWeight: 800, letterSpacing: "-1.5px", margin: "14px 0 0", lineHeight: 1.08, color: "var(--text)" }}>
               {t("howTitle")}
             </h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20, marginTop: 44 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 20, marginTop: 44 }}>
               {[
                 {
                   icon: (
@@ -246,13 +270,25 @@ export default async function HomePage({
                   text: t("step2Text"),
                 },
                 {
+                  // Gravação ganhou passo próprio: era o recurso menos
+                  // descoberto e é o que sustenta a tese do piloto.
                   icon: (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                      <path d="M8 5.5v13a1 1 0 001.54.84l10-6.5a1 1 0 000-1.68l-10-6.5A1 1 0 008 5.5z" />
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <rect x="9" y="3" width="6" height="11" rx="3" />
+                      <path d="M5 11a7 7 0 0014 0" /><path d="M12 18v3" />
                     </svg>
                   ),
                   title: t("step3Title"),
                   text: t("step3Text"),
+                },
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" />
+                    </svg>
+                  ),
+                  title: t("step4Title"),
+                  text: t("step4Text"),
                 },
               ].map(({ icon, title, text }) => (
                 <div key={title} style={{

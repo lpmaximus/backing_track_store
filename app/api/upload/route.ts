@@ -16,6 +16,7 @@ import { eq } from "drizzle-orm";
 import { presignPut, sanitizeKey } from "@/src/lib/r2";
 import { checkUploadQuota } from "@/src/lib/quota";
 import { track } from "@/src/lib/activity";
+import { checkBudget, checkConcurrency, checkDuration } from "@/src/lib/betaGuards";
 
 const HASH_RE = /^[a-f0-9]{64}$/i;
 
@@ -36,10 +37,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const { filename, contentType, hash } = (await req.json()) as {
+  const { filename, contentType, hash, durationSec } = (await req.json()) as {
     filename?: string;
     contentType?: string;
     hash?: string;
+    /** Duração medida no navegador (s). Trava de duração do Beta. */
+    durationSec?: number;
   };
 
   if (!filename || !contentType) {
@@ -83,6 +86,17 @@ export async function POST(req: NextRequest) {
         { status: 429 },
       );
     }
+
+    // ── Travas do Beta (preventivas; as autoritativas são no /confirm) ────────
+    // Checar aqui evita que a pessoa espere o arquivo inteiro subir para só
+    // então ouvir que ele passou do limite.
+    const role = session.user.role;
+    const dur = checkDuration(durationSec, role);
+    if (dur) return NextResponse.json(dur.body, { status: dur.status });
+    const conc = await checkConcurrency(userId, role);
+    if (conc) return NextResponse.json(conc.body, { status: conc.status });
+    const { block } = await checkBudget();
+    if (block) return NextResponse.json(block.body, { status: block.status });
 
     // ── Presigned URL para o mix original ─────────────────────────────────────
     const key = sanitizeKey(

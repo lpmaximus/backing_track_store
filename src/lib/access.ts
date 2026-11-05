@@ -13,6 +13,7 @@
 import { db, bandMembers, bands, subscriptions } from "@/src/db";
 import { and, eq } from "drizzle-orm";
 import { isProRole, decideProAccess } from "./roles";
+import { isBetaFullAccess } from "./beta";
 
 // Status de assinatura que concedem acesso.
 const ACTIVE_SUB_STATUSES = new Set(["active", "trialing"]);
@@ -23,10 +24,11 @@ const ACTIVE_SUB_STATUSES = new Set(["active", "trialing"]);
  */
 export async function hasProAccess(userId: number, role?: string | null): Promise<boolean> {
   // Beta/captação: libera a experiência Pro (mixer de stems, velocidade, pitch,
-  // setlists, sem anúncios) para TODO usuário logado. A cota de uploads/mês NÃO
-  // muda (é por role em checkUploadQuota), então o Free segue com 3/mês.
-  // Reverter = remover a env BETA_FULL_ACCESS.
-  if (process.env.BETA_FULL_ACCESS === "true" && userId) return true;
+  // setlists, sem anúncios) para TODO usuário logado. A cota de separações do
+  // Free sobe para o pacote do piloto (src/lib/beta.ts → quota.ts), com teto
+  // de custo aplicado em /api/upload/confirm (src/lib/betaGuards.ts).
+  // Reverter = desligar BETA_FULL_ACCESS e NEXT_PUBLIC_BETA_FULL_ACCESS.
+  if (isBetaFullAccess() && userId) return true;
   if (isProRole(role)) return true;
   if (!userId) return false;
 

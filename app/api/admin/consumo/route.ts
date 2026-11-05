@@ -8,6 +8,8 @@ import { db, processingJobs, subscriptions, users } from "@/src/db";
 import { and, eq, gte, ne, sql, inArray } from "drizzle-orm";
 import { isAdminRequest } from "@/src/lib/adminAuth";
 import { SEPARATION_COST, FIXED_INFRA_COST, computeMrr } from "@/src/lib/pricing";
+import { budgetStatus } from "@/src/lib/betaGuards";
+import { betaLimits, isBetaFullAccess } from "@/src/lib/beta";
 
 const ACTIVE = ["active", "trialing"];
 const DELINQUENT = ["past_due", "unpaid"];
@@ -59,6 +61,11 @@ export async function GET(req: NextRequest) {
     const totalCost = separationCost + infra;
     const margin = mrr - totalCost;
 
+    // Orçamento do Open Beta (PRD-BTS-001 §7). Usa SEPARATION_COST_BRL, que
+    // pode divergir do SEPARATION_COST acima até o custo real ser medido.
+    const budget = await budgetStatus().catch(() => null);
+    const limits = betaLimits();
+
     return NextResponse.json({
       month: monthStart.toISOString().slice(0, 7),
       separations,
@@ -69,6 +76,16 @@ export async function GET(req: NextRequest) {
       mrr,
       delinquent,
       margin,
+      beta: {
+        enabled: isBetaFullAccess(),
+        budget,
+        limits: {
+          separationsPerMonth: limits.separationsPerMonth,
+          maxDurationSec: limits.maxDurationSec,
+          concurrentPerUser: limits.concurrentPerUser,
+          takes: limits.takes,
+        },
+      },
       note: `Tempo real do mês corrente. Custo de separação = R$${SEPARATION_COST.toFixed(2)}/música (confirmar no Replicate).`,
     });
   } catch (err) {
