@@ -126,17 +126,31 @@ async function loadCommunity(): Promise<CommunityData> {
       })),
     };
   } catch (err) {
-    // Sem tabela/coluna ainda (migração não rodou) ou banco fora: a home
-    // continua de pé, só sem a seção preenchida.
+    // Relança: o unstable_cache não guarda erro, então uma falha passageira do
+    // banco não deixa o mapa vazio por 2 minutos. Quem chama trata (abaixo).
     console.error("[community] falha ao carregar mapa/mural", err);
-    return { countries: [], posts: [] };
+    throw err;
   }
 }
 
+/** Tag do cache: a moderação a invalida na hora (app/api/admin/mural). */
+export const COMMUNITY_TAG = "community";
+
 /**
  * Cache de 2 min: a home é dinâmica (lê a sessão), então sem isto seriam duas
- * queries por visita. Um recado aprovado aparece em até 2 minutos.
+ * queries por visita. Contas novas entram no mapa em até 2 minutos; recado
+ * aprovado/recusado no /admin/mural aparece na hora (revalidateTag).
  */
-export const getCommunityData = unstable_cache(loadCommunity, ["community-home-v1"], {
+const cachedCommunity = unstable_cache(loadCommunity, ["community-home-v2"], {
   revalidate: 120,
+  tags: [COMMUNITY_TAG],
 });
+
+/** Sem tabela/coluna ainda (migração não rodou) ou banco fora: a home segue de pé. */
+export async function getCommunityData(): Promise<CommunityData> {
+  try {
+    return await cachedCommunity();
+  } catch {
+    return { countries: [], posts: [] };
+  }
+}

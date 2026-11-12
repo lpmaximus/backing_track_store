@@ -5,12 +5,14 @@
  *   POST → { id, action: "approve" | "reject" | "delete" }
  *
  * Mesma auth dos módulos R3: senha admin no header x-admin-password.
- * Aprovado aparece na home em até 2 min (cache de src/lib/community.ts).
+ * Aprovar/recusar/apagar invalida o cache da home na hora (revalidateTag).
  */
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { desc, eq, inArray } from "drizzle-orm";
 import { db, wallPosts, users } from "@/src/db";
 import { isAdminRequest } from "@/src/lib/adminAuth";
+import { COMMUNITY_TAG } from "@/src/lib/community";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +73,8 @@ export async function POST(req: NextRequest) {
         .set({ status: action === "approve" ? "approved" : "rejected", moderatedAt: new Date() })
         .where(eq(wallPosts.id, id));
     }
+    // expire: 0 = descarta o cache já, sem servir a versão velha uma última vez.
+    revalidateTag(COMMUNITY_TAG, { expire: 0 });
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[POST /api/admin/mural]", err);
