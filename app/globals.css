@@ -565,3 +565,12 @@ body:has(.bts-app) ::-webkit-scrollbar-thumb { background: #2a2a31; }
 /* Player dentro do app: o motor (WavePlayer) é o mesmo do site. Aqui só
    ajustamos o que fica apertado a 390px. */
 .app-player .player-sidebar { width: 100% !important; }
+
+/* ─── Comunidade na home (mapa + mural) ─────────────────────────────────── */
+.cm-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.cm-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 880px) { .cm-grid { grid-template-columns: 1fr; } .cm-grid > div:last-child { order: -1; } .cm-grid > div:last-child > div { position: static !important; } }
+@media (max-width: 480px) { .cm-row { grid-template-columns: 1fr; } }
+.cm-pulse { opacity: 0.25; transform-box: fill-box; transform-origin: center; animation: cmPulse 2.6s ease-out infinite; }
+@keyframes cmPulse { 0% { transform: scale(0.5); opacity: 0.45; } 80%, 100% { transform: scale(1.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cm-pulse { animation: none; } }

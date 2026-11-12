@@ -12,6 +12,7 @@ import FaqSection, { type FaqItem } from "@/app/components/FaqSection";
 import FreePromoBanner from "@/app/components/FreePromoBanner";
 import BlurredPrice from "@/app/components/BlurredPrice";
 import TrackedLink from "@/app/components/TrackedLink";
+import CommunitySection from "@/app/components/community/CommunitySection";
 import { isBetaFullAccess } from "@/src/lib/beta";
 
 // Título e descrição vêm do layout (são os da marca). Aqui só o canonical:
@@ -221,6 +222,10 @@ export default async function HomePage({
             no celular ele + o aviso de beta ocupavam a primeira tela inteira
             e a proposta do produto só aparecia depois de rolar. */}
         <FreePromoBanner />
+
+        {/* COMUNIDADE — mapa de países (dados reais) + mural moderado.
+            Prova social logo depois dos caminhos do hero (2026-11-12). */}
+        <CommunitySection locale={locale} />
 
         {/* VÍDEO EM LOOP — seção escura (padrão layout-6) */}
         <section className="videosec">

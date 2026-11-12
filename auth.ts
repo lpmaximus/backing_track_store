@@ -10,6 +10,8 @@ import { track } from "@/src/lib/activity";
 import { isInternalTestEmail } from "@/src/lib/internalTest";
 import { verifyMagicToken, verifyHandoffCode } from "@/src/lib/authTokens";
 import { onUserCreated } from "@/src/lib/lifecycle";
+import { headers } from "next/headers";
+import { countryFromHeaders, rememberUserCountry } from "@/src/lib/community";
 
 // Conta impedida de logar: suspensa, banida ou em processo de exclusão (R3).
 function isLoginBlocked(u: { status?: string | null; deletionScheduledAt?: Date | null }): boolean {
@@ -137,6 +139,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Analytics de produto: marca a entrada no sistema. Só no primeiro
           // login/refresh do token, não em toda requisição. Best effort.
           if (user) void track(dbUser.id, "login");
+          // Mapa da comunidade: grava o país (só o código) se ainda faltar.
+          if (user && !dbUser.country) {
+            try {
+              void rememberUserCountry(dbUser.id, countryFromHeaders(await headers()));
+            } catch {
+              // fora de contexto de request — ignora
+            }
+          }
           // Trial de convite vencido rebaixa aqui também, não só no cron:
           // garante que ninguém siga Pro se /api/jobs/trials falhar.
           if (dbUser.trialPlan && dbUser.trialEndsAt && dbUser.trialEndsAt.getTime() <= Date.now()) {

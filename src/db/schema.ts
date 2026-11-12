@@ -121,6 +121,10 @@ export const users = pgTable("users", {
   // user_activity atualiza aqui). Serve para separar ativo × dormente sem
   // precisar varrer a tabela de eventos.
   lastSeenAt: timestamp("last_seen_at"),
+  // País (ISO 3166-1 alfa-2) vindo do header de geo do edge (Vercel). Só o
+  // país — nunca IP nem cidade. Alimenta o mapa "De onde você toca" da home.
+  // Preenchido no cadastro e, para contas antigas, no próximo login/atividade.
+  country: varchar("country", { length: 2 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -305,6 +309,31 @@ export const comments = pgTable("comments", {
   content: text("content").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// ─── Mural da comunidade (home) ───────────────────────────────────────────────
+// "De onde você toca?" — qualquer visitante escreve (sem conta, para ser fácil),
+// mas NADA aparece sem aprovação no /admin/mural. ipHash é um sha256 do IP com
+// segredo, usado só para limitar envios por dia; o IP em si não é guardado.
+export const wallPosts = pgTable(
+  "wall_posts",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+    name: varchar("name", { length: 40 }).notNull(),
+    country: varchar("country", { length: 2 }),
+    city: varchar("city", { length: 60 }),
+    content: text("content").notNull(),
+    locale: varchar("locale", { length: 5 }),
+    status: varchar("status", { length: 12 }).notNull().default("pending"), // pending | approved | rejected
+    ipHash: varchar("ip_hash", { length: 64 }),
+    moderatedAt: timestamp("moderated_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byStatus: index("wall_posts_status_created_idx").on(t.status, t.createdAt),
+    byIp: index("wall_posts_ip_created_idx").on(t.ipHash, t.createdAt),
+  }),
+);
 
 // ─── Setlists (Pro) ───────────────────────────────────────────────────────────
 export const setlists = pgTable("setlists", {
@@ -680,6 +709,8 @@ export type NewUser = typeof users.$inferInsert;
 export type Subscription = typeof subscriptions.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type NewComment = typeof comments.$inferInsert;
+export type WallPost = typeof wallPosts.$inferSelect;
+export type NewWallPost = typeof wallPosts.$inferInsert;
 export type Setlist = typeof setlists.$inferSelect;
 export type NewSetlist = typeof setlists.$inferInsert;
 export type SetlistSong = typeof setlistSongs.$inferSelect;

@@ -18,6 +18,7 @@ import {
   PRACTICE_QUALIFY_SECONDS,
   PRACTICE_QUALIFY_INTERACTIONS,
 } from "@/src/lib/activity";
+import { countryFromHeaders, rememberUserCountry } from "@/src/lib/community";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,10 @@ export async function POST(req: NextRequest) {
 
   const userId = Number(session.user.id);
   if (!Number.isFinite(userId)) return new NextResponse(null, { status: 204 });
+
+  // Mapa da comunidade: contas antigas ganham o país na primeira atividade
+  // (só grava se ainda estiver vazio; uma query barata e best effort).
+  void rememberUserCountry(userId, countryFromHeaders(req.headers));
 
   let body: { event?: unknown; songId?: unknown; meta?: unknown };
   try {

@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { onUserCreated } from "@/src/lib/lifecycle";
+import { countryFromHeaders } from "@/src/lib/community";
 
 // Mesmo pixel de app/components/TikTokPixel.tsx (conta L2techs_adv, criado
 // 2026-08-15). Duplicado aqui de propósito — client component não pode
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
     const passwordHash = await bcrypt.hash(password, 12);
     const [created] = await db
       .insert(users)
-      .values({ email, name: name ?? null, passwordHash, provider: "credentials", role: "free" })
+      .values({ email, name: name ?? null, passwordHash, provider: "credentials", role: "free", country: countryFromHeaders(req.headers) })
       .returning({ id: users.id });
 
     // Boas-vindas por e-mail (sai depois da resposta — cadastro não espera SMTP).

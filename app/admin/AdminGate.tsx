@@ -11,6 +11,7 @@ const NAV = [
   { href: "/admin/usuarios", label: "👥 Usuários" },
   { href: "/admin/audio", label: "🎵 Áudio" },
   { href: "/admin/moderacao", label: "📝 Cifras" },
+  { href: "/admin/mural", label: "🌍 Mural" },
   { href: "/admin/piloto", label: "🧪 Piloto" },
   { href: "/admin/consumo", label: "📊 Consumo" },
   { href: "/admin/analytics", label: "🌐 Audiência" },
