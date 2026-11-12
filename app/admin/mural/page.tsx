@@ -2,7 +2,7 @@
 
 /**
  * /admin/mural — moderação do mural "De onde você toca" da home.
- * Nada aparece no site sem passar por aqui. Aprovado entra na home em até 2 min.
+ * Nada aparece no site sem passar por aqui. Aprovar, recusar ou apagar atualiza a home na hora.
  */
 import { useCallback, useEffect, useState } from "react";
 import AdminGate from "../AdminGate";
@@ -70,6 +70,12 @@ function MuralLoader() {
     }
   }
 
+  // Exclusão definitiva (some do banco). Pede confirmação: não tem desfazer.
+  function remove(p: Post) {
+    if (window.confirm(`Excluir de vez o recado de ${p.name}? Isso não pode ser desfeito.`)) void act(p.id, "delete");
+  }
+  const delBtn = btn("transparent", "var(--danger)", "1px solid var(--danger)");
+
   if (loading) return <p style={{ color: "var(--muted)" }}>Carregando mural…</p>;
   if (error) return <p style={{ color: "var(--danger)" }}>Não foi possível carregar o mural. A migração (_add_community_wall.mjs) já rodou?</p>;
 
@@ -89,7 +95,7 @@ function MuralLoader() {
     <div style={{ width: "100%" }}>
       <h1 style={{ fontWeight: 900, fontSize: 26, margin: "0 0 4px", color: "var(--text)" }}>Mural da home</h1>
       <p style={{ color: "var(--muted)", fontSize: 14, margin: "0 0 24px" }}>
-        Recados de “De onde você toca?”. Só aparece no site o que for aprovado aqui (em até 2 min).
+        Recados de “De onde você toca?”. Só aparece no site o que for aprovado aqui (na hora).
       </p>
 
       <h2 style={{ fontSize: 13, letterSpacing: "0.1em", color: "var(--muted)", fontWeight: 700, margin: "0 0 12px" }}>
@@ -105,6 +111,7 @@ function MuralLoader() {
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                 <button disabled={busy === p.id} onClick={() => act(p.id, "approve")} style={btn("var(--accent)", "#000")}>Publicar</button>
                 <button disabled={busy === p.id} onClick={() => act(p.id, "reject")} style={btn("var(--surface2)", "var(--text)", "1px solid var(--border2)")}>Recusar</button>
+                <button disabled={busy === p.id} onClick={() => remove(p)} style={delBtn}>Excluir</button>
               </div>
             </div>
           ))}
@@ -119,8 +126,8 @@ function MuralLoader() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {done.map((p) => (
-            <div key={p.id} style={{ ...card, opacity: p.status === "rejected" ? 0.6 : 1, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
-              <div style={{ minWidth: 0, flex: "1 1 320px" }}>
+            <div key={p.id} style={{ ...card, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+              <div style={{ minWidth: 0, flex: "1 1 320px", opacity: p.status === "rejected" ? 0.6 : 1 }}>
                 <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: p.status === "approved" ? "var(--accent)" : "var(--muted2)" }}>
                   {p.status === "approved" ? "NO AR" : "RECUSADO"}
                 </span>
@@ -130,7 +137,7 @@ function MuralLoader() {
                 {p.status === "approved"
                   ? <button disabled={busy === p.id} onClick={() => act(p.id, "reject")} style={btn("var(--surface2)", "var(--text)", "1px solid var(--border2)")}>Tirar do ar</button>
                   : <button disabled={busy === p.id} onClick={() => act(p.id, "approve")} style={btn("var(--surface2)", "var(--text)", "1px solid var(--border2)")}>Publicar</button>}
-                <button disabled={busy === p.id} onClick={() => act(p.id, "delete")} style={btn("transparent", "var(--muted)", "1px solid var(--border2)")}>Apagar</button>
+                <button disabled={busy === p.id} onClick={() => remove(p)} style={delBtn}>Excluir</button>
               </div>
             </div>
           ))}
